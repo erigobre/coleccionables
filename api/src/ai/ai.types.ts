@@ -40,3 +40,10 @@ export interface ImageInput {
   buffer: Buffer;
   mimetype: string;
 }
+
+// Resultado de buscar un producto por código de barras (EAN/UPC). `found` es
+// false cuando la búsqueda no identificó ningún producto con confianza.
+export interface BarcodeLookupResult {
+  found: boolean;
+  extracted: ExtractedItemData;
+}

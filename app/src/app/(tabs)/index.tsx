@@ -5,7 +5,7 @@ import { useAuth } from '../../context/auth-context';
 function StatCard({ label, value }: { label: string; value: number }) {
   return (
     <View className="flex-1 rounded-lg border border-border bg-surface p-4">
-      <Text className="text-2xl font-bold text-text">{value}</Text>
+      <Text className="font-display text-2xl text-text">{value}</Text>
       <Text className="mt-1 text-xs text-textMuted">{label}</Text>
     </View>
   );
@@ -17,7 +17,7 @@ export default function HomeScreen() {
 
   return (
     <Screen>
-      <Text className="text-2xl font-bold text-text">Hola{firstName ? `, ${firstName}` : ''} 👋</Text>
+      <Text className="font-body-bold text-2xl text-text">Hola{firstName ? `, ${firstName}` : ''} 👋</Text>
       <Text className="mt-1 text-sm text-textMuted">Este es el resumen de tu colección</Text>
 
       <View className="mt-6 flex-row gap-3">

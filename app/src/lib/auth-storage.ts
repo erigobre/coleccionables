@@ -1,8 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 import type { AuthTokens } from './api';
 
-const ACCESS_TOKEN_KEY = 'coleccionables.accessToken';
-const REFRESH_TOKEN_KEY = 'coleccionables.refreshToken';
+const ACCESS_TOKEN_KEY = 'frikidex.accessToken';
+const REFRESH_TOKEN_KEY = 'frikidex.refreshToken';
 
 export async function saveTokens(tokens: AuthTokens): Promise<void> {
   await Promise.all([

@@ -8,12 +8,12 @@ interface TextFieldProps extends TextInputProps {
 export function TextField({ label, error, ...inputProps }: TextFieldProps) {
   return (
     <View className="mb-4">
-      <Text className="mb-1.5 text-sm font-medium text-text">{label}</Text>
+      <Text className="mb-1.5 text-sm font-medium text-textSecondary">{label}</Text>
       <TextInput
-        className={`h-14 rounded-md border bg-surface px-4 text-base text-text ${
+        className={`h-14 rounded-md border bg-surfaceElevated px-4 text-base text-text ${
           error ? 'border-danger' : 'border-border'
         }`}
-        placeholderTextColor="#6B685F"
+        placeholderTextColor="#A79FC4"
         autoCapitalize="none"
         autoCorrect={false}
         {...inputProps}

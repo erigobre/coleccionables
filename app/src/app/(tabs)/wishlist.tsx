@@ -6,7 +6,7 @@ export default function WishlistScreen() {
   return (
     <Screen>
       <View className="mb-2">
-        <Text className="text-2xl font-bold text-text">Wishlist</Text>
+        <Text className="font-display text-[22px] uppercase tracking-wide text-text">Wishlist</Text>
       </View>
       <EmptyState
         icon="heart-outline"

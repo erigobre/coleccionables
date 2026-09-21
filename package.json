@@ -1,5 +1,5 @@
 {
-  "name": "inventario-coleccionables",
+  "name": "frikidex",
   "private": true,
   "workspaces": [
     "app",

@@ -28,7 +28,7 @@ export default function LoginScreen() {
   return (
     <Screen>
       <View className="mb-10 mt-16">
-        <Text className="text-2xl font-bold text-text">Bienvenido de vuelta</Text>
+        <Text className="font-display text-[28px] uppercase tracking-wide text-text">Bienvenido de vuelta</Text>
         <Text className="mt-1 text-sm text-textMuted">Inicia sesión para ver tu colección</Text>
       </View>
 
@@ -55,7 +55,7 @@ export default function LoginScreen() {
 
       <View className="mt-6 flex-row justify-center">
         <Text className="text-sm text-textMuted">¿No tienes cuenta? </Text>
-        <Link href="/(auth)/register" className="text-sm font-semibold text-primary">
+        <Link href="/(auth)/register" className="font-body-bold text-sm text-primary">
           Regístrate
         </Link>
       </View>

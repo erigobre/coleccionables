@@ -20,6 +20,7 @@ import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ChangeLocationDto } from './dto/change-location.dto.js';
 import { MatchItemDto } from './dto/match-item.dto.js';
+import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -51,6 +52,12 @@ export class ItemsController {
   @UseInterceptors(FilesInterceptor('photos'))
   analyze(@UploadedFiles() photos: Express.Multer.File[]) {
     return this.itemsService.analyzePhotos(photos);
+  }
+
+  // Busca el producto por código de barras (EAN/UPC) leído con la cámara.
+  @Post('lookup-barcode')
+  lookupBarcode(@Body() dto: LookupBarcodeDto) {
+    return this.itemsService.lookupBarcode(dto.barcode);
   }
 
   @Get(':id')

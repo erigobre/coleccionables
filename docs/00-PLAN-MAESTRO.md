@@ -1,7 +1,7 @@
 > Documento vivo. No se escribe código de la app hasta que este documento esté validado por el usuario y se reciba el "GO".
 > Última actualización: 2026-09-20 — Autor: Claude (planeación) + iamkikelo@gmail.com (owner del producto)
 
-# Plan Maestro — App Inventario de Coleccionables
+# Plan Maestro — Frikidex
 
 ## DECISIONES CONFIRMADAS (2026-09-20)
 
@@ -24,9 +24,9 @@ Estas decisiones ya están reflejadas en el resto del documento (stack en §3, c
 | 10 | Idioma v1 | **Solo español** |
 | 9 | Tipo de cuenta | **Cuentas tipo familia/negocio desde v1** — ver nota de diseño abajo |
 | 12 | Fotos por objeto | **Varias fotos** (frente/atrás/empaque/detalle) |
-| 13 | Enlace público de objeto | **Página web pública simple**, sin necesidad de tener la app instalada |
+| 13 | Enlace público de objeto | **Página web pública simple**, sin necesidad de tener la app instalada. Se sirve bajo el dominio **frikidex.app** (ver decisión #11 de branding) |
 | 6 | "¿Ya lo tengo?" sin match | Modal con mensaje **"Este objeto no se encuentra en tu colección, ¿deseas agregarlo de una vez o lo cargamos a wishlist?"** con 3 botones: **Agregar / Wishlist / Cancelar** |
-| 11 | Branding | Aún no definido — se define en Fase 0 con placeholder mientras tanto (nombre provisional: "Coleccionables") |
+| 11 | Branding | **CONFIRMADO (2026-09-20):** nombre **"Frikidex"**. Dominio principal **frikidex.com**; **frikidex.app** para marketing ("descárgala en frikidex.app") y para enlaces públicos de objetos / ligas de conexión para compartir (ver #13). **Identidad visual completa CONFIRMADA (2026-09-21):** paleta, tipografía (Bungee + DM Sans), botones, ícono y elementos gráficos — ver `docs/01-IDENTIDAD-VISUAL.md`, fuente de verdad para todo el trabajo de UI. Ya implementada en la app móvil (modo oscuro por defecto). |
 | 14-20 | Features extra del roadmap | **Se incluyen todas**: offline-first (con badge "No sincronizado" en objetos pendientes de subir), exportar a PDF/Excel, búsqueda y filtros avanzados, estadísticas con gráficas, historial de cambios del objeto, modo checklist de QR para inventario anual |
 
 **Nota de diseño importante — cuentas familia/negocio vs. "sin compartidos en v1":** para no contradecir la decisión bloqueante #4 (sin colecciones/ubicaciones compartidas en v1), la cuenta "familia/negocio" se modela así en v1: existe una entidad `Organization` (unidad de facturación/paquete SaaS) que agrupa varios `User` bajo un mismo plan pagado. Cada usuario dentro de la organización sigue teniendo **sus propias colecciones, objetos y ubicaciones individuales** (no compartidos entre sí todavía). Lo único que comparten en v1 es la suscripción/paquete. La colaboración real sobre una misma colección/ubicación (editar los objetos del otro, ver su contenido) sigue siendo v1.1, tal como se decidió. **Si esto no es lo que tenías en mente, dímelo antes de que avance más con el modelo de datos de organización/facturación.**
@@ -289,30 +289,31 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
   - [ ] Theming (NativeWind/design tokens)
   - [ ] Pantallas de login/registro
 
-- [ ] **Fase 3 — Perfil: Ubicaciones y Temporadas** *(se hace antes que Objetos porque Objetos depende de tener ubicaciones)*
-  - [ ] CRUD ubicaciones + sub-ubicaciones (árbol, recursive CTE en MySQL/MariaDB)
-  - [ ] Generación de QR + escaneo (v1: acceso solo para el owner)
-  - [ ] CRUD Temporadas
+- [x] **Fase 3 — Perfil: Ubicaciones y Temporadas** *(se hace antes que Objetos porque Objetos depende de tener ubicaciones)* — **hecho 2026-09-20**
+  - [x] CRUD ubicaciones + sub-ubicaciones (árbol, recursive CTE en MySQL/MariaDB)
+  - [x] Generación de QR (backend ya generaba el PNG; UI de Perfil → Ubicaciones lo muestra)
+  - [ ] Escaneo de QR con cámara — diferido a Fase 5 (se construye junto con la integración de cámara de Objetos)
+  - [x] CRUD Temporadas + checklist de objetos asignados ("Ya lo regresé a su ubicación principal")
   - [ ] *(v1.1)* Compartir ubicación (miembros manuales)
 
-- [ ] **Fase 4 — Colecciones**
-  - [ ] Colecciones default al crear cuenta
-  - [ ] Grid + orden por relevancia
-  - [ ] CRUD, suspender, migrar objetos al eliminar
-  - [ ] Modelo de datos preparado para `collection_members` (sin UI de invitación aún)
+- [x] **Fase 4 — Colecciones**
+  - [x] Colecciones default al crear cuenta
+  - [x] Grid + orden por relevancia
+  - [x] CRUD, suspender, migrar objetos al eliminar
+  - [x] Modelo de datos preparado para `collection_members` (sin UI de invitación aún)
   - [ ] *(v1.1)* Compartir colección (invitar editor/admin) + herencia de permisos de ubicación (§7.1)
 
-- [ ] **Fase 5 — Objetos**
-  - [ ] Listado tipo Amazon + favoritos + multi-colección
-  - [ ] Botón flotante "+" → cámara → preview → Analizar/Manual
-  - [ ] Integración IA visual (Gemini u otra, según §9 pregunta 1) + prompt de extracción de campos + tags
-  - [ ] Lectura de código de barras
-  - [ ] Formulario completo (§6) con prellenado
-  - [ ] Perfil de objeto estilo Tinder
-  - [ ] Modal de cambio de ubicación multi-paso
+- [ ] **Fase 5 — Objetos** *(en progreso — primer slice manual completado 2026-09-21, IA/cámara/transferencia pendientes)*
+  - [x] Listado tipo Amazon + favoritos + multi-colección
+  - [x] Botón flotante "+" → cámara → preview → Analizar/Manual *(2026-09-21; `objetos/captura.tsx`: foto o galería hasta 4 fotos, preview con aviso de calidad, "Analizar" o "No gracias, llenaré los datos manualmente". Verificado: tsc + expo export + `POST /items/analyze` en producción. **Falta probar en dispositivo real**)*
+  - [x] Integración IA visual (Gemini) + prompt de extracción de campos + tags *(backend ya estaba; la app manda las fotos a `/items/analyze`, prellena el formulario y ofrece los `suggestedTags`, que se crean hasta guardar)*
+  - [~] Lectura de código de barras *(el modo "Código de barras" de la cámara lee EAN/UPC/Code128/QR y deja el código en "Identificador único"; **falta** el lookup del producto por código — Gemini con búsqueda web o UPCItemDB, §1)*
+  - [x] Formulario completo (§6) con prellenado *(manual o prellenado por IA desde la cámara)*
+  - [x] Perfil de objeto estilo Tinder *(layout estático: foto grande + info + acciones; sin swipe/gestos animados)*
+  - [x] Modal de cambio de ubicación multi-paso
   - [ ] Flujo de transferencia/venta (animación + aceptar/rechazar) (§7.3)
   - [ ] Sección "objetos vendidos relacionados" en resultados de búsqueda
-  - [ ] Botón de precio de mercado (IA)
+  - [x] Botón de precio de mercado (IA) *(verificado en vivo contra Gemini con facturación activada 2026-09-21 — respuesta exitosa real con precio, disponibilidad y link de referencia; extendido el mismo día para incluir "notas de coleccionista" (rareza/tirada/variantes) en la misma llamada, sin repetir campos ya conocidos, con botón "Usar sugerencia en Notas" en la ficha)*
   - [ ] Compartir objeto (URL pública simplificada)
 
 - [ ] **Fase 6 — Home**

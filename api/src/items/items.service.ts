@@ -320,6 +320,11 @@ export class ItemsService {
     return { extracted, photoUrls };
   }
 
+  // Lectura de código de barras (plan §1/§5.3.6): no requiere fotos, solo el código.
+  lookupBarcode(barcode: string) {
+    return this.geminiService.lookupBarcode(barcode);
+  }
+
   private rankCandidates<T extends SimilarityCandidate & { id: string }>(
     target: SimilarityCandidate,
     candidates: Array<{

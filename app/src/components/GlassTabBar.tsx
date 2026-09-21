@@ -35,14 +35,14 @@ export function GlassTabBar({ state, navigation, insets }: TabBarProps) {
     >
       <BlurView
         intensity={60}
-        tint="light"
+        tint="dark"
         style={{
           flexDirection: 'row',
           borderRadius: 24,
           overflow: 'hidden',
           borderWidth: 1,
-          borderColor: colors.glassBorder,
-          backgroundColor: colors.glassTint,
+          borderColor: 'rgba(198,244,50,0.18)',
+          backgroundColor: 'rgba(34,28,61,0.75)',
         }}
       >
         {state.routes.map((route, index) => {
@@ -59,7 +59,7 @@ export function GlassTabBar({ state, navigation, insets }: TabBarProps) {
           return (
             <Pressable key={route.key} onPress={onPress} className="flex-1 items-center justify-center py-3">
               <Ionicons name={isFocused ? meta.active : meta.inactive} size={22} color={isFocused ? colors.primary : colors.textMuted} />
-              <Text className="mt-1 text-[11px]" style={{ color: isFocused ? colors.primary : colors.textMuted }}>
+              <Text className="font-body-medium mt-1 text-[11px]" style={{ color: isFocused ? colors.primary : colors.textMuted }}>
                 {meta.label}
               </Text>
             </Pressable>

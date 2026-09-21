@@ -37,7 +37,7 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <View className="mb-10 mt-16">
-        <Text className="text-2xl font-bold text-text">Crea tu cuenta</Text>
+        <Text className="font-display text-[28px] uppercase tracking-wide text-text">Crea tu cuenta</Text>
         <Text className="mt-1 text-sm text-textMuted">Empieza a organizar tu colección</Text>
       </View>
 
@@ -71,7 +71,7 @@ export default function RegisterScreen() {
 
       <View className="mt-6 flex-row justify-center">
         <Text className="text-sm text-textMuted">¿Ya tienes cuenta? </Text>
-        <Link href="/(auth)/login" className="text-sm font-semibold text-primary">
+        <Link href="/(auth)/login" className="font-body-bold text-sm text-primary">
           Inicia sesión
         </Link>
       </View>

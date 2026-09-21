@@ -6,7 +6,12 @@ import {
   UsageState,
   ConservationState,
 } from '@prisma/client';
-import type { ExtractedItemData, ImageInput, MarketPriceResult } from './ai.types.js';
+import type {
+  BarcodeLookupResult,
+  ExtractedItemData,
+  ImageInput,
+  MarketPriceResult,
+} from './ai.types.js';
 
 const MODEL = 'gemini-flash-latest';
 
@@ -74,6 +79,83 @@ export class GeminiService {
     } catch (error) {
       this.logger.error(`No se pudo parsear la respuesta de análisis de IA: ${text}`, error);
       return { suggestedTags: [] };
+    }
+  }
+
+  // Igual que lookupMarketPrice: googleSearch no se puede combinar con
+  // responseSchema, así que se pide JSON por prompt y se valida a mano.
+  async lookupBarcode(barcode: string): Promise<BarcodeLookupResult> {
+    const prompt = `Identifica el producto coleccionable (juguete, art toy, estatua, cómic, libro, figura de acción) que corresponde al código de barras EAN/UPC ${barcode}.
+Busca el código en la web. Si no encuentras un producto con certeza que corresponda a ESTE código, responde con "found": false y no inventes datos. Si el producto no es un coleccionable pero sí lo identificas, igual devuélvelo.
+
+Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con esta forma; omite cualquier campo que no conozcas con certeza:
+{
+  "found": true | false,
+  "name": "<nombre del producto en español o como se vende>",
+  "category": ${Object.values(ItemCategory)
+    .map((value) => `"${value}"`)
+    .join(' | ')},
+  "brand": "<marca>",
+  "toyLine": "<línea/serie/modelo>",
+  "edition": "<edición o variante>",
+  "scale": "<escala o altura>",
+  "designer": "<diseñador/artista>",
+  "releaseYear": <año como número>,
+  "originalSetNumber": "<número de set/SKU del fabricante>",
+  "comicWriter": "<solo cómics/libros>",
+  "comicPublisher": "<solo cómics/libros>",
+  "suggestedTags": ["<franquicia/personaje>", "<color principal si aplica>"]
+}`;
+
+    const response = await this.client.models.generateContent({
+      model: MODEL,
+      contents: prompt,
+      config: { tools: [{ googleSearch: {} }] },
+    });
+
+    return this.parseBarcodeResponse(response.text ?? '', barcode);
+  }
+
+  private parseBarcodeResponse(text: string, barcode: string): BarcodeLookupResult {
+    const notFound: BarcodeLookupResult = { found: false, extracted: { suggestedTags: [] } };
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1 || end < start) return notFound;
+
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+      const str = (value: unknown) =>
+        typeof value === 'string' && value.trim() ? value.trim() : undefined;
+      const name = str(parsed.name);
+      if (parsed.found === false || !name) return notFound;
+
+      const category = Object.values(ItemCategory).find((value) => value === parsed.category);
+      const year = typeof parsed.releaseYear === 'number' ? Math.trunc(parsed.releaseYear) : undefined;
+      const tags = Array.isArray(parsed.suggestedTags)
+        ? parsed.suggestedTags.map(str).filter((tag): tag is string => !!tag)
+        : [];
+
+      return {
+        found: true,
+        extracted: {
+          name,
+          category,
+          brand: str(parsed.brand),
+          toyLine: str(parsed.toyLine),
+          edition: str(parsed.edition),
+          scale: str(parsed.scale),
+          designer: str(parsed.designer),
+          releaseYear: year && year > 1800 && year < 2200 ? year : undefined,
+          originalSetNumber: str(parsed.originalSetNumber),
+          comicWriter: str(parsed.comicWriter),
+          comicPublisher: str(parsed.comicPublisher),
+          uniqueIdentifier: barcode,
+          suggestedTags: tags,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`No se pudo parsear la respuesta de búsqueda por código: ${text}`, error);
+      return notFound;
     }
   }
 
