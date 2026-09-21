@@ -7,7 +7,10 @@ import { JwtStrategy } from './jwt.strategy.js';
 
 @Global()
 @Module({
-  imports: [PassportModule, JwtModule.register({})],
+  imports: [
+    PassportModule.register({ defaultStrategy: 'jwt' }),
+    JwtModule.register({}),
+  ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy],
   exports: [AuthService, PassportModule],
