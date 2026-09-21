@@ -14,13 +14,14 @@ RUN npm ci
 
 FROM deps AS build
 COPY api ./api
-RUN npx prisma generate --schema=api/prisma/schema.prisma
-RUN npm run build --workspace=api
+WORKDIR /repo/api
+RUN npx prisma generate
+RUN npm run build
 
 FROM base AS runtime
 ENV NODE_ENV=production
 COPY --from=build /repo/node_modules ./node_modules
-COPY --from=build /repo/package.json ./package.json
+COPY --from=build /repo/api/node_modules ./api/node_modules
 COPY --from=build /repo/api/package.json ./api/package.json
 COPY --from=build /repo/api/dist ./api/dist
 COPY --from=build /repo/api/prisma ./api/prisma
