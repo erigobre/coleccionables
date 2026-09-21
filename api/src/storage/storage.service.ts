@@ -1,12 +1,15 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 
 const UPLOADS_DIR = join(process.cwd(), 'uploads');
 const MAX_WIDTH = 1280;
 const JPEG_QUALITY = 70;
+// Solo se borran archivos con la forma exacta que genera saveCompressedImage: la URL
+// viene de la base de datos y podría haberse guardado con cualquier texto.
+const STORED_IMAGE_URL = /^\/uploads\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.jpg$/;
 
 @Injectable()
 export class StorageService {
@@ -28,5 +31,10 @@ export class StorageService {
     await writeFile(join(UPLOADS_DIR, filename), compressed);
 
     return `/uploads/${filename}`;
+  }
+
+  async deleteImage(url: string): Promise<void> {
+    if (!STORED_IMAGE_URL.test(url)) return;
+    await unlink(join(UPLOADS_DIR, url.slice('/uploads/'.length))).catch(() => undefined);
   }
 }

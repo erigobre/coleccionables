@@ -161,6 +161,16 @@ export class ItemsService {
       throw new NotFoundException('Foto no encontrada');
     }
     await this.prisma.itemPhoto.delete({ where: { id: photoId } });
+
+    // Aceptar una transferencia comparte la URL con el objeto nuevo, y la wishlist
+    // también guarda URLs: el archivo solo se borra si ya nadie lo usa.
+    const [otherPhotos, wishlistUses] = await Promise.all([
+      this.prisma.itemPhoto.count({ where: { url: photo.url } }),
+      this.prisma.wishlistItem.count({ where: { photoUrl: photo.url } }),
+    ]);
+    if (otherPhotos === 0 && wishlistUses === 0) {
+      await this.storageService.deleteImage(photo.url);
+    }
   }
 
   async addToCollection(ownerId: string, id: string, collectionId: string) {
@@ -306,6 +316,7 @@ export class ItemsService {
   // contra la colección. A diferencia de `analyzePhotos`, NO guarda las fotos: si
   // el usuario solo consulta, no debe quedar basura en el almacenamiento.
   async identify(ownerId: string, files: ImageInput[]) {
+    this.assertHasPhotos(files);
     const extracted = await this.geminiService.analyzePhotos(files);
     await this.prisma.usageEvent.create({ data: { userId: ownerId, type: 'AI_SCAN' } });
     const result = await this.match(ownerId, {
@@ -363,11 +374,16 @@ export class ItemsService {
   // Botón "Analizar" del flujo de alta (plan §5.3.6-9): sube las fotos ya
   // comprimidas y devuelve los datos estructurados detectados por la IA.
   async analyzePhotos(files: ImageInput[]) {
+    this.assertHasPhotos(files);
     const [extracted, photoUrls] = await Promise.all([
       this.geminiService.analyzePhotos(files),
       Promise.all(files.map((file) => this.storageService.saveCompressedImage(file))),
     ]);
     return { extracted, photoUrls };
+  }
+
+  private assertHasPhotos(files: ImageInput[] | undefined) {
+    if (!files?.length) throw new BadRequestException('Debes enviar al menos una foto');
   }
 
   // Lectura de código de barras (plan §1/§5.3.6): no requiere fotos, solo el código.
