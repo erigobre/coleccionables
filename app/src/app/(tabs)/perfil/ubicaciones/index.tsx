@@ -138,7 +138,14 @@ export default function UbicacionesScreen() {
           </View>
         </View>
       ) : (
-        <Button label="+ Nueva ubicación" onPress={() => setShowCreate(true)} />
+        <View className="gap-3">
+          <Button label="+ Nueva ubicación" onPress={() => setShowCreate(true)} />
+          <Button
+            label="Escanear QR de ubicación"
+            variant="ghost"
+            onPress={() => router.push('/(tabs)/perfil/ubicaciones/escanear')}
+          />
+        </View>
       )}
     </ScrollView>
   );

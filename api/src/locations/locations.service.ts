@@ -140,11 +140,20 @@ export class LocationsService {
     const descendantIds = await this.collectDescendantIds(location.ownerId, location.id);
     const locationIds = [location.id, ...descendantIds];
 
+    // Los vendidos conservan su ubicación en el registro inmutable, pero ya no están
+    // físicamente ahí. Se incluye la ubicación actual para que la app marque los
+    // objetos que pertenecen aquí pero andan fuera (p. ej. por una temporada).
     const items = await this.prisma.item.findMany({
       where: {
+        ownerId: location.ownerId,
+        status: { not: 'SOLD' },
         OR: [{ currentLocationId: { in: locationIds } }, { permanentLocationId: { in: locationIds } }],
       },
-      include: { photos: { orderBy: { order: 'asc' }, take: 1 } },
+      include: {
+        photos: { orderBy: { order: 'asc' }, take: 1 },
+        currentLocation: { select: { id: true, name: true } },
+      },
+      orderBy: { name: 'asc' },
     });
 
     return { location, items };

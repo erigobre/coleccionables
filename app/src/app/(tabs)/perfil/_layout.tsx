@@ -15,6 +15,7 @@ export default function PerfilStackLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="ubicaciones/index" options={{ title: 'Ubicaciones' }} />
       <Stack.Screen name="ubicaciones/[id]" options={{ title: 'Ubicación' }} />
+      <Stack.Screen name="ubicaciones/escanear" options={{ title: 'Escanear QR' }} />
       <Stack.Screen name="temporadas/index" options={{ title: 'Temporadas' }} />
       <Stack.Screen name="temporadas/[id]" options={{ title: 'Temporada' }} />
     </Stack>

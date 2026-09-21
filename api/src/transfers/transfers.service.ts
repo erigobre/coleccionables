@@ -120,10 +120,33 @@ export class TransfersService {
     ]);
   }
 
+  // El remitente se arrepiente (o se equivocó de correo) antes de que el receptor
+  // responda. Se borra la transferencia pendiente en vez de marcarla con un estado
+  // nuevo: para el historial nunca ocurrió, y el objeto vuelve a estar activo.
+  async cancel(fromUserId: string, transferId: string) {
+    const transfer = await this.prisma.transfer.findUnique({ where: { id: transferId } });
+    if (!transfer || transfer.fromUserId !== fromUserId) {
+      throw new NotFoundException('Transferencia no encontrada');
+    }
+    if (transfer.status !== 'PENDING') {
+      throw new ForbiddenException('Esta transferencia ya fue respondida o expiró');
+    }
+
+    await this.prisma.$transaction([
+      this.prisma.transfer.delete({ where: { id: transfer.id } }),
+      this.prisma.item.update({ where: { id: transfer.itemId }, data: { status: 'ACTIVE' } }),
+    ]);
+  }
+
+  // Nunca incluir el User completo: trae passwordHash. El receptor solo ve el
+  // nombre del remitente; el remitente ya conoce el correo al que transfirió.
   findIncoming(userId: string) {
     return this.prisma.transfer.findMany({
       where: { toUserId: userId, status: 'PENDING' },
-      include: { item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } }, fromUser: true },
+      include: {
+        item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } },
+        fromUser: { select: { id: true, name: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -131,7 +154,10 @@ export class TransfersService {
   findOutgoing(userId: string) {
     return this.prisma.transfer.findMany({
       where: { fromUserId: userId },
-      include: { item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } }, toUser: true },
+      include: {
+        item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } },
+        toUser: { select: { id: true, name: true, email: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

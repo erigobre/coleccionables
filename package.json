@@ -19,5 +19,8 @@
     "@prisma/engines@6.19.3": true,
     "@google/genai@2.23.0": true,
     "protobufjs@7.6.6": true
+  },
+  "overrides": {
+    "react-native-worklets": "0.10.1"
   }
 }

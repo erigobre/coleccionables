@@ -39,4 +39,9 @@ export class TransfersController {
   reject(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.transfersService.reject(user.id, id);
   }
+
+  @Post(':id/cancel')
+  cancel(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.transfersService.cancel(user.id, id);
+  }
 }

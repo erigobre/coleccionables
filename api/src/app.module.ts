@@ -16,6 +16,7 @@ import { AiModule } from './ai/ai.module.js';
 import { ItemsModule } from './items/items.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { WishlistModule } from './wishlist/wishlist.module.js';
+import { ShareModule } from './share/share.module.js';
 import { AdminModule } from './admin/admin.module.js';
 
 @Module({
@@ -37,6 +38,7 @@ import { AdminModule } from './admin/admin.module.js';
     ItemsModule,
     TransfersModule,
     WishlistModule,
+    ShareModule,
     AdminModule,
   ],
   controllers: [AppController],

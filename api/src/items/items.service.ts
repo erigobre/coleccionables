@@ -85,6 +85,29 @@ export class ItemsService {
     });
   }
 
+  // Sección "Objetos vendidos que se relacionan con tu búsqueda" (plan §5.3.9.5).
+  // Sin texto de búsqueda no devuelve nada: los vendidos nunca se listan sueltos.
+  async findSold(ownerId: string, search?: string) {
+    const term = search?.trim();
+    if (!term) return [];
+    return this.prisma.item.findMany({
+      where: {
+        ownerId,
+        status: 'SOLD',
+        OR: [
+          { name: { contains: term } },
+          { brand: { contains: term } },
+          { toyLine: { contains: term } },
+          { edition: { contains: term } },
+          { uniqueIdentifier: { contains: term } },
+        ],
+      },
+      include: ITEM_INCLUDE,
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+    });
+  }
+
   async findOne(ownerId: string, id: string) {
     return this.assertOwnedItem(ownerId, id);
   }
@@ -119,8 +142,14 @@ export class ItemsService {
 
   async addPhoto(ownerId: string, id: string, url: string) {
     await this.assertEditableItem(ownerId, id);
-    const count = await this.prisma.itemPhoto.count({ where: { itemId: id } });
-    return this.prisma.itemPhoto.create({ data: { itemId: id, url, order: count } });
+    // max+1 (no count): al quitar una foto intermedia, count repetiría un order existente.
+    const last = await this.prisma.itemPhoto.aggregate({
+      where: { itemId: id },
+      _max: { order: true },
+    });
+    return this.prisma.itemPhoto.create({
+      data: { itemId: id, url, order: (last._max.order ?? -1) + 1 },
+    });
   }
 
   async removePhoto(ownerId: string, id: string, photoId: string) {
@@ -367,11 +396,16 @@ export class ItemsService {
     return item;
   }
 
-  // Los objetos vendidos son completamente no editables (plan §5.3.9.5).
+  // Los objetos vendidos son completamente no editables (plan §5.3.9.5). En
+  // transferencia también: si el receptor rechaza, el objeto vuelve a ACTIVE y
+  // pisaría cualquier cambio de estado hecho mientras esperaba (p. ej. "Donado").
   private async assertEditableItem(ownerId: string, id: string) {
     const item = await this.assertOwnedItem(ownerId, id);
     if (item.status === 'SOLD') {
       throw new BadRequestException('Un objeto vendido no se puede editar');
+    }
+    if (item.status === 'PENDING_TRANSFER') {
+      throw new BadRequestException('Un objeto en transferencia no se puede editar hasta que responda el receptor');
     }
     return item;
   }

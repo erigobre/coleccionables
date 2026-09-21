@@ -133,6 +133,12 @@ export function fetchItems(accessToken: string, filters: { collectionId?: string
   return apiFetch<Item[]>(`/items${query ? `?${query}` : ''}`, { accessToken });
 }
 
+// Vendidos que coinciden con el texto buscado (plan §5.3.9.5). Sin texto no hay
+// resultados: los vendidos nunca se listan sueltos.
+export function fetchSoldItems(accessToken: string, search: string) {
+  return apiFetch<Item[]>(`/items/sold?search=${encodeURIComponent(search)}`, { accessToken });
+}
+
 export function fetchItem(accessToken: string, id: string) {
   return apiFetch<Item>(`/items/${id}`, { accessToken });
 }
@@ -269,4 +275,22 @@ export function lookupBarcode(accessToken: string, barcode: string) {
     body: { barcode },
     accessToken,
   });
+}
+
+export function addItemPhotos(accessToken: string, id: string, urls: string[]) {
+  return apiFetch<ItemPhoto[]>(`/items/${id}/photos`, { method: 'POST', body: { urls }, accessToken });
+}
+
+export function removeItemPhoto(accessToken: string, id: string, photoId: string) {
+  return apiFetch<void>(`/items/${id}/photos/${photoId}`, { method: 'DELETE', accessToken });
+}
+
+// Enlace público (página web simple, sin la app). Es idempotente: compartir dos
+// veces devuelve la misma URL.
+export function shareItem(accessToken: string, id: string) {
+  return apiFetch<{ token: string; url: string }>(`/items/${id}/share`, { method: 'POST', accessToken });
+}
+
+export function unshareItem(accessToken: string, id: string) {
+  return apiFetch<void>(`/items/${id}/share`, { method: 'DELETE', accessToken });
 }

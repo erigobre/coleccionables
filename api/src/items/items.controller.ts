@@ -60,6 +60,12 @@ export class ItemsController {
     return this.itemsService.lookupBarcode(dto.barcode);
   }
 
+  // Antes de ':id' para que "sold" no se interprete como un id.
+  @Get('sold')
+  findSold(@CurrentUser() user: AuthenticatedUser, @Query('search') search?: string) {
+    return this.itemsService.findSold(user.id, search);
+  }
+
   @Get(':id')
   findOne(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.itemsService.findOne(user.id, id);
@@ -116,7 +122,13 @@ export class ItemsController {
     @Param('id') id: string,
     @Body('urls') urls: string[] = [],
   ) {
-    return Promise.all(urls.map((url) => this.itemsService.addPhoto(user.id, id, url)));
+    // En serie a propósito: addPhoto calcula `order` leyendo el máximo actual, y en
+    // paralelo todas las fotos leerían el mismo valor y quedarían con order repetido.
+    const created = [];
+    for (const url of urls) {
+      created.push(await this.itemsService.addPhoto(user.id, id, url));
+    }
+    return created;
   }
 
   @Delete(':id/photos/:photoId')

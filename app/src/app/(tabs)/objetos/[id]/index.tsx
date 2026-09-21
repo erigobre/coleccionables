@@ -1,7 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
+import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Button } from '../../../../components/ui/Button';
 import { resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
@@ -20,12 +21,15 @@ import {
   lookupMarketPrice,
   removeItemFromCollection,
   removeItemTag,
+  shareItem,
   toggleFavorite,
+  unshareItem,
   updateItem,
   type Item,
   type MarketPriceResult,
 } from '../../../../lib/items';
 import { fetchTags, type Tag } from '../../../../lib/tags';
+import { cancelTransfer, fetchOutgoingTransfers, type OutgoingTransfer } from '../../../../lib/transfers';
 import { colors } from '../../../../theme/tokens';
 
 const STATUS_LABEL: Record<string, string> = {
@@ -50,7 +54,14 @@ export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken } = useAuth();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
 
+  const pagerRef = useRef<ScrollView>(null);
+  const [photoIndex, setPhotoIndex] = useState(0);
+  const [pendingTransfer, setPendingTransfer] = useState<OutgoingTransfer | null>(null);
+  const [cancelling, setCancelling] = useState(false);
+  const [sharing, setSharing] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
   const [item, setItem] = useState<Item | null | undefined>(undefined);
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
@@ -68,9 +79,16 @@ export default function ItemDetailScreen() {
         fetchActiveCollections(accessToken),
         fetchTags(accessToken),
       ]);
+      // Con el objeto en transferencia se busca a quién se envió, para poder cancelarla.
+      let pending: OutgoingTransfer | null = null;
+      if (fetchedItem.status === 'PENDING_TRANSFER') {
+        const outgoing = await fetchOutgoingTransfers(accessToken);
+        pending = outgoing.find((t) => t.itemId === fetchedItem.id && t.status === 'PENDING') ?? null;
+      }
       setItem(fetchedItem);
       setCollections(fetchedCollections);
       setTags(fetchedTags);
+      setPendingTransfer(pending);
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -138,6 +156,46 @@ export default function ItemDetailScreen() {
     }
   };
 
+  const onCancelTransfer = async () => {
+    if (!accessToken || !pendingTransfer) return;
+    setCancelling(true);
+    setError(null);
+    try {
+      await cancelTransfer(accessToken, pendingTransfer.id);
+      await load();
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const onShare = async () => {
+    if (!accessToken || !item) return;
+    setSharing(true);
+    setError(null);
+    setNotice(null);
+    try {
+      const { url } = await shareItem(accessToken, item.id);
+      await Share.share({ message: `${item.name} — mira este objeto de mi colección en Frikidex: ${url}`, url });
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  const onUnshare = async () => {
+    if (!accessToken || !item) return;
+    setError(null);
+    try {
+      await unshareItem(accessToken, item.id);
+      setNotice('Dejaste de compartir el enlace: ya no abre para nadie.');
+    } catch (err) {
+      setError(authErrorMessage(err));
+    }
+  };
+
   const onLookupMarketPrice = async () => {
     if (!accessToken || !item) return;
     setLoadingMarketPrice(true);
@@ -185,19 +243,58 @@ export default function ItemDetailScreen() {
     );
   }
 
-  const photo = item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined;
   const statusLabel = STATUS_LABEL[item.status];
+
+  // Como en Tinder: tocar el tercio izquierdo/derecho de la foto pasa a la
+  // anterior/siguiente; el tercio central no hace nada. Deslizar sigue funcionando.
+  const goToPhoto = (index: number) => {
+    const next = Math.max(0, Math.min(item.photos.length - 1, index));
+    pagerRef.current?.scrollTo({ x: next * screenWidth, animated: true });
+    setPhotoIndex(next);
+  };
+  const onPhotoTap = (locationX: number) => {
+    if (locationX < screenWidth * 0.35) goToPhoto(photoIndex - 1);
+    else if (locationX > screenWidth * 0.65) goToPhoto(photoIndex + 1);
+  };
 
   return (
     <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: 80 }}>
       <View className="relative w-full bg-surface" style={{ aspectRatio: 4 / 5 }}>
-        {photo ? (
-          <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+        {item.photos.length > 0 ? (
+          <ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onMomentumScrollEnd={(e) => setPhotoIndex(Math.round(e.nativeEvent.contentOffset.x / screenWidth))}
+          >
+            {item.photos.map((p) => (
+              <Pressable key={p.id} onPress={(e) => onPhotoTap(e.nativeEvent.locationX)}>
+                <Animated.View entering={FadeIn.duration(300)}>
+                  <Image
+                    source={{ uri: resolvePhotoUrl(p.url) }}
+                    style={{ width: screenWidth, height: '100%' }}
+                    resizeMode="cover"
+                  />
+                </Animated.View>
+              </Pressable>
+            ))}
+          </ScrollView>
         ) : (
           <View className="h-full w-full items-center justify-center">
             <Ionicons name="image-outline" size={48} color={colors.textMuted} />
           </View>
         )}
+        {item.photos.length > 1 ? (
+          <View pointerEvents="none" className="absolute bottom-9 w-full flex-row justify-center gap-1.5">
+            {item.photos.map((p, index) => (
+              <View
+                key={p.id}
+                className={`h-2 w-2 rounded-full ${index === photoIndex ? 'bg-primary' : 'bg-white/50'}`}
+              />
+            ))}
+          </View>
+        ) : null}
         <Pressable
           onPress={onToggleFavorite}
           className="absolute right-4 top-4 h-10 w-10 items-center justify-center rounded-full bg-background/70"
@@ -206,7 +303,11 @@ export default function ItemDetailScreen() {
         </Pressable>
       </View>
 
-      <View className="px-5 pt-5">
+      {/* Hoja que sube y solapa la foto, como el perfil de Tinder. */}
+      <Animated.View
+        entering={FadeInDown.springify().damping(18)}
+        className="-mt-6 rounded-t-3xl bg-background px-5 pt-6"
+      >
         <Text className="font-body-bold text-2xl text-text">{item.name}</Text>
         {statusLabel ? (
           <View className="mt-2 self-start rounded-full bg-danger px-3 py-1">
@@ -303,19 +404,37 @@ export default function ItemDetailScreen() {
         </View>
 
         {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
+        {notice ? <Text className="mb-4 text-sm text-textSecondary">{notice}</Text> : null}
+
+        {item.status === 'PENDING_TRANSFER' && pendingTransfer ? (
+          <View className="mb-5 rounded-lg border border-primary bg-surface p-4">
+            <Text className="mb-1 text-sm font-semibold text-text">Esperando respuesta</Text>
+            <Text className="mb-4 text-xs text-textMuted">
+              Enviado a {pendingTransfer.toUser.email}. Si no responde en{' '}
+              {Math.max(0, Math.ceil((new Date(pendingTransfer.expiresAt).getTime() - Date.now()) / 86_400_000))} día(s),
+              vuelve a ti.
+            </Text>
+            <Button label="Cancelar envío" variant="ghost" onPress={onCancelTransfer} loading={cancelling} />
+          </View>
+        ) : null}
 
         {editable ? (
           <View className="gap-3">
             <Button label="Editar objeto" onPress={() => router.push(`/(tabs)/objetos/${item.id}/edit`)} />
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
+            <Button label="Compartir enlace" variant="ghost" onPress={onShare} loading={sharing} />
+            <Button label="Vendido" variant="ghost" onPress={() => router.push(`/(tabs)/objetos/${item.id}/vender`)} />
             <Button label="Eliminar objeto" variant="destructive" onPress={onDelete} loading={deleting} />
+            <Pressable onPress={onUnshare} className="items-center py-2">
+              <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
+            </Pressable>
           </View>
         ) : (
           <Text className="text-center text-sm text-textMuted">
             Este objeto está {statusLabel.toLowerCase()} y no se puede editar.
           </Text>
         )}
-      </View>
+      </Animated.View>
     </ScrollView>
   );
 }

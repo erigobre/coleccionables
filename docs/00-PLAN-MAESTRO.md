@@ -292,7 +292,7 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
 - [x] **Fase 3 — Perfil: Ubicaciones y Temporadas** *(se hace antes que Objetos porque Objetos depende de tener ubicaciones)* — **hecho 2026-09-20**
   - [x] CRUD ubicaciones + sub-ubicaciones (árbol, recursive CTE en MySQL/MariaDB)
   - [x] Generación de QR (backend ya generaba el PNG; UI de Perfil → Ubicaciones lo muestra)
-  - [ ] Escaneo de QR con cámara — diferido a Fase 5 (se construye junto con la integración de cámara de Objetos)
+  - [x] Escaneo de QR con cámara *(2026-09-21; Perfil → Ubicaciones → "Escanear QR de ubicación": `CameraView` solo QR → `GET /locations/scan/:token` → lista los objetos de la ubicación y sus sub-ubicaciones, excluye vendidos y marca "Ahora está en: X" los que andan fuera de lugar; error 403/404 con reintento. **Falta probar en dispositivo**)*
   - [x] CRUD Temporadas + checklist de objetos asignados ("Ya lo regresé a su ubicación principal")
   - [ ] *(v1.1)* Compartir ubicación (miembros manuales)
 
@@ -303,18 +303,18 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
   - [x] Modelo de datos preparado para `collection_members` (sin UI de invitación aún)
   - [ ] *(v1.1)* Compartir colección (invitar editor/admin) + herencia de permisos de ubicación (§7.1)
 
-- [ ] **Fase 5 — Objetos** *(en progreso — primer slice manual completado 2026-09-21, IA/cámara/transferencia pendientes)*
+- [ ] **Fase 5 — Objetos** *(código completo 2026-09-21, sin commit/deploy ni prueba en dispositivo — ver nota al final)*
   - [x] Listado tipo Amazon + favoritos + multi-colección
   - [x] Botón flotante "+" → cámara → preview → Analizar/Manual *(2026-09-21; `objetos/captura.tsx`: foto o galería hasta 4 fotos, preview con aviso de calidad, "Analizar" o "No gracias, llenaré los datos manualmente". Verificado: tsc + expo export + `POST /items/analyze` en producción. **Falta probar en dispositivo real**)*
   - [x] Integración IA visual (Gemini) + prompt de extracción de campos + tags *(backend ya estaba; la app manda las fotos a `/items/analyze`, prellena el formulario y ofrece los `suggestedTags`, que se crean hasta guardar)*
-  - [~] Lectura de código de barras *(el modo "Código de barras" de la cámara lee EAN/UPC/Code128/QR y deja el código en "Identificador único"; **falta** el lookup del producto por código — Gemini con búsqueda web o UPCItemDB, §1)*
+  - [x] Lectura de código de barras *(2026-09-21; modo "Código de barras" lee EAN/UPC y `POST /items/lookup-barcode` (Gemini + Google Search) prellena el formulario; si no encuentra el producto deja solo el código en "Identificador único". Verificado en producción con un EAN real, uno inventado y una entrada no numérica; **falta probar con un coleccionable real y en dispositivo**)*
   - [x] Formulario completo (§6) con prellenado *(manual o prellenado por IA desde la cámara)*
-  - [x] Perfil de objeto estilo Tinder *(layout estático: foto grande + info + acciones; sin swipe/gestos animados)*
+  - [x] Perfil de objeto estilo Tinder *(foto grande + panel que sube con spring; toque en el 35% izquierdo/derecho de la foto o deslizar para cambiar de foto. **Falta probar el gesto en dispositivo**)*
   - [x] Modal de cambio de ubicación multi-paso
-  - [ ] Flujo de transferencia/venta (animación + aceptar/rechazar) (§7.3)
-  - [ ] Sección "objetos vendidos relacionados" en resultados de búsqueda
+  - [x] Flujo de transferencia/venta (animación + aceptar/rechazar) (§7.3) *(botón "Vendido" → correo del receptor → animación de cápsula con Reanimated → pendiente 7 días; receptor ve "¡Acabas de recibir un objeto!" en Objetos → Transferencias, elige colección y acepta o rechaza; el emisor puede cancelar (borra la transferencia y devuelve el objeto a ACTIVE); un objeto en PENDING_TRANSFER no se puede editar. **Corrige fuga real:** `findIncoming`/`findOutgoing` devolvían el `User` completo de la contraparte, incluido `passwordHash`; ahora solo `id/name` (`email` en el receptor). **Falta probar la animación en dispositivo**)*
+  - [x] Sección "objetos vendidos relacionados" en resultados de búsqueda *(buscador en Objetos; con ≥2 letras consulta `GET /items/sold?search=` (nombre/marca/línea/edición/identificador) y muestra tarjetas de solo lectura con insignia "Vendido"; la integración con "¿Ya lo tengo?" de Home se hace en Fase 6 reutilizando `match` → `soldMatches`)*
   - [x] Botón de precio de mercado (IA) *(verificado en vivo contra Gemini con facturación activada 2026-09-21 — respuesta exitosa real con precio, disponibilidad y link de referencia; extendido el mismo día para incluir "notas de coleccionista" (rareza/tirada/variantes) en la misma llamada, sin repetir campos ya conocidos, con botón "Usar sugerencia en Notas" en la ficha)*
-  - [ ] Compartir objeto (URL pública simplificada)
+  - [x] Compartir objeto (URL pública simplificada) *(botón "Compartir enlace" en la ficha → `POST /items/:id/share` (reusa la tabla `share_links` existente, token aleatorio de 144 bits, idempotente) → hoja nativa de compartir; `DELETE /items/:id/share` lo revoca. `GET /s/:token` sirve una página HTML sin login (nombre, estado, marca, línea, edición, escala, año, empaque, uso, conservación, fotos; nunca precio/notas/ubicación/dueño), con todo escapado, CSP estricta y `noindex`; vendidos/donados/perdidos devuelven 404 con página amable. Base de la URL: `PUBLIC_BASE_URL` si existe (poner `https://frikidex.app` al configurar el dominio), si no el host de la petición)*
 
 - [ ] **Fase 6 — Home**
   - [ ] Cards de estadísticas + CTA primer objeto

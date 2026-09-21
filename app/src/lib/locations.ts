@@ -1,4 +1,5 @@
 import { apiFetch } from './api';
+import type { ItemLocationRef, ItemPhoto, ItemScalar } from './items';
 
 export interface LocationNode {
   id: string;
@@ -36,6 +37,19 @@ export function fetchLocationQr(accessToken: string, id: string) {
   return apiFetch<{ qrToken: string; qrImageDataUrl: string }>(`/locations/${id}/qr`, {
     accessToken,
   });
+}
+
+// Objeto tal como lo devuelve el escaneo: solo su primera foto y su ubicación actual.
+export type ScannedItem = ItemScalar & { photos: ItemPhoto[]; currentLocation: Pick<ItemLocationRef, 'id' | 'name'> | null };
+
+export interface ScanLocationResult {
+  location: { id: string; name: string };
+  items: ScannedItem[];
+}
+
+// Resuelve el token leído de un QR de ubicación (solo el dueño puede ver el contenido).
+export function scanLocation(accessToken: string, token: string) {
+  return apiFetch<ScanLocationResult>(`/locations/scan/${encodeURIComponent(token)}`, { accessToken });
 }
 
 // Aplana el árbol a una lista ordenada (padres antes que hijos) para selects
