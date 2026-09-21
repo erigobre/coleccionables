@@ -6,6 +6,7 @@ WORKDIR /repo
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
+ENV NODE_ENV=development
 COPY package.json package-lock.json ./
 COPY app/package.json ./app/package.json
 COPY api/package.json ./api/package.json
