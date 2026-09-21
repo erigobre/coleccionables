@@ -1,26 +1,30 @@
 # syntax=docker/dockerfile:1
+# Build context is the monorepo root (npm workspaces: app, api, admin share one lockfile)
 
 FROM node:22-bookworm-slim AS base
-WORKDIR /app
+WORKDIR /repo
 RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 
 FROM base AS deps
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
+COPY app/package.json ./app/package.json
+COPY api/package.json ./api/package.json
+COPY admin/package.json ./admin/package.json
 RUN npm ci
 
 FROM deps AS build
-COPY . .
-RUN npx prisma generate
-RUN npm run build
+COPY api ./api
+RUN npx prisma generate --schema=api/prisma/schema.prisma
+RUN npm run build --workspace=api
 
 FROM base AS runtime
 ENV NODE_ENV=production
-COPY package.json package-lock.json* ./
-RUN npm ci --omit=dev
-COPY --from=build /app/dist ./dist
-COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
-COPY prisma ./prisma
+COPY --from=build /repo/node_modules ./node_modules
+COPY --from=build /repo/package.json ./package.json
+COPY --from=build /repo/api/package.json ./api/package.json
+COPY --from=build /repo/api/dist ./api/dist
+COPY --from=build /repo/api/prisma ./api/prisma
 
+WORKDIR /repo/api
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main.js"]
