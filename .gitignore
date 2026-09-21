@@ -1,0 +1,50 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Expo
+.expo/
+.expo-shared/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor/OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+Thumbs.db
+
+# Prisma
+api/prisma/dev.db
+
+# Uploads (dev-only local storage; producción usa R2/S3)
+api/uploads/
+
+# Misc
+coverage/
+*.tsbuildinfo
+
+# Deploy secrets (Coolify token, Gemini key, SSH deploy keys) — never commit
+deploy/

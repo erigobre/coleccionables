@@ -1,0 +1,451 @@
+// Modelo de datos — Inventario de Coleccionables
+// Ver docs/00-PLAN-MAESTRO.md para el contexto/decisiones detrás de cada entidad.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Cuentas / usuarios / SaaS
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  SUPERADMIN
+  OWNER // dueño de la Organization (cuenta familia/negocio)
+  MEMBER // miembro invitado dentro de la Organization
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  SPONSORED // cuenta patrocinada por el superadmin, nunca paga
+}
+
+// Unidad de facturación SaaS. Una Organization agrupa 1+ Users bajo un mismo
+// paquete/plan. En v1 los miembros de una misma Organization NO comparten
+// colecciones/ubicaciones entre sí (eso es v1.1) — solo comparten el plan/pago.
+model Organization {
+  id                 String             @id @default(cuid())
+  name               String
+  plan               String? // paquete contratado (se define en Fase 2 de negocio)
+  subscriptionStatus SubscriptionStatus @default(ACTIVE)
+  sponsored          Boolean            @default(false) // activado desde Superadmin, exime de pago
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  users    User[]
+  payments Payment[]
+
+  @@map("organizations")
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  email        String   @unique
+  passwordHash String
+  name         String
+  role         UserRole @default(OWNER)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  locations             Location[]
+  seasons               Season[]
+  collections           Collection[]
+  tags                  Tag[]
+  items                 Item[]
+  wishlistItems         WishlistItem[]
+  sentTransfers         Transfer[]         @relation("TransferSender")
+  receivedTransfers     Transfer[]         @relation("TransferReceiver")
+  usageEvents           UsageEvent[]
+  locationMemberships   LocationMember[]
+  collectionMemberships CollectionMember[]
+
+  @@map("users")
+}
+
+// Preparado desde v1 para no migrar esquema en v1.1, pero sin UI/lógica de
+// invitación todavía (ver docs/00-PLAN-MAESTRO.md §7.1).
+enum SharedRole {
+  OWNER
+  EDITOR
+  VIEWER
+}
+
+model CollectionMember {
+  id           String     @id @default(cuid())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         SharedRole @default(EDITOR)
+  createdAt    DateTime   @default(now())
+
+  @@unique([collectionId, userId])
+  @@map("collection_members")
+}
+
+enum LocationMemberSource {
+  MANUAL
+  INHERITED_FROM_COLLECTION
+}
+
+model LocationMember {
+  id         String               @id @default(cuid())
+  locationId String
+  location   Location             @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  userId     String
+  user       User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       SharedRole           @default(VIEWER)
+  source     LocationMemberSource @default(MANUAL)
+  createdAt  DateTime             @default(now())
+
+  @@unique([locationId, userId])
+  @@map("location_members")
+}
+
+// Fase 2 de negocio (pagos SaaS reales) — modelo listo desde ahora.
+enum PaymentStatus {
+  PAID
+  PENDING
+  FAILED
+}
+
+model Payment {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Decimal       @db.Decimal(10, 2)
+  currency       String        @default("MXN")
+  status         PaymentStatus @default(PENDING)
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime      @default(now())
+
+  @@map("payments")
+}
+
+// Log ligero de uso para las estadísticas del backend Superadmin.
+enum UsageEventType {
+  ITEM_CREATED
+  AI_SCAN
+  MARKET_PRICE_LOOKUP
+  TRANSFER_COMPLETED
+  LOGIN
+}
+
+model UsageEvent {
+  id        String         @id @default(cuid())
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      UsageEventType
+  metadata  Json?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+  @@map("usage_events")
+}
+
+// ---------------------------------------------------------------------------
+// Ubicaciones (con sub-ubicaciones) y Temporadas
+// ---------------------------------------------------------------------------
+
+model Location {
+  id       String     @id @default(cuid())
+  ownerId  String
+  owner    User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name     String
+  parentId String?
+  parent   Location?  @relation("LocationTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children Location[] @relation("LocationTree")
+
+  isPermanentDefault Boolean  @default(false) // "Ubicación permanente" default del owner
+  qrToken            String   @unique @default(cuid()) // valor codificado en el QR impreso
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  members          LocationMember[]
+  itemsAsCurrent   Item[]           @relation("ItemCurrentLocation")
+  itemsAsPermanent Item[]           @relation("ItemPermanentLocation")
+
+  @@map("locations")
+}
+
+model Season {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String // Halloween, Navidad, Pascua, etc.
+  startDate DateTime
+  endDate   DateTime
+  createdAt DateTime @default(now())
+
+  items Item[]
+
+  @@map("seasons")
+}
+
+// ---------------------------------------------------------------------------
+// Colecciones
+// ---------------------------------------------------------------------------
+
+enum CollectionStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+model Collection {
+  id        String           @id @default(cuid())
+  ownerId   String
+  owner     User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  icon      String? // nombre de ícono o url de imagen
+  status    CollectionStatus @default(ACTIVE)
+  isDefault Boolean          @default(false) // Libros, Comics, Juguetes, ArtToys, Esculturas, Pinturas, Estatuas
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  members   CollectionMember[]
+  itemLinks ItemCollection[]
+
+  @@map("collections")
+}
+
+// ---------------------------------------------------------------------------
+// Tags / Etiquetas
+// ---------------------------------------------------------------------------
+
+enum TagType {
+  COLOR_PRINCIPAL
+  FRANCHISE
+  GENERIC
+}
+
+model Tag {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  type      TagType  @default(GENERIC)
+  createdAt DateTime @default(now())
+
+  itemLinks ItemTag[]
+
+  @@unique([ownerId, name])
+  @@map("tags")
+}
+
+// ---------------------------------------------------------------------------
+// Objetos (Items)
+// ---------------------------------------------------------------------------
+
+enum ItemCategory {
+  LIBRO
+  COMIC
+  ART_TOY
+  ESTATUA
+  FIGURA_ACCION
+  JUGUETE
+  ESCULTURA
+  PINTURA
+  OTRO
+}
+
+enum PackagingCondition {
+  SUELTO
+  BLISTER_SELLADO
+  BLISTER_ABIERTO
+  CON_CAJA_SIN_BLISTER
+}
+
+enum UsageState {
+  NUEVO
+  USADO
+  ABIERTO
+}
+
+enum ConservationState {
+  MINT
+  NEAR_MINT
+  BUEN_ESTADO
+  CON_DETALLES
+}
+
+// Estado de vida del objeto dentro del inventario.
+enum ItemStatus {
+  ACTIVE
+  PENDING_TRANSFER // "vendido" iniciado, esperando aceptación del receptor
+  SOLD
+  DONATED
+  LOST
+}
+
+// Estado del cambio de ubicación actual (independiente de ItemStatus).
+enum LocationAssignmentType {
+  INDEFINIDO
+  TEMPORAL
+}
+
+enum SyncStatus {
+  SYNCED
+  PENDING // offline-first: creado sin internet, badge "No sincronizado"
+}
+
+model Item {
+  id      String @id @default(cuid())
+  ownerId String
+  owner   User   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  name                 String
+  category             ItemCategory
+  packagingCondition   PackagingCondition
+  usageState           UsageState
+  conservationState    ConservationState?
+  brand                String?
+  toyLine              String?
+  edition              String?
+  scale                String?
+  designer             String?
+  releaseYear          Int?
+  originalSetNumber    String?
+  uniqueIdentifier     String? // SKU / UPC / ISBN
+  purchasePrice        Decimal?           @db.Decimal(10, 2)
+  currency             String             @default("MXN")
+  purchaseLocationText String? // "lugar de compra" en texto libre
+  acquisitionDate      DateTime?
+  quantity             Int                @default(1)
+  isGift               Boolean            @default(false)
+  isFavorite           Boolean            @default(false)
+  notes                String?            @db.Text
+
+  // Solo aplica si category = COMIC (o LIBRO)
+  comicCoverNumber String?
+  comicIssueNumber String?
+  comicWriter      String?
+  comicPenciler    String?
+  comicInker       String?
+  comicColorist    String?
+  comicPublisher   String?
+
+  status ItemStatus @default(ACTIVE)
+
+  currentLocationId   String?
+  currentLocation     Location?              @relation("ItemCurrentLocation", fields: [currentLocationId], references: [id], onDelete: SetNull)
+  permanentLocationId String?
+  permanentLocation   Location?              @relation("ItemPermanentLocation", fields: [permanentLocationId], references: [id], onDelete: SetNull)
+  locationAssignment  LocationAssignmentType @default(INDEFINIDO)
+  currentSeasonId     String? // si locationAssignment = TEMPORAL
+  currentSeason       Season?                @relation(fields: [currentSeasonId], references: [id], onDelete: SetNull)
+  returnedFromSeason  Boolean                @default(true) // false mientras está "fuera" de su ubicación permanente por temporada
+
+  syncStatus SyncStatus @default(SYNCED)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  photos      ItemPhoto[]
+  collections ItemCollection[]
+  tags        ItemTag[]
+  transfers   Transfer[]
+  shareLink   ShareLink?
+
+  @@index([ownerId, status])
+  @@map("items")
+}
+
+model ItemPhoto {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  url       String
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@map("item_photos")
+}
+
+model ItemCollection {
+  itemId       String
+  item         Item       @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, collectionId])
+  @@map("item_collections")
+}
+
+model ItemTag {
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, tagId])
+  @@map("item_tags")
+}
+
+// Enlace público (perfil simplificado, no requiere la app instalada).
+model ShareLink {
+  id        String   @id @default(cuid())
+  itemId    String   @unique
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  token     String   @unique @default(cuid())
+  createdAt DateTime @default(now())
+
+  @@map("share_links")
+}
+
+// ---------------------------------------------------------------------------
+// Transferencia ("vendido" estilo Pokémon)
+// ---------------------------------------------------------------------------
+
+enum TransferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model Transfer {
+  id          String         @id @default(cuid())
+  itemId      String
+  item        Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fromUserId  String
+  fromUser    User           @relation("TransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId    String
+  toUser      User           @relation("TransferReceiver", fields: [toUserId], references: [id], onDelete: Cascade)
+  status      TransferStatus @default(PENDING)
+  expiresAt   DateTime // createdAt + 7 días (decisión confirmada en el plan)
+  respondedAt DateTime?
+  createdAt   DateTime       @default(now())
+
+  @@map("transfers")
+}
+
+// ---------------------------------------------------------------------------
+// Wishlist
+// ---------------------------------------------------------------------------
+
+model WishlistItem {
+  id        String        @id @default(cuid())
+  ownerId   String
+  owner     User          @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name      String
+  category  ItemCategory?
+  photoUrl  String?
+  foundAt   String? // dónde lo encontró
+  price     Decimal?      @db.Decimal(10, 2)
+  currency  String        @default("MXN")
+  notes     String?       @db.Text
+  createdAt DateTime      @default(now())
+
+  @@map("wishlist_items")
+}
