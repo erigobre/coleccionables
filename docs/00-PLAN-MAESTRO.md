@@ -316,15 +316,15 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
   - [x] Botón de precio de mercado (IA) *(verificado en vivo contra Gemini con facturación activada 2026-09-21 — respuesta exitosa real con precio, disponibilidad y link de referencia; extendido el mismo día para incluir "notas de coleccionista" (rareza/tirada/variantes) en la misma llamada, sin repetir campos ya conocidos, con botón "Usar sugerencia en Notas" en la ficha)*
   - [x] Compartir objeto (URL pública simplificada) *(botón "Compartir enlace" en la ficha → `POST /items/:id/share` (reusa la tabla `share_links` existente, token aleatorio de 144 bits, idempotente) → hoja nativa de compartir; `DELETE /items/:id/share` lo revoca. `GET /s/:token` sirve una página HTML sin login (nombre, estado, marca, línea, edición, escala, año, empaque, uso, conservación, fotos; nunca precio/notas/ubicación/dueño), con todo escapado, CSP estricta y `noindex`; vendidos/donados/perdidos devuelven 404 con página amable. Base de la URL: `PUBLIC_BASE_URL` si existe (poner `https://frikidex.app` al configurar el dominio), si no el host de la petición)*
 
-- [ ] **Fase 6 — Home**
-  - [ ] Cards de estadísticas + CTA primer objeto
-  - [ ] Flujo "¿Ya lo tengo?" (cámara + matching) (§7.2)
-  - [ ] Objetos similares
-  - [ ] Carrusel de favoritos
+- [x] **Fase 6 — Home** *(codeado 2026-09-21; falta desplegar el backend y probar en dispositivo)*
+  - [x] Cards de estadísticas + CTA primer objeto *(objetos totales y wishlist, tocables; sin objetos muestra el CTA "Agregar objeto")*
+  - [x] Flujo "¿Ya lo tengo?" (cámara + matching) (§7.2) *(pantalla `objetos/ya-lo-tengo`: hasta 3 fotos → `POST /items/identify` (la IA extrae y se compara, sin guardar fotos) → "¡Ya lo tienes!" solo si `hasMatch` (puntaje ≥ umbral fuerte Y nombres con solapamiento Jaccard ≥ 0.6, para evitar falsos positivos); si no, "Parece que no lo tienes" con Agregar a colección / Agregar a wishlist / Cancelar)*
+  - [x] Objetos similares *(lista de coincidencias parciales con foto, ubicación y fecha; más vendidos relacionados con insignia)*
+  - [x] Carrusel de favoritos
 
-- [ ] **Fase 7 — Wishlist**
-  - [ ] Alta desde flujo "¿Ya lo tengo?" → No lo tengo → Wishlist
-  - [ ] Edición manual (dónde lo viste / precio)
+- [x] **Fase 7 — Wishlist** *(codeado 2026-09-21)*
+  - [x] Alta desde flujo "¿Ya lo tengo?" → No lo tengo → Wishlist *(sube la primera foto y crea el elemento con nombre/categoría detectados)*
+  - [x] Edición manual (dónde lo viste / precio) *(hoja modal con dónde lo viste, precio y notas; quitar con confirmación)*
 
 - [ ] **Fase 8 — Notificaciones**
   - [ ] Push de temporada ("recuerda regresar tus objetos de Halloween")

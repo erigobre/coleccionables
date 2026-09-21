@@ -61,3 +61,31 @@ export function computeSimilarityScore(a: SimilarityCandidate, b: SimilarityCand
 
   return score;
 }
+
+function nameTokens(value?: string | null): Set<string> {
+  return new Set(
+    normalize(value)
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .split(/[^a-z0-9]+/)
+      .filter((token) => token.length >= 3),
+  );
+}
+
+// ¿Podrían ser el mismo objeto? Marca + línea + categoría suman score de sobra
+// (7) aunque sean figuras distintas, así que "ya lo tengo" exige además que los
+// nombres se parezcan. La IA y el usuario no escriben igual ("Funko Pop Darth
+// Vader" vs "Darth Vader Funko"), por eso se comparan palabras, no el texto.
+// Es deliberadamente estricta: decir "ya lo tienes" por error es peor que mostrarlo
+// como "similar".
+export function namesOverlap(a?: string | null, b?: string | null): boolean {
+  const tokensA = nameTokens(a);
+  const tokensB = nameTokens(b);
+  if (tokensA.size === 0 || tokensB.size === 0) return false;
+  let shared = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) shared += 1;
+  }
+  // Jaccard: "Hot Wheels Camaro" vs "Hot Wheels Mustang" comparten marca, no objeto.
+  return shared / (tokensA.size + tokensB.size - shared) >= 0.6;
+}

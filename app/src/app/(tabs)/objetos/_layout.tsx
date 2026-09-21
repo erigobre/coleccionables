@@ -14,6 +14,7 @@ export default function ObjetosStackLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="captura" options={{ title: 'Nuevo objeto', headerTransparent: true, headerTintColor: colors.white, headerTitle: '' }} />
+      <Stack.Screen name="ya-lo-tengo" options={{ title: '¿Ya lo tengo?', headerTransparent: true, headerTintColor: colors.white, headerTitle: '' }} />
       <Stack.Screen name="new" options={{ title: 'Nuevo objeto' }} />
       <Stack.Screen name="[id]/index" options={{ title: 'Objeto' }} />
       <Stack.Screen name="[id]/edit" options={{ title: 'Editar objeto' }} />

@@ -54,6 +54,13 @@ export class ItemsController {
     return this.itemsService.analyzePhotos(photos);
   }
 
+  // "¿Ya lo tengo?": identifica el objeto de la foto y lo busca en la colección.
+  @Post('identify')
+  @UseInterceptors(FilesInterceptor('photos'))
+  identify(@CurrentUser() user: AuthenticatedUser, @UploadedFiles() photos: Express.Multer.File[]) {
+    return this.itemsService.identify(user.id, photos);
+  }
+
   // Busca el producto por código de barras (EAN/UPC) leído con la cámara.
   @Post('lookup-barcode')
   lookupBarcode(@Body() dto: LookupBarcodeDto) {

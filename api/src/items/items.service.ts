@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { ItemCategory } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
 import { LocationsService } from '../locations/locations.service.js';
@@ -12,6 +13,7 @@ import type { MatchItemDto } from './dto/match-item.dto.js';
 import {
   computeSimilarityScore,
   MIN_DISPLAY_THRESHOLD,
+  namesOverlap,
   STRONG_MATCH_THRESHOLD,
   type SimilarityCandidate,
 } from './similarity.js';
@@ -275,15 +277,15 @@ export class ItemsService {
   // Flujo "¿Ya lo tengo?" de Home (plan §5.1 y §7.2). Incluye al final los
   // objetos vendidos relacionados, de solo lectura (plan §5.3.9.5).
   async match(ownerId: string, dto: MatchItemDto) {
+    // Para las tarjetas de resultado: primera foto y ubicación actual.
+    const include = {
+      tags: { include: { tag: true } },
+      photos: { orderBy: { order: 'asc' as const }, take: 1 },
+      currentLocation: { select: { id: true, name: true } },
+    };
     const [activeCandidates, soldCandidates] = await Promise.all([
-      this.prisma.item.findMany({
-        where: { ownerId, status: { not: 'SOLD' } },
-        include: { tags: { include: { tag: true } } },
-      }),
-      this.prisma.item.findMany({
-        where: { ownerId, status: 'SOLD' },
-        include: { tags: { include: { tag: true } } },
-      }),
+      this.prisma.item.findMany({ where: { ownerId, status: { not: 'SOLD' } }, include }),
+      this.prisma.item.findMany({ where: { ownerId, status: 'SOLD' }, include }),
     ]);
 
     const target: SimilarityCandidate = { ...dto };
@@ -291,10 +293,29 @@ export class ItemsService {
     const soldMatches = this.rankCandidates(target, soldCandidates);
 
     return {
-      hasMatch: matches.length > 0 && matches[0].score >= STRONG_MATCH_THRESHOLD,
+      hasMatch:
+        matches.length > 0 &&
+        matches[0].score >= STRONG_MATCH_THRESHOLD &&
+        namesOverlap(dto.name, matches[0].item.name),
       matches,
       soldMatches,
     };
+  }
+
+  // "¿Ya lo tengo?" con foto (plan §5.1): la IA identifica el objeto y se compara
+  // contra la colección. A diferencia de `analyzePhotos`, NO guarda las fotos: si
+  // el usuario solo consulta, no debe quedar basura en el almacenamiento.
+  async identify(ownerId: string, files: ImageInput[]) {
+    const extracted = await this.geminiService.analyzePhotos(files);
+    await this.prisma.usageEvent.create({ data: { userId: ownerId, type: 'AI_SCAN' } });
+    const result = await this.match(ownerId, {
+      name: extracted.name,
+      brand: extracted.brand,
+      toyLine: extracted.toyLine,
+      category: Object.values(ItemCategory).find((c) => c === extracted.category),
+      tags: extracted.suggestedTags,
+    });
+    return { extracted, ...result };
   }
 
   // Botón "Solicitar precio actual promedio de mercado" (plan §5.3.9.10).
@@ -354,17 +375,16 @@ export class ItemsService {
     return this.geminiService.lookupBarcode(barcode);
   }
 
-  private rankCandidates<T extends SimilarityCandidate & { id: string }>(
-    target: SimilarityCandidate,
-    candidates: Array<{
+  private rankCandidates<
+    C extends {
       id: string;
       name: string;
       brand: string | null;
       toyLine: string | null;
       category: string;
       tags: { tag: { name: string } }[];
-    }>,
-  ) {
+    },
+  >(target: SimilarityCandidate, candidates: C[]) {
     return candidates
       .map((candidate) => ({
         item: candidate,

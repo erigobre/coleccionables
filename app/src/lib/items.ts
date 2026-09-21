@@ -294,3 +294,32 @@ export function shareItem(accessToken: string, id: string) {
 export function unshareItem(accessToken: string, id: string) {
   return apiFetch<void>(`/items/${id}/share`, { method: 'DELETE', accessToken });
 }
+
+// Coincidencia de "¿Ya lo tengo?": el backend devuelve el objeto con solo su
+// primera foto y su ubicación actual, más el puntaje de similitud (plan §7.2).
+export type MatchedItem = ItemScalar & {
+  photos: ItemPhoto[];
+  currentLocation: { id: string; name: string } | null;
+};
+
+export interface ItemMatch {
+  item: MatchedItem;
+  score: number;
+}
+
+export interface IdentifyResult {
+  extracted: ExtractedItemData;
+  hasMatch: boolean;
+  matches: ItemMatch[];
+  soldMatches: ItemMatch[];
+}
+
+// Identifica el objeto de la foto y lo busca en la colección. No guarda las fotos
+// en el servidor: si el usuario decide agregarlo, se suben después.
+export function identifyItemPhotos(accessToken: string, photoUris: string[]) {
+  const form = new FormData();
+  photoUris.forEach((uri, index) => {
+    form.append('photos', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
+  });
+  return apiUpload<IdentifyResult>('/items/identify', form, accessToken);
+}

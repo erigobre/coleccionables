@@ -1,9 +1,7 @@
 // Default apunta al backend NestJS ya desplegado en Coolify (ver
 // deploy/.env → APP_PUBLIC_URL). Se puede sobreescribir con EXPO_PUBLIC_API_URL
 // para apuntar a un backend local durante desarrollo.
-// TODO: mover a https://api.frikidex.com cuando se configure el dominio
-// (frikidex.com / frikidex.app) en Coolify.
-const DEFAULT_API_URL = 'http://wfjhkiodddiyyoarjxxlj4jz.108.174.152.198.sslip.io';
+const DEFAULT_API_URL = 'https://api.frikidex.com';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? DEFAULT_API_URL;
 
