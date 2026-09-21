@@ -81,9 +81,18 @@ export class GeminiService {
   // con la herramienta `googleSearch` en la misma llamada, así que aquí se le pide
   // al modelo por prompt que responda ÚNICAMENTE con un JSON y se parsea de forma
   // tolerante (buscando el primer/último `{`/`}` del texto de respuesta).
-  async lookupMarketPrice(itemDescription: string, currency: string): Promise<MarketPriceResult> {
+  async lookupMarketPrice(
+    itemDescription: string,
+    currency: string,
+    knownFields: string,
+  ): Promise<MarketPriceResult> {
     const prompt = `Busca el precio promedio actual de mercado (reventa/coleccionismo, no precio original de lista) para este objeto coleccionable:
 "${itemDescription}"
+
+Estos datos ya los conoce el usuario y están guardados en su ficha (NO los repitas ni los parafrasees en "collectorNotes"):
+${knownFields || '(sin datos adicionales registrados)'}
+
+Además del precio, busca y aporta datos de interés para un coleccionista que NO estén ya en la lista anterior: qué tan raro o común es, si tuvo una tirada limitada o edición especial, si está descontinuado, variantes conocidas, o cualquier dato que explique por qué le importaría a un coleccionista. Si no encuentras nada relevante que no esté ya cubierto, deja el texto breve o vacío en vez de inventar o repetir.
 
 Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con esta forma exacta:
 {
@@ -91,7 +100,8 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
   "currency": "${currency}",
   "availability": "DISPONIBLE" | "AGOTADO" | "NO_EN_MERCADO",
   "purchaseLinks": [<URLs relevantes como strings, puede ser vacío>],
-  "summary": "<resumen breve en español de 1-2 frases>"
+  "summary": "<resumen breve en español de 1-2 frases sobre el precio>",
+  "collectorNotes": "<2-4 frases en español sobre rareza/tiraje/interés coleccionable, sin repetir los datos ya conocidos; vacío si no hay nada nuevo que aportar>"
 }`;
 
     const response = await this.client.models.generateContent({
@@ -116,6 +126,7 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
         availability: 'NO_EN_MERCADO',
         purchaseLinks: [],
         summary: text.trim() || 'No se pudo determinar el precio de mercado.',
+        collectorNotes: '',
       };
     }
 
@@ -127,6 +138,7 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
         availability: parsed.availability ?? 'NO_EN_MERCADO',
         purchaseLinks: Array.isArray(parsed.purchaseLinks) ? parsed.purchaseLinks : [],
         summary: parsed.summary ?? '',
+        collectorNotes: typeof parsed.collectorNotes === 'string' ? parsed.collectorNotes : '',
       };
     } catch (error) {
       this.logger.error(`No se pudo parsear la respuesta de precio de mercado: ${text}`, error);
@@ -136,6 +148,7 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
         availability: 'NO_EN_MERCADO',
         purchaseLinks: [],
         summary: text.trim() || 'No se pudo determinar el precio de mercado.',
+        collectorNotes: '',
       };
     }
   }

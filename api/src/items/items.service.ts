@@ -269,13 +269,35 @@ export class ItemsService {
   }
 
   // Botón "Solicitar precio actual promedio de mercado" (plan §5.3.9.10).
+  // También pide notas de interés para coleccionista (rareza/tiraje/etc.) en
+  // la misma llamada, evitando repetir lo que el usuario ya tiene registrado.
   async lookupMarketPrice(ownerId: string, id: string) {
     const item = await this.assertOwnedItem(ownerId, id);
     const description = [item.name, item.brand, item.toyLine, item.edition, item.releaseYear]
       .filter(Boolean)
       .join(', ');
 
-    const marketPrice = await this.geminiService.lookupMarketPrice(description, item.currency);
+    const knownFields = [
+      ['Categoría', item.category],
+      ['Empaque', item.packagingCondition],
+      ['Estado de uso', item.usageState],
+      ['Conservación', item.conservationState],
+      ['Marca', item.brand],
+      ['Línea/modelo', item.toyLine],
+      ['Edición', item.edition],
+      ['Escala/altura', item.scale],
+      ['Diseñador', item.designer],
+      ['Año de lanzamiento', item.releaseYear],
+      ['Número de set original', item.originalSetNumber],
+      ['Identificador único', item.uniqueIdentifier],
+      ['Cantidad', item.quantity],
+      ['Notas existentes del usuario', item.notes],
+    ]
+      .filter(([, value]) => value !== null && value !== undefined && value !== '')
+      .map(([label, value]) => `- ${label}: ${value}`)
+      .join('\n');
+
+    const marketPrice = await this.geminiService.lookupMarketPrice(description, item.currency, knownFields);
 
     await this.prisma.usageEvent.create({
       data: { userId: ownerId, type: 'MARKET_PRICE_LOOKUP', metadata: { itemId: id } },

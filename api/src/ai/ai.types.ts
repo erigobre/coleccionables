@@ -33,6 +33,7 @@ export interface MarketPriceResult {
   availability: MarketAvailability;
   purchaseLinks: string[];
   summary: string;
+  collectorNotes: string;
 }
 
 export interface ImageInput {
