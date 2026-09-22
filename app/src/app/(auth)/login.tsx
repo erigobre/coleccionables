@@ -5,6 +5,7 @@ import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
+import { colors } from '../../theme/tokens';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -55,7 +56,7 @@ export default function LoginScreen() {
 
       <View className="mt-6 flex-row justify-center">
         <Text className="text-sm text-textMuted">¿No tienes cuenta? </Text>
-        <Link href="/(auth)/register" className="font-body-bold text-sm text-primary">
+        <Link href="/(auth)/register" className="font-body-bold text-sm" style={{ color: colors.primary }}>
           Regístrate
         </Link>
       </View>

@@ -22,16 +22,24 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
-    const existing = await this.prisma.user.findUnique({ where: { email: dto.email } });
-    if (existing) {
+    const username = dto.username.toLowerCase();
+    const [existingEmail, existingUsername] = await Promise.all([
+      this.prisma.user.findUnique({ where: { email: dto.email } }),
+      this.prisma.user.findUnique({ where: { username } }),
+    ]);
+    if (existingEmail) {
       throw new ConflictException('Ya existe una cuenta con ese correo');
+    }
+    if (existingUsername) {
+      throw new ConflictException('Ese usuario ya está en uso');
     }
 
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
     const user = await this.prisma.$transaction(async (tx) => {
+      // La organización ya no la nombra el usuario a mano; se deriva de su nombre.
       const organization = await tx.organization.create({
-        data: { name: dto.organizationName },
+        data: { name: `Colección de ${dto.name}` },
       });
 
       const createdUser = await tx.user.create({
@@ -40,6 +48,7 @@ export class AuthService {
           email: dto.email,
           passwordHash,
           name: dto.name,
+          username,
           role: 'OWNER',
         },
       });
@@ -67,6 +76,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       name: user.name,
+      username: user.username,
       role: user.role,
       organizationId: user.organizationId,
     });
@@ -91,6 +101,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       name: user.name,
+      username: user.username,
       role: user.role,
       organizationId: user.organizationId,
     });
@@ -115,6 +126,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       name: user.name,
+      username: user.username,
       role: user.role,
       organizationId: user.organizationId,
     });

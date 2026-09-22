@@ -5,17 +5,22 @@ import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
+import { colors } from '../../theme/tokens';
+
+// Solo minúsculas, números y guion bajo: debe coincidir con RegisterDto en el backend.
+const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
 
 export default function RegisterScreen() {
   const { register } = useAuth();
   const [name, setName] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const canSubmit = name.length >= 2 && organizationName.length >= 2 && email.length > 0 && password.length >= 8;
+  const canSubmit =
+    name.length >= 2 && USERNAME_REGEX.test(username) && email.length > 0 && password.length >= 8;
 
   const onSubmit = async () => {
     setError(null);
@@ -23,7 +28,7 @@ export default function RegisterScreen() {
     try {
       await register({
         name: name.trim(),
-        organizationName: organizationName.trim(),
+        username: username.trim().toLowerCase(),
         email: email.trim(),
         password,
       });
@@ -43,11 +48,17 @@ export default function RegisterScreen() {
 
       <TextField label="Tu nombre" value={name} onChangeText={setName} autoComplete="name" placeholder="Ej. Erick" />
       <TextField
-        label="Nombre de tu cuenta"
-        value={organizationName}
-        onChangeText={setOrganizationName}
-        placeholder="Ej. Mi colección, o el nombre de tu familia/negocio"
+        label="Usuario"
+        value={username}
+        onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_]/g, ''))}
+        placeholder="tu_usuario"
+        autoCapitalize="none"
+        autoCorrect={false}
       />
+      <Text className="-mt-3 mb-4 text-xs text-textMuted">
+        Es tu identificador único, como en Instagram o Twitter (@usuario). Solo minúsculas, números y guion bajo;
+        más adelante servirá para que otros te sigan.
+      </Text>
       <TextField
         label="Correo"
         value={email}
@@ -71,7 +82,7 @@ export default function RegisterScreen() {
 
       <View className="mt-6 flex-row justify-center">
         <Text className="text-sm text-textMuted">¿Ya tienes cuenta? </Text>
-        <Link href="/(auth)/login" className="font-body-bold text-sm text-primary">
+        <Link href="/(auth)/login" className="font-body-bold text-sm" style={{ color: colors.primary }}>
           Inicia sesión
         </Link>
       </View>

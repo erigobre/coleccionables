@@ -51,6 +51,8 @@ model User {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   email        String   @unique
+  // @usuario único para poder seguir gente y armar el feed de la colección (plan futuro).
+  username     String?  @unique
   passwordHash String
   name         String
   role         UserRole @default(OWNER)

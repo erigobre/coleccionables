@@ -6,6 +6,7 @@ export interface AuthUser {
   sub: string;
   email: string;
   name: string;
+  username: string | null;
   role: string;
   organizationId: string;
 }
@@ -15,7 +16,7 @@ interface AuthContextValue {
   accessToken: string | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (fields: { name: string; organizationName: string; email: string; password: string }) => Promise<void>;
+  register: (fields: { name: string; username: string; email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -58,7 +59,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (fields: { name: string; organizationName: string; email: string; password: string }) => {
+    async (fields: { name: string; username: string; email: string; password: string }) => {
       const next = await registerRequest(fields);
       await applyTokens(next);
     },

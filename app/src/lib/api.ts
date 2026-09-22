@@ -142,7 +142,7 @@ export async function apiUpload<T>(path: string, form: FormData, accessToken: st
 
 export function registerRequest(dto: {
   name: string;
-  organizationName: string;
+  username: string;
   email: string;
   password: string;
 }) {
