@@ -38,9 +38,11 @@ const USD_PER_1M_OUTPUT_TOKENS = 0.3;
 // Umbral bajo/medio deliberadamente estricto: falsos positivos aquí solo
 // cuestan un reintento ("sube otra foto"), pero un falso negativo en
 // contenido sexual es lo que este chequeo existe para evitar.
+// HARM_CATEGORY_IMAGE_SEXUALLY_EXPLICIT existe en el enum del SDK pero la API
+// de generateContent la rechaza con 400 INVALID_ARGUMENT (es válida solo para
+// otros endpoints, ej. generación de imágenes) — no incluirla aquí.
 const SAFETY_SETTINGS: SafetySetting[] = [
   { category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_IMAGE_SEXUALLY_EXPLICIT, threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
   { category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
 ];
@@ -50,7 +52,6 @@ const SAFETY_SETTINGS: SafetySetting[] = [
 // tratan como incidente de moderación.
 const WATCHED_HARM_CATEGORIES = new Set<HarmCategory>([
   HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-  HarmCategory.HARM_CATEGORY_IMAGE_SEXUALLY_EXPLICIT,
   HarmCategory.HARM_CATEGORY_HARASSMENT,
   HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
 ]);
