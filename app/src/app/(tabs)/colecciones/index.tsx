@@ -48,6 +48,17 @@ export default function ColeccionesScreen() {
   );
 
   if (collections === null) {
+    // Si `load()` falla (sesión vencida, sin red, etc.) `collections` nunca deja
+    // de ser null: sin esta rama la pantalla se queda cargando para siempre en
+    // vez de mostrar el error con un botón para reintentar.
+    if (error) {
+      return (
+        <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+          <Text className="text-center text-sm text-danger">{error}</Text>
+          <Button label="Reintentar" onPress={load} />
+        </View>
+      );
+    }
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.primary} />

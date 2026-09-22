@@ -323,7 +323,12 @@ export default function YaLoTengoScreen() {
               <Text className="text-sm text-white">Volver</Text>
             </Pressable>
           ) : (
-            <View className="h-12 w-12" />
+            <Pressable
+              onPress={() => router.replace('/(tabs)/objetos/captura')}
+              className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
+            >
+              <Text className="text-sm text-white">Objeto nuevo</Text>
+            </Pressable>
           )}
         </View>
         {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}

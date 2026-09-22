@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { ApiError, loginRequest, registerRequest, type AuthTokens } from '../lib/api';
+import { ApiError, loginRequest, registerRequest, setTokenListener, type AuthTokens } from '../lib/api';
 import { clearTokens, decodeJwtPayload, loadTokens, saveTokens } from '../lib/auth-storage';
 
 export interface AuthUser {
@@ -33,6 +33,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loadTokens()
       .then(setTokens)
       .finally(() => setIsLoading(false));
+  }, []);
+
+  // api.ts renueva el access token solo cuando expira (401) y avisa acá para
+  // que el estado de React no quede desincronizado de lo que ya guardó en
+  // SecureStore; si el refresh token también venció, avisa con `null` y esto
+  // desloguea (Stack.Protected en _layout.tsx manda a la pantalla de login).
+  useEffect(() => {
+    setTokenListener(setTokens);
+    return () => setTokenListener(null);
   }, []);
 
   const applyTokens = useCallback(async (next: AuthTokens) => {

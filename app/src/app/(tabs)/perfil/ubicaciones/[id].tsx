@@ -123,6 +123,14 @@ export default function LocationDetailScreen() {
   };
 
   if (node === undefined) {
+    if (error) {
+      return (
+        <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+          <Text className="text-center text-sm text-danger">{error}</Text>
+          <Button label="Reintentar" onPress={load} />
+        </View>
+      );
+    }
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.primary} />

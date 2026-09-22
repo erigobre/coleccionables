@@ -3,6 +3,7 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { authErrorMessage, useAuth } from '../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../lib/api';
@@ -234,7 +235,11 @@ export default function ObjetosScreen() {
         {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 
         {items === null ? (
-          <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+          error ? (
+            <Button label="Reintentar" onPress={load} />
+          ) : (
+            <ActivityIndicator color={colors.primary} style={{ marginTop: 40 }} />
+          )
         ) : visibleItems && visibleItems.length === 0 && soldItems.length === 0 ? (
           <EmptyState
             icon={trimmedQuery ? 'search-outline' : 'cube-outline'}

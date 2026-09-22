@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { TextField } from '../../../components/ui/TextField';
@@ -131,8 +131,9 @@ export default function NewItemScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadFormData = useCallback(() => {
     if (!accessToken) return;
+    setError(null);
     fetchLocationTree(accessToken).then(setLocations).catch((err) => setError(authErrorMessage(err)));
     fetchActiveCollections(accessToken).then(setCollections).catch((err) => setError(authErrorMessage(err)));
     fetchTags(accessToken)
@@ -151,6 +152,10 @@ export default function NewItemScreen() {
       })
       .catch((err) => setError(authErrorMessage(err)));
   }, [accessToken, draft]);
+
+  useEffect(() => {
+    loadFormData();
+  }, [loadFormData]);
 
   const onChange = <K extends keyof ItemFormValues>(field: K, value: ItemFormValues[K]) => {
     setValues((prev) => ({ ...prev, [field]: value }));
@@ -207,6 +212,14 @@ export default function NewItemScreen() {
   };
 
   if (locations === null || collections === null || tags === null) {
+    if (error) {
+      return (
+        <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+          <Text className="text-center text-sm text-danger">{error}</Text>
+          <Button label="Reintentar" onPress={loadFormData} />
+        </View>
+      );
+    }
     return (
       <View className="flex-1 items-center justify-center bg-background">
         <ActivityIndicator color={colors.primary} />

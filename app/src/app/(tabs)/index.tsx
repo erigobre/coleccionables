@@ -82,13 +82,28 @@ export default function HomeScreen() {
           </View>
 
           {items.length === 0 ? (
-            <View className="mt-8 rounded-xl border border-dashed border-border bg-surface p-6">
-              <Text className="font-body-bold mb-1 text-lg text-text">Registra tu primer objeto</Text>
-              <Text className="mb-5 text-sm text-textMuted">
-                Toma una foto y la IA rellena la ficha por ti. Después podrás ubicarlo, compartirlo o transferirlo.
-              </Text>
-              <Button label="Agregar objeto" onPress={() => router.push('/(tabs)/objetos/captura')} />
-            </View>
+            <>
+              <View className="mt-8 rounded-xl border border-dashed border-border bg-surface p-6">
+                <Text className="font-body-bold mb-1 text-lg text-text">Registra tu primer objeto</Text>
+                <Text className="mb-5 text-sm text-textMuted">
+                  Toma una foto y la IA rellena la ficha por ti. Después podrás ubicarlo, compartirlo o transferirlo.
+                </Text>
+                <Button label="Agregar objeto" onPress={() => router.push('/(tabs)/objetos/captura')} />
+              </View>
+
+              <Pressable
+                onPress={() => router.push('/(tabs)/objetos/ya-lo-tengo')}
+                className="mt-4 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
+              >
+                <View className="flex-1 pr-3">
+                  <Text className="font-display text-xl uppercase tracking-wide text-white">¿Ya lo tengo?</Text>
+                  <Text className="mt-1 text-sm text-white/80">
+                    Fotografía algo que viste en una tienda y comprueba si ya está en tu colección.
+                  </Text>
+                </View>
+                <Ionicons name="camera" size={32} color={colors.white} />
+              </Pressable>
+            </>
           ) : (
             <>
               <Pressable

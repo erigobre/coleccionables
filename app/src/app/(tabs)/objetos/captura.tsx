@@ -140,7 +140,6 @@ export default function CapturaScreen() {
         </Text>
         <View className="w-full gap-3">
           <Button label="Permitir cámara" onPress={requestPermission} />
-          <Button label="Llenar datos manualmente" variant="ghost" onPress={onManual} loading={busy === 'manual'} />
         </View>
       </View>
     );
@@ -178,14 +177,22 @@ export default function CapturaScreen() {
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
           <Button label="Analizar" onPress={onAnalyze} loading={busy === 'analizar'} disabled={busy === 'manual'} />
-          {photos.length < MAX_PHOTOS ? (
-            <Button label="Agregar otra foto" variant="ghost" onPress={() => setAdding(true)} disabled={busy !== null} />
-          ) : null}
-          <Pressable onPress={onManual} disabled={busy !== null} className="items-center py-2">
-            <Text className="text-sm text-textMuted underline">
-              {busy === 'manual' ? 'Subiendo fotos…' : 'No gracias, llenaré los datos manualmente'}
-            </Text>
-          </Pressable>
+          <View className="flex-row gap-3">
+            <View className="flex-1">
+              {photos.length < MAX_PHOTOS ? (
+                <Button label="+Fotos" variant="ghost" onPress={() => setAdding(true)} disabled={busy !== null} />
+              ) : null}
+            </View>
+            <View className="flex-1">
+              <Button
+                label="Llenado manual"
+                variant="ghost"
+                onPress={onManual}
+                loading={busy === 'manual'}
+                disabled={busy === 'analizar'}
+              />
+            </View>
+          </View>
           <Text className="text-center text-xs text-textMuted">
             Al analizar, la foto se envía a un servicio de IA para reconocer el objeto.
           </Text>
@@ -267,13 +274,22 @@ export default function CapturaScreen() {
               <Text className="text-sm text-white">Volver</Text>
             </Pressable>
           ) : (
-            <Pressable
-              onPress={onManual}
-              disabled={busy !== null}
-              className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
-            >
-              <Text className="text-sm text-white">Manual</Text>
-            </Pressable>
+            <View className="items-end gap-2">
+              <Pressable
+                onPress={onManual}
+                disabled={busy !== null}
+                className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
+              >
+                <Text className="text-sm text-white">Manual</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => router.replace('/(tabs)/objetos/ya-lo-tengo')}
+                disabled={busy !== null}
+                className="h-9 items-center justify-center rounded-full bg-primary px-3"
+              >
+                <Text className="font-body-medium text-xs text-primaryText">¿Ya lo tengo?</Text>
+              </Pressable>
+            </View>
           )}
         </View>
 

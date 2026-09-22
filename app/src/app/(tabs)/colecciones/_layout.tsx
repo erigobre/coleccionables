@@ -9,7 +9,7 @@ export default function ColeccionesStackLayout() {
         headerShadowVisible: false,
         headerTintColor: colors.text,
         headerTitleStyle: { color: colors.text },
-        headerBackTitle: '',
+        headerBackTitle: 'Atrás',
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

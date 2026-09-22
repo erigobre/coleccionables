@@ -161,23 +161,25 @@ export default function WishlistScreen() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<WishlistItem | null>(null);
 
+  const load = useCallback(() => {
+    if (!accessToken) return () => {};
+    let active = true;
+    fetchWishlist(accessToken)
+      .then((loaded) => {
+        if (!active) return;
+        setItems(loaded);
+        setError(null);
+      })
+      .catch((err) => {
+        if (active) setError(authErrorMessage(err));
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
   useFocusEffect(
-    useCallback(() => {
-      if (!accessToken) return;
-      let active = true;
-      fetchWishlist(accessToken)
-        .then((loaded) => {
-          if (!active) return;
-          setItems(loaded);
-          setError(null);
-        })
-        .catch((err) => {
-          if (active) setError(authErrorMessage(err));
-        });
-      return () => {
-        active = false;
-      };
-    }, [accessToken]),
+    useCallback(() => load(), [load]),
   );
 
   return (
@@ -194,7 +196,10 @@ export default function WishlistScreen() {
       </View>
 
       {error && items === null ? (
-        <Text className="mt-8 text-center text-sm text-danger">{error}</Text>
+        <View className="mt-8 items-center gap-4">
+          <Text className="text-center text-sm text-danger">{error}</Text>
+          <Button label="Reintentar" onPress={load} />
+        </View>
       ) : items === null ? (
         <ActivityIndicator className="mt-12" color={colors.primary} />
       ) : items.length === 0 ? (
