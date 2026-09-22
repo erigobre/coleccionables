@@ -19,6 +19,7 @@ import { WishlistModule } from './wishlist/wishlist.module.js';
 import { ShareModule } from './share/share.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { FtModule } from './ft/ft.module.js';
+import { LegalModule } from './legal/legal.module.js';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { FtModule } from './ft/ft.module.js';
     ShareModule,
     AdminModule,
     FtModule,
+    LegalModule,
   ],
   controllers: [AppController],
   providers: [AppService],
