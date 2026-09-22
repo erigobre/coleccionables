@@ -1,13 +1,16 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
+import { FtService } from '../ft/ft.service.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { JwtPayload } from './auth.types.js';
 
 const SALT_ROUNDS = 10;
+const MONTHLY_FREE_FT_FALLBACK = 20;
+const FREE_FT_LOT_DAYS = 30;
 
 export interface Tokens {
   accessToken: string;
@@ -16,9 +19,12 @@ export interface Tokens {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
+    private readonly ftService: FtService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -72,6 +78,29 @@ export class AuthService {
       return createdUser;
     });
 
+    // Regalo inicial de FrikiTokens (fuera de la transacción de arriba: si
+    // fallara, la cuenta ya quedó creada y el cron diario de regalo mensual
+    // la recoge de todos modos porque `ftFreeGrantAt` sigue en null).
+    try {
+      const amount = await this.ftService.getConfigValue('MONTHLY_FREE_FT', MONTHLY_FREE_FT_FALLBACK);
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + FREE_FT_LOT_DAYS);
+      await this.prisma.organization.update({
+        where: { id: user.organizationId },
+        data: { ftFreeGrantAt: new Date() },
+      });
+      await this.ftService.grant({
+        organizationId: user.organizationId,
+        userId: user.id,
+        source: 'MONTHLY_FREE',
+        amount,
+        expiresAt,
+        idempotencyKey: `signup-free:${user.organizationId}`,
+      });
+    } catch (error) {
+      this.logger.warn(`No se pudo dar el regalo inicial de FT a ${user.organizationId}`, error as Error);
+    }
+
     return this.issueTokens({
       sub: user.id,
       email: user.email,
@@ -91,6 +120,9 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash);
     if (!passwordMatches) {
       throw new UnauthorizedException('Credenciales inválidas');
+    }
+    if (user.status === 'SUSPENDED') {
+      throw new UnauthorizedException('Tu cuenta está suspendida. Contacta a soporte si crees que es un error.');
     }
 
     await this.prisma.usageEvent.create({
@@ -120,6 +152,9 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
     if (!user) {
       throw new UnauthorizedException('Refresh token inválido o expirado');
+    }
+    if (user.status === 'SUSPENDED') {
+      throw new UnauthorizedException('Tu cuenta está suspendida');
     }
 
     return this.issueTokens({

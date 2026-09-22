@@ -20,6 +20,11 @@ enum UserRole {
   MEMBER // miembro invitado dentro de la Organization
 }
 
+enum UserStatus {
+  ACTIVE
+  SUSPENDED // bloqueada por moderación (ver ModerationFlag) o manualmente por un superadmin
+}
+
 enum SubscriptionStatus {
   ACTIVE
   PAST_DUE
@@ -42,6 +47,15 @@ model Organization {
   users    User[]
   payments Payment[]
 
+  // FrikiTokens: el saldo cuelga de la Organization (igual que plan/payments),
+  // no del User, porque así ya se factura todo lo demás (plan §7.1: los
+  // miembros de una misma Organization comparten plan/pago).
+  ftLots         FtLot[]
+  ftTransactions FtTransaction[]
+  ftFreeGrantAt  DateTime? // última vez que se le dio el regalo mensual de FT gratis
+
+  moderationFlags ModerationFlag[]
+
   @@map("organizations")
 }
 
@@ -55,7 +69,8 @@ model User {
   username     String?  @unique
   passwordHash String
   name         String
-  role         UserRole @default(OWNER)
+  role         UserRole   @default(OWNER)
+  status       UserStatus @default(ACTIVE)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -70,6 +85,8 @@ model User {
   usageEvents           UsageEvent[]
   locationMemberships   LocationMember[]
   collectionMemberships CollectionMember[]
+  ftTransactions        FtTransaction[] // quién disparó cada cobro, para auditoría
+  moderationFlags       ModerationFlag[] // incidentes de moderación de IA disparados por este usuario
 
   @@map("users")
 }
@@ -154,6 +171,137 @@ model UsageEvent {
 
   @@index([userId, type])
   @@map("usage_events")
+}
+
+// ---------------------------------------------------------------------------
+// FrikiTokens (FT): moneda virtual interna para medir/cobrar el uso de IA
+// (Gemini). El saldo vive en la Organization (ver comentario en Organization).
+// ---------------------------------------------------------------------------
+
+// Acciones de IA que cuestan FT. Catálogo editable desde el panel Superadmin
+// (Fase 9); esta tabla guarda el costo vigente, sembrado con valores iniciales
+// en la migración.
+enum FtServiceKey {
+  CREATE_WITH_AI      // Analizar fotos al dar de alta (sin búsqueda web)
+  SCAN_HAVE_IT        // "¿Ya lo tengo?" con foto (sin búsqueda web)
+  BARCODE_LOOKUP      // Lectura de código de barras (con búsqueda web)
+  MARKET_PRICE_FRESH  // Precio de mercado, consulta nueva a Gemini (con búsqueda web)
+  MARKET_PRICE_CACHED // Precio de mercado, reutilizando el último resultado guardado
+}
+
+model FtServiceConfig {
+  key       FtServiceKey @id
+  label     String
+  ftCost    Int
+  active    Boolean      @default(true)
+  updatedAt DateTime     @updatedAt
+
+  @@map("ft_service_configs")
+}
+
+// Perillas globales del módulo, editables a futuro desde Superadmin sin
+// necesitar un deploy (ej. cuántos FT gratis se regalan al mes).
+model FtConfig {
+  key   String @id
+  value Int
+
+  @@map("ft_configs")
+}
+
+enum FtLotSource {
+  MONTHLY_FREE // Regalo mensual del plan gratuito
+  PURCHASE     // Compra real (IAP / Stripe) — fase futura
+  PROMO        // Regalo manual del superadmin
+  REFUND       // Devolución de un cobro que se retuvo (HELD) pero falló
+}
+
+// El saldo se guarda por "lotes", no como un solo número: así cada lote puede
+// expirar por su cuenta (ej. el regalo mensual) y se gasta primero el que
+// vence antes (o el que ya expiró se ignora), sin afectar lotes comprados que
+// no expiran.
+model FtLot {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  source         FtLotSource
+  amount         Int // saldo restante de este lote
+  originalAmount Int // monto original, para historial/reportes
+  expiresAt      DateTime? // null = no expira (ej. FT comprados)
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, expiresAt])
+  @@map("ft_lots")
+}
+
+enum FtTransactionType {
+  CHARGE // Consumo por una acción de IA
+  GRANT  // Alta de FT: regalo mensual, promo o compra
+}
+
+enum FtTransactionStatus {
+  HELD      // Descontado del saldo, esperando que la acción de IA termine (patrón hold/confirm/release)
+  CONFIRMED // La acción de IA terminó bien; el cobro queda en firme
+  RELEASED  // La acción de IA falló; el saldo se devolvió (lote FtLotSource.REFUND)
+}
+
+// Bitácora de cada movimiento de FT. `idempotencyKey` evita cobrar 2 veces si
+// el cliente reintenta la misma acción (ej. por un timeout de red), y
+// `realCostUsd` (calculado del usageMetadata real de Gemini) sirve para medir
+// el margen real entre lo cobrado en FT y lo que cuesta la IA de verdad.
+model FtTransaction {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String? // null en regalos automáticos (regalo mensual, sin usuario que lo dispare)
+  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type           FtTransactionType
+  service        FtServiceKey?
+  status         FtTransactionStatus @default(HELD)
+  ftAmount       Int // siempre positivo; el signo lo da `type`
+  idempotencyKey String              @unique
+  realCostUsd    Decimal?            @db.Decimal(10, 6)
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  confirmedAt    DateTime?
+
+  @@index([organizationId, createdAt])
+  @@map("ft_transactions")
+}
+
+// Qué se hizo automáticamente al detectar el incidente. AUTO_SUSPENDED solo se
+// usa para la señal de más confianza (el filtro de seguridad propio de Google,
+// auditado para esto); todo lo demás (ej. "no parece un objeto coleccionable",
+// que puede confundirse con una figura/muñeco con rostro humano) solo se
+// marca para revisión humana, nunca suspende sola.
+enum ModerationAction {
+  AUTO_SUSPENDED
+  FLAGGED_FOR_REVIEW
+}
+
+// Incidente detectado por la IA al analizar fotos (plan: bloqueo/reporte de
+// contenido no apto, confirmado con el owner 2026-09-22). `category` queda
+// como texto libre (no enum cerrado) porque viene de las categorías de Google
+// (HarmCategory) o de nuestro propio check, y Google puede agregar categorías
+// sin que eso requiera una migración. `userId` es nullable con SetNull (igual
+// que FtTransaction) para que el historial de moderación sobreviva aunque la
+// cuenta se borre después.
+model ModerationFlag {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  context        String // endpoint/flujo que lo disparó: "analyzePhotos" | "identify"
+  category       String // ej. "sexually_explicit", "not_collectible", "possible_person"
+  detail         String?           @db.Text // nota de la IA para que el revisor entienda qué vio
+  action         ModerationAction
+  reviewedAt     DateTime?
+  reviewedById   String? // id del superadmin que revisó (sin relación FK: no debe romperse si ese admin se borra)
+  resolution     String?           @db.Text
+  createdAt      DateTime          @default(now())
+
+  @@index([organizationId, createdAt])
+  @@map("moderation_flags")
 }
 
 // ---------------------------------------------------------------------------
@@ -349,6 +497,12 @@ model Item {
   returnedFromSeason  Boolean                @default(true) // false mientras está "fuera" de su ubicación permanente por temporada
 
   syncStatus SyncStatus @default(SYNCED)
+
+  // Último resultado de "precio de mercado" (plan FrikiTokens): se guarda para
+  // poder ofrecer un re-consulta barata (MARKET_PRICE_CACHED) mostrando la
+  // fecha del dato, en vez de cobrar siempre una llamada nueva a Gemini.
+  lastMarketPriceResult Json?
+  lastMarketPriceAt     DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

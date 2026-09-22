@@ -18,6 +18,7 @@ import { TransfersModule } from './transfers/transfers.module.js';
 import { WishlistModule } from './wishlist/wishlist.module.js';
 import { ShareModule } from './share/share.module.js';
 import { AdminModule } from './admin/admin.module.js';
+import { FtModule } from './ft/ft.module.js';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AdminModule } from './admin/admin.module.js';
     WishlistModule,
     ShareModule,
     AdminModule,
+    FtModule,
   ],
   controllers: [AppController],
   providers: [AppService],

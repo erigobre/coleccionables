@@ -8,6 +8,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../../global.css';
 import { AuthProvider, useAuth } from '../context/auth-context';
+import { FtProvider } from '../context/ft-context';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -20,8 +21,10 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <AuthProvider>
-          <RootNavigator fontsLoaded={fontsLoaded} />
-          <StatusBar style="light" />
+          <FtProvider>
+            <RootNavigator fontsLoaded={fontsLoaded} />
+            <StatusBar style="light" />
+          </FtProvider>
         </AuthProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>

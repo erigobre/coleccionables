@@ -14,6 +14,7 @@ import {
 import { FilesInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
+import { IdempotencyKey } from '../common/decorators/idempotency-key.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { ItemsService } from './items.service.js';
 import { CreateItemDto } from './dto/create-item.dto.js';
@@ -21,6 +22,7 @@ import { UpdateItemDto } from './dto/update-item.dto.js';
 import { ChangeLocationDto } from './dto/change-location.dto.js';
 import { MatchItemDto } from './dto/match-item.dto.js';
 import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
+import { LookupMarketPriceDto } from './dto/lookup-market-price.dto.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -47,24 +49,39 @@ export class ItemsController {
     return this.itemsService.match(user.id, dto);
   }
 
-  // Analiza fotos con IA y las sube ya comprimidas (plan §5.3.6-9).
+  // Analiza fotos con IA y las sube ya comprimidas (plan §5.3.6-9). Cobra FT
+  // (CREATE_WITH_AI); requiere el header Idempotency-Key.
   @Post('analyze')
   @UseInterceptors(FilesInterceptor('photos'))
-  analyze(@UploadedFiles() photos: Express.Multer.File[]) {
-    return this.itemsService.analyzePhotos(photos);
+  analyze(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFiles() photos: Express.Multer.File[],
+    @IdempotencyKey() idempotencyKey: string,
+  ) {
+    return this.itemsService.analyzePhotos(user.id, user.organizationId, photos, idempotencyKey);
   }
 
-  // "¿Ya lo tengo?": identifica el objeto de la foto y lo busca en la colección.
+  // "¿Ya lo tengo?": identifica el objeto de la foto y lo busca en la
+  // colección. Cobra FT (SCAN_HAVE_IT); requiere Idempotency-Key.
   @Post('identify')
   @UseInterceptors(FilesInterceptor('photos'))
-  identify(@CurrentUser() user: AuthenticatedUser, @UploadedFiles() photos: Express.Multer.File[]) {
-    return this.itemsService.identify(user.id, photos);
+  identify(
+    @CurrentUser() user: AuthenticatedUser,
+    @UploadedFiles() photos: Express.Multer.File[],
+    @IdempotencyKey() idempotencyKey: string,
+  ) {
+    return this.itemsService.identify(user.id, user.organizationId, photos, idempotencyKey);
   }
 
   // Busca el producto por código de barras (EAN/UPC) leído con la cámara.
+  // Cobra FT (BARCODE_LOOKUP); requiere Idempotency-Key.
   @Post('lookup-barcode')
-  lookupBarcode(@Body() dto: LookupBarcodeDto) {
-    return this.itemsService.lookupBarcode(dto.barcode);
+  lookupBarcode(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: LookupBarcodeDto,
+    @IdempotencyKey() idempotencyKey: string,
+  ) {
+    return this.itemsService.lookupBarcode(user.id, user.organizationId, dto.barcode, idempotencyKey);
   }
 
   // Antes de ':id' para que "sold" no se interprete como un id.
@@ -102,9 +119,23 @@ export class ItemsController {
     return this.itemsService.findSimilar(user.id, id);
   }
 
+  // Antes de cobrar: dice si hay un precio guardado y de cuándo, para que la
+  // app ofrezca "usar ese dato (menos FT)" vs "consultar uno nuevo (más FT)".
+  @Get(':id/market-price')
+  peekMarketPrice(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.itemsService.peekMarketPrice(user.id, id);
+  }
+
+  // Cobra FT (MARKET_PRICE_CACHED o MARKET_PRICE_FRESH según `dto.mode`);
+  // requiere Idempotency-Key.
   @Post(':id/market-price')
-  lookupMarketPrice(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.itemsService.lookupMarketPrice(user.id, id);
+  lookupMarketPrice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: LookupMarketPriceDto,
+    @IdempotencyKey() idempotencyKey: string,
+  ) {
+    return this.itemsService.lookupMarketPrice(user.id, user.organizationId, id, dto.mode, idempotencyKey);
   }
 
   @Patch(':id/location')

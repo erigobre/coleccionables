@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
+import type { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 
 const ACTIVE_WINDOW_DAYS = 30;
 
@@ -24,6 +25,7 @@ export class AdminService {
         name: true,
         email: true,
         role: true,
+        status: true,
         createdAt: true,
         organization: {
           select: { id: true, name: true, plan: true, subscriptionStatus: true, sponsored: true },
@@ -100,6 +102,46 @@ export class AdminService {
       aiScansThisMonth,
       activeUsersLast30Days: activeUsers.length,
     };
+  }
+
+  // "Reportes" de moderación (plan de bloqueo de contenido no apto, confirmado
+  // con el owner 2026-09-22): el reporte vive como cola de revisión interna
+  // aquí; un reporte externo (ej. NCMEC para CSAM real) es una decisión legal
+  // que le corresponde al owner tomar caso por caso, no algo que se automatiza.
+  findModerationFlags(reviewed?: boolean) {
+    return this.prisma.moderationFlag.findMany({
+      where: reviewed === undefined ? undefined : { reviewedAt: reviewed ? { not: null } : null },
+      include: { user: { select: { id: true, name: true, email: true, username: true, status: true } } },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async resolveModerationFlag(id: string, adminId: string, dto: ResolveModerationFlagDto) {
+    const flag = await this.prisma.moderationFlag.findUnique({ where: { id } });
+    if (!flag) {
+      throw new NotFoundException('Incidente de moderación no encontrado');
+    }
+
+    const updated = await this.prisma.moderationFlag.update({
+      where: { id },
+      data: { reviewedAt: new Date(), reviewedById: adminId, resolution: dto.resolution },
+    });
+
+    if (dto.reactivateUser && flag.userId) {
+      await this.prisma.user.update({ where: { id: flag.userId }, data: { status: 'ACTIVE' } });
+    }
+
+    return updated;
+  }
+
+  // Suspensión/reactivación manual, para cuando el reporte no vino de la IA
+  // (ej. otro usuario avisó por fuera de la app).
+  async setUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    return this.prisma.user.update({ where: { id: userId }, data: { status } });
   }
 
   private async assertOrganizationExists(id: string) {

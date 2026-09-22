@@ -4,8 +4,9 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { Button } from '../../../../components/ui/Button';
-import { resolvePhotoUrl } from '../../../../lib/api';
+import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
+import { insufficientFtMessage, useFt } from '../../../../context/ft-context';
 import { fetchActiveCollections, type Collection } from '../../../../lib/collections';
 import {
   categoryLabel,
@@ -19,6 +20,7 @@ import {
   deleteItem,
   fetchItem,
   lookupMarketPrice,
+  peekMarketPrice,
   removeItemFromCollection,
   removeItemTag,
   shareItem,
@@ -26,6 +28,7 @@ import {
   unshareItem,
   updateItem,
   type Item,
+  type MarketPricePeek,
   type MarketPriceResult,
 } from '../../../../lib/items';
 import { fetchTags, type Tag } from '../../../../lib/tags';
@@ -53,6 +56,7 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken } = useAuth();
+  const { refresh: refreshFt } = useFt();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
 
@@ -67,17 +71,20 @@ export default function ItemDetailScreen() {
   const [tags, setTags] = useState<Tag[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [marketPeek, setMarketPeek] = useState<MarketPricePeek | null>(null);
   const [marketPrice, setMarketPrice] = useState<MarketPriceResult | null>(null);
-  const [loadingMarketPrice, setLoadingMarketPrice] = useState(false);
+  const [marketPriceInfo, setMarketPriceInfo] = useState<{ fetchedAt: string; fromCache: boolean } | null>(null);
+  const [loadingMarketPrice, setLoadingMarketPrice] = useState<'cached' | 'fresh' | null>(null);
   const [applyingNotes, setApplyingNotes] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
     try {
-      const [fetchedItem, fetchedCollections, fetchedTags] = await Promise.all([
+      const [fetchedItem, fetchedCollections, fetchedTags, peek] = await Promise.all([
         fetchItem(accessToken, id),
         fetchActiveCollections(accessToken),
         fetchTags(accessToken),
+        peekMarketPrice(accessToken, id),
       ]);
       // Con el objeto en transferencia se busca a quién se envió, para poder cancelarla.
       let pending: OutgoingTransfer | null = null;
@@ -89,6 +96,7 @@ export default function ItemDetailScreen() {
       setCollections(fetchedCollections);
       setTags(fetchedTags);
       setPendingTransfer(pending);
+      setMarketPeek(peek);
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -196,19 +204,27 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const onLookupMarketPrice = async () => {
+  // El usuario siempre elige entre reusar el dato guardado (más barato) o pedir
+  // uno nuevo a Gemini (más caro pero al día); nunca se decide en silencio
+  // (decisión confirmada con el owner 2026-09-22).
+  const onLookupMarketPrice = async (mode: 'cached' | 'fresh') => {
     if (!accessToken || !item) return;
-    setLoadingMarketPrice(true);
+    setLoadingMarketPrice(mode);
     setError(null);
     try {
-      const result = await lookupMarketPrice(accessToken, item.id);
+      const result = await lookupMarketPrice(accessToken, item.id, mode);
       setMarketPrice(result.market);
+      setMarketPriceInfo({ fetchedAt: result.fetchedAt, fromCache: result.fromCache });
+      refreshFt();
     } catch (err) {
-      setError(authErrorMessage(err));
+      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
     } finally {
-      setLoadingMarketPrice(false);
+      setLoadingMarketPrice(null);
     }
   };
+
+  const formatMarketDate = (iso: string) =>
+    new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 
   const onUseCollectorNotes = async () => {
     if (!accessToken || !item || !marketPrice?.collectorNotes) return;
@@ -383,6 +399,12 @@ export default function ItemDetailScreen() {
               </Text>
               <Text className="mt-1 text-xs text-textMuted">{marketPrice.availability}</Text>
               <Text className="mt-2 text-xs text-textMuted">{marketPrice.summary}</Text>
+              {marketPriceInfo ? (
+                <Text className="mt-2 text-[11px] text-textMuted">
+                  {marketPriceInfo.fromCache ? 'Dato guardado del ' : 'Consultado hoy, '}
+                  {formatMarketDate(marketPriceInfo.fetchedAt)}
+                </Text>
+              ) : null}
 
               {marketPrice.collectorNotes ? (
                 <View className="mt-4 border-t border-border pt-4">
@@ -400,14 +422,59 @@ export default function ItemDetailScreen() {
                   ) : null}
                 </View>
               ) : null}
+
+              <View className="mt-4">
+                <Button
+                  label={
+                    marketPeek?.fresh.ftCost != null
+                      ? `Consultar precio actualizado hoy (${marketPeek.fresh.ftCost} FT)`
+                      : 'Consultar precio actualizado hoy'
+                  }
+                  variant="ghost"
+                  onPress={() => onLookupMarketPrice('fresh')}
+                  loading={loadingMarketPrice === 'fresh'}
+                  disabled={loadingMarketPrice === 'cached'}
+                />
+              </View>
+            </View>
+          ) : marketPeek ? (
+            <View className="gap-3">
+              {marketPeek.cached ? (
+                <>
+                  <Text className="text-xs text-textMuted">
+                    Ya tenemos una estimación de precio del {formatMarketDate(marketPeek.cached.fetchedAt)}.
+                  </Text>
+                  <Button
+                    label={
+                      marketPeek.cached.ftCost != null
+                        ? `Usar ese dato (${marketPeek.cached.ftCost} FT)`
+                        : 'Usar ese dato'
+                    }
+                    variant="secondary"
+                    onPress={() => onLookupMarketPrice('cached')}
+                    loading={loadingMarketPrice === 'cached'}
+                    disabled={loadingMarketPrice === 'fresh'}
+                  />
+                </>
+              ) : (
+                <Text className="text-xs text-textMuted">
+                  Todavía no hay una estimación guardada para este objeto.
+                </Text>
+              )}
+              <Button
+                label={
+                  marketPeek.fresh.ftCost != null
+                    ? `Consultar precio de hoy (${marketPeek.fresh.ftCost} FT)`
+                    : 'Consultar precio de hoy'
+                }
+                variant={marketPeek.cached ? 'ghost' : 'secondary'}
+                onPress={() => onLookupMarketPrice('fresh')}
+                loading={loadingMarketPrice === 'fresh'}
+                disabled={loadingMarketPrice === 'cached'}
+              />
             </View>
           ) : (
-            <Button
-              label="Solicitar precio actual promedio de mercado"
-              variant="secondary"
-              onPress={onLookupMarketPrice}
-              loading={loadingMarketPrice}
-            />
+            <ActivityIndicator color={colors.primary} />
           )}
         </View>
 

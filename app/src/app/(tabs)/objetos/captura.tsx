@@ -7,6 +7,8 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../components/ui/Button';
 import { authErrorMessage, useAuth } from '../../../context/auth-context';
+import { insufficientFtMessage, useFt } from '../../../context/ft-context';
+import { ApiError } from '../../../lib/api';
 import { setItemDraft } from '../../../lib/item-draft';
 import { EMPTY_ITEM_FORM, itemFormFromExtracted } from '../../../lib/item-form';
 import { analyzeItemPhotos, lookupBarcode, uploadItemPhotos } from '../../../lib/items';
@@ -18,6 +20,7 @@ type CaptureMode = 'foto' | 'codigo';
 
 export default function CapturaScreen() {
   const { accessToken } = useAuth();
+  const { costOf, refresh: refreshFt } = useFt();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
@@ -78,13 +81,17 @@ export default function CapturaScreen() {
     if (/^\d{8,14}$/.test(data)) {
       try {
         const result = await lookupBarcode(accessToken, data);
+        refreshFt();
         if (result.found) {
           values = { ...itemFormFromExtracted(result.extracted), uniqueIdentifier: data };
           suggestedTags = result.extracted.suggestedTags ?? [];
           notice = 'Producto encontrado por su código de barras. Revisa los datos, la IA puede equivocarse.';
         }
-      } catch {
-        notice = `Código leído: ${data}. No se pudo buscar el producto; llena los datos manualmente.`;
+      } catch (err) {
+        notice =
+          err instanceof ApiError && err.status === 402
+            ? `Código leído: ${data}. ${insufficientFtMessage(err.details)} Llena los datos manualmente.`
+            : `Código leído: ${data}. No se pudo buscar el producto; llena los datos manualmente.`;
       }
     } else {
       notice = `Código leído: ${data}. Solo se buscan códigos EAN/UPC; llena los datos manualmente.`;
@@ -100,6 +107,7 @@ export default function CapturaScreen() {
     setError(null);
     try {
       const { extracted, photoUrls } = await analyzeItemPhotos(accessToken, photos);
+      refreshFt();
       setItemDraft({
         values: itemFormFromExtracted(extracted),
         photoUrls,
@@ -108,7 +116,7 @@ export default function CapturaScreen() {
       });
       goToForm();
     } catch (err) {
-      setError(authErrorMessage(err));
+      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
       setBusy(null);
     }
   };
@@ -176,7 +184,12 @@ export default function CapturaScreen() {
 
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
-          <Button label="Analizar" onPress={onAnalyze} loading={busy === 'analizar'} disabled={busy === 'manual'} />
+          <Button
+            label={costOf('CREATE_WITH_AI') != null ? `Analizar (${costOf('CREATE_WITH_AI')} FT)` : 'Analizar'}
+            onPress={onAnalyze}
+            loading={busy === 'analizar'}
+            disabled={busy === 'manual'}
+          />
           <View className="flex-row gap-3">
             <View className="flex-1">
               {photos.length < MAX_PHOTOS ? (

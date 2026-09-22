@@ -7,7 +7,8 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../components/ui/Button';
 import { authErrorMessage, useAuth } from '../../../context/auth-context';
-import { resolvePhotoUrl } from '../../../lib/api';
+import { insufficientFtMessage, useFt } from '../../../context/ft-context';
+import { ApiError, resolvePhotoUrl } from '../../../lib/api';
 import { setItemDraft } from '../../../lib/item-draft';
 import { itemFormFromExtracted } from '../../../lib/item-form';
 import { usageLabel } from '../../../lib/item-enums';
@@ -64,6 +65,7 @@ function MatchCard({ match, highlight, onOpen }: { match: ItemMatch; highlight?:
 // la colección. Si no existe se ofrece agregarlo o mandarlo a la wishlist.
 export default function YaLoTengoScreen() {
   const { accessToken } = useAuth();
+  const { costOf, refresh: refreshFt } = useFt();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [permission, requestPermission] = useCameraPermissions();
@@ -109,8 +111,9 @@ export default function YaLoTengoScreen() {
     setError(null);
     try {
       setResult(await identifyItemPhotos(accessToken, photos));
+      refreshFt();
     } catch (err) {
-      setError(authErrorMessage(err));
+      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
     } finally {
       setBusy(null);
     }
@@ -279,7 +282,11 @@ export default function YaLoTengoScreen() {
 
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
-          <Button label="Buscar en mi colección" onPress={onSearch} loading={busy === 'buscar'} />
+          <Button
+            label={costOf('SCAN_HAVE_IT') != null ? `Buscar en mi colección (${costOf('SCAN_HAVE_IT')} FT)` : 'Buscar en mi colección'}
+            onPress={onSearch}
+            loading={busy === 'buscar'}
+          />
           {photos.length < MAX_PHOTOS ? (
             <Button label="Agregar otra foto" variant="ghost" onPress={() => setAdding(true)} disabled={busy !== null} />
           ) : null}

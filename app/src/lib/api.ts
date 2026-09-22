@@ -58,6 +58,18 @@ async function throwIfError(response: Response): Promise<unknown> {
   return payload;
 }
 
+// FrikiTokens: toda acción que cobra FT necesita un Idempotency-Key (para que
+// un reintento de red no cobre 2 veces la misma acción). Se genera una llave
+// nueva por cada llamada a apiFetch/apiUpload y se reutiliza en el reintento
+// interno tras un refresh de token (sigue siendo la misma acción lógica).
+// No hace falta que sea criptográficamente única: solo distinguir intentos
+// de la misma acción entre sí.
+let idempotencyCounter = 0;
+function generateIdempotencyKey(): string {
+  idempotencyCounter = (idempotencyCounter + 1) % 1_000_000;
+  return `${Date.now().toString(36)}-${idempotencyCounter.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
 // --- Renovación transparente del access token ---
 // El access token dura 15 minutos y antes nunca se renovaba: cualquier
 // pantalla abierta más tiempo que eso empezaba a recibir 401 "Unauthorized" o
@@ -99,9 +111,13 @@ function refreshAccessToken(): Promise<string | null> {
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, accessToken } = options;
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
+  const idempotencyKey = generateIdempotencyKey();
 
   const request = (token?: string | null) => {
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    };
     if (token) headers.Authorization = `Bearer ${token}`;
     return fetch(`${API_BASE_URL}${path}`, { method, headers, body: serializedBody });
   };
@@ -125,8 +141,13 @@ export function resolvePhotoUrl(url: string): string {
 
 // Para multipart NO se fija Content-Type: fetch lo arma con el boundary correcto.
 export async function apiUpload<T>(path: string, form: FormData, accessToken: string): Promise<T> {
+  const idempotencyKey = generateIdempotencyKey();
   const request = (token: string) =>
-    fetch(`${API_BASE_URL}${path}`, { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: form });
+    fetch(`${API_BASE_URL}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': idempotencyKey },
+      body: form,
+    });
 
   const response = await request(accessToken);
 

@@ -1,11 +1,12 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import { ItemCategory } from '@prisma/client';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { ItemCategory, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { GeminiService } from '../ai/gemini.service.js';
-import type { ImageInput } from '../ai/ai.types.js';
+import { FtService } from '../ft/ft.service.js';
+import type { ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
 import type { CreateItemDto } from './dto/create-item.dto.js';
 import type { UpdateItemDto } from './dto/update-item.dto.js';
 import { ChangeLocationDto, LocationChangeDestination, LocationChangeAssignment } from './dto/change-location.dto.js';
@@ -37,6 +38,7 @@ export class ItemsService {
     private readonly locationsService: LocationsService,
     private readonly storageService: StorageService,
     private readonly geminiService: GeminiService,
+    private readonly ftService: FtService,
   ) {}
 
   async create(ownerId: string, dto: CreateItemDto) {
@@ -315,25 +317,83 @@ export class ItemsService {
   // "¿Ya lo tengo?" con foto (plan §5.1): la IA identifica el objeto y se compara
   // contra la colección. A diferencia de `analyzePhotos`, NO guarda las fotos: si
   // el usuario solo consulta, no debe quedar basura en el almacenamiento.
-  async identify(ownerId: string, files: ImageInput[]) {
+  // Cobra FrikiTokens (SCAN_HAVE_IT): ver módulo `ft`.
+  async identify(ownerId: string, organizationId: string, files: ImageInput[], idempotencyKey: string) {
     this.assertHasPhotos(files);
-    const extracted = await this.geminiService.analyzePhotos(files);
-    await this.prisma.usageEvent.create({ data: { userId: ownerId, type: 'AI_SCAN' } });
-    const result = await this.match(ownerId, {
-      name: extracted.name,
-      brand: extracted.brand,
-      toyLine: extracted.toyLine,
-      category: Object.values(ItemCategory).find((c) => c === extracted.category),
-      tags: extracted.suggestedTags,
-    });
-    return { extracted, ...result };
+    return this.ftService.runChargedAction(
+      { organizationId, userId: ownerId, service: 'SCAN_HAVE_IT', idempotencyKey },
+      async () => {
+        const { result: extracted, usage, moderation } = await this.geminiService.analyzePhotos(files);
+        await this.handleModerationSignal(organizationId, ownerId, 'identify', moderation);
+        const matchResult = await this.match(ownerId, {
+          name: extracted.name,
+          brand: extracted.brand,
+          toyLine: extracted.toyLine,
+          category: Object.values(ItemCategory).find((c) => c === extracted.category),
+          tags: extracted.suggestedTags,
+        });
+        return {
+          data: { extracted, ...matchResult },
+          realCostUsd: GeminiService.estimateCostUsd(usage),
+          usageEventType: 'AI_SCAN' as const,
+        };
+      },
+    );
+  }
+
+  // Antes de cobrar nada: le dice a la app si ya hay un precio de mercado
+  // guardado (y de cuándo) para poder ofrecer la elección "usar ese dato por
+  // menos FT" vs "consultar uno nuevo por más FT" (plan FrikiTokens, decisión
+  // confirmada con el owner 2026-09-22).
+  async peekMarketPrice(ownerId: string, id: string) {
+    const item = await this.assertOwnedItem(ownerId, id);
+    const catalog = await this.ftService.getCatalog();
+    const costOf = (key: string) => catalog.find((c) => c.key === key)?.ftCost ?? null;
+
+    return {
+      cached: item.lastMarketPriceResult
+        ? {
+            market: item.lastMarketPriceResult as unknown as MarketPriceResult,
+            fetchedAt: item.lastMarketPriceAt,
+            ftCost: costOf('MARKET_PRICE_CACHED'),
+          }
+        : null,
+      fresh: { ftCost: costOf('MARKET_PRICE_FRESH') },
+    };
   }
 
   // Botón "Solicitar precio actual promedio de mercado" (plan §5.3.9.10).
-  // También pide notas de interés para coleccionista (rareza/tiraje/etc.) en
-  // la misma llamada, evitando repetir lo que el usuario ya tiene registrado.
-  async lookupMarketPrice(ownerId: string, id: string) {
+  // `mode: 'cached'` reutiliza `lastMarketPriceResult` (barato); `mode: 'fresh'`
+  // vuelve a preguntarle a Gemini y actualiza ese caché. Ambos cobran FT.
+  async lookupMarketPrice(
+    ownerId: string,
+    organizationId: string,
+    id: string,
+    mode: 'cached' | 'fresh',
+    idempotencyKey: string,
+  ) {
     const item = await this.assertOwnedItem(ownerId, id);
+
+    if (mode === 'cached') {
+      if (!item.lastMarketPriceResult) {
+        throw new BadRequestException('Todavía no hay un precio de mercado guardado para este objeto');
+      }
+      return this.ftService.runChargedAction(
+        { organizationId, userId: ownerId, service: 'MARKET_PRICE_CACHED', idempotencyKey, metadata: { itemId: id } },
+        async () => ({
+          data: {
+            purchasePrice: item.purchasePrice,
+            currency: item.currency,
+            market: item.lastMarketPriceResult as unknown as MarketPriceResult,
+            fetchedAt: item.lastMarketPriceAt,
+            fromCache: true,
+          },
+          usageEventType: 'MARKET_PRICE_LOOKUP' as const,
+          usageEventMetadata: { itemId: id, fromCache: true },
+        }),
+      );
+    }
+
     const description = [item.name, item.brand, item.toyLine, item.edition, item.releaseYear]
       .filter(Boolean)
       .join(', ');
@@ -358,37 +418,131 @@ export class ItemsService {
       .map(([label, value]) => `- ${label}: ${value}`)
       .join('\n');
 
-    const marketPrice = await this.geminiService.lookupMarketPrice(description, item.currency, knownFields);
-
-    await this.prisma.usageEvent.create({
-      data: { userId: ownerId, type: 'MARKET_PRICE_LOOKUP', metadata: { itemId: id } },
-    });
-
-    return {
-      purchasePrice: item.purchasePrice,
-      currency: item.currency,
-      market: marketPrice,
-    };
+    return this.ftService.runChargedAction(
+      { organizationId, userId: ownerId, service: 'MARKET_PRICE_FRESH', idempotencyKey, metadata: { itemId: id } },
+      async () => {
+        const { result: marketPrice, usage } = await this.geminiService.lookupMarketPrice(
+          description,
+          item.currency,
+          knownFields,
+        );
+        const fetchedAt = new Date();
+        await this.prisma.item.update({
+          where: { id },
+          data: {
+            lastMarketPriceResult: marketPrice as unknown as Prisma.InputJsonValue,
+            lastMarketPriceAt: fetchedAt,
+          },
+        });
+        return {
+          data: {
+            purchasePrice: item.purchasePrice,
+            currency: item.currency,
+            market: marketPrice,
+            fetchedAt,
+            fromCache: false,
+          },
+          realCostUsd: GeminiService.estimateCostUsd(usage),
+          usageEventType: 'MARKET_PRICE_LOOKUP' as const,
+          usageEventMetadata: { itemId: id, fromCache: false },
+        };
+      },
+    );
   }
 
   // Botón "Analizar" del flujo de alta (plan §5.3.6-9): sube las fotos ya
   // comprimidas y devuelve los datos estructurados detectados por la IA.
-  async analyzePhotos(files: ImageInput[]) {
+  // Cobra FrikiTokens (CREATE_WITH_AI): ver módulo `ft`.
+  async analyzePhotos(ownerId: string, organizationId: string, files: ImageInput[], idempotencyKey: string) {
     this.assertHasPhotos(files);
-    const [extracted, photoUrls] = await Promise.all([
-      this.geminiService.analyzePhotos(files),
-      Promise.all(files.map((file) => this.storageService.saveCompressedImage(file))),
-    ]);
-    return { extracted, photoUrls };
+    return this.ftService.runChargedAction(
+      { organizationId, userId: ownerId, service: 'CREATE_WITH_AI', idempotencyKey },
+      async () => {
+        // Ojo: NO se sube la foto en paralelo con el análisis (a diferencia de
+        // antes) — si la moderación la rechaza, no debe quedar guardada.
+        const { result: extracted, usage, moderation } = await this.geminiService.analyzePhotos(files);
+        await this.handleModerationSignal(organizationId, ownerId, 'analyzePhotos', moderation);
+        const photoUrls = await Promise.all(files.map((file) => this.storageService.saveCompressedImage(file)));
+        return {
+          data: { extracted, photoUrls },
+          realCostUsd: GeminiService.estimateCostUsd(usage),
+          usageEventType: 'AI_SCAN' as const,
+        };
+      },
+    );
+  }
+
+  // Moderación de contenido de las fotos subidas (plan confirmado con el owner
+  // 2026-09-22, a raíz de la pregunta "¿qué pasa si suben una foto que no es
+  // un objeto coleccionable / contenido sexual no autorizado?").
+  // - blockedByGoogleSafety (filtro propio de Gemini, auditado por Google):
+  //   la señal más confiable → se registra el incidente Y se suspende la
+  //   cuenta de inmediato. `runChargedAction` libera el cobro de FT al
+  //   propagarse esta excepción, así que nunca se cobra por un intento así.
+  // - isLikelyCollectible/containsIdentifiablePerson (chequeo propio, pedido
+  //   al mismo modelo): menos confiable — una figura/muñeco con rostro humano
+  //   puede disparar un falso positivo — así que solo queda marcado para
+  //   revisión de un superadmin (admin.service.ts), sin bloquear al usuario.
+  private async handleModerationSignal(
+    organizationId: string,
+    userId: string,
+    context: string,
+    moderation: ModerationSignal | undefined,
+  ) {
+    if (!moderation) return;
+
+    if (moderation.blockedByGoogleSafety) {
+      await this.prisma.$transaction([
+        this.prisma.moderationFlag.create({
+          data: {
+            organizationId,
+            userId,
+            context,
+            category: moderation.blockedCategories.join(', ') || 'safety_block',
+            detail: moderation.moderationNote,
+            action: 'AUTO_SUSPENDED',
+          },
+        }),
+        this.prisma.user.update({ where: { id: userId }, data: { status: 'SUSPENDED' } }),
+      ]);
+      throw new ForbiddenException(
+        'Esta foto fue bloqueada por nuestro filtro de contenido y tu cuenta fue suspendida. Si crees que es un error, contacta a soporte.',
+      );
+    }
+
+    if (moderation.isLikelyCollectible === false || moderation.containsIdentifiablePerson === true) {
+      await this.prisma.moderationFlag.create({
+        data: {
+          organizationId,
+          userId,
+          context,
+          category: moderation.containsIdentifiablePerson ? 'possible_person' : 'not_collectible',
+          detail: moderation.moderationNote,
+          action: 'FLAGGED_FOR_REVIEW',
+        },
+      });
+    }
   }
 
   private assertHasPhotos(files: ImageInput[] | undefined) {
     if (!files?.length) throw new BadRequestException('Debes enviar al menos una foto');
   }
 
-  // Lectura de código de barras (plan §1/§5.3.6): no requiere fotos, solo el código.
-  lookupBarcode(barcode: string) {
-    return this.geminiService.lookupBarcode(barcode);
+  // Lectura de código de barras (plan §1/§5.3.6): no requiere fotos, solo el
+  // código. También usa IA con búsqueda web, así que también cobra FT
+  // (BARCODE_LOOKUP) aunque el spec original no la contemplaba explícitamente.
+  async lookupBarcode(ownerId: string, organizationId: string, barcode: string, idempotencyKey: string) {
+    return this.ftService.runChargedAction(
+      { organizationId, userId: ownerId, service: 'BARCODE_LOOKUP', idempotencyKey, metadata: { barcode } },
+      async () => {
+        const { result, usage } = await this.geminiService.lookupBarcode(barcode);
+        return {
+          data: result,
+          realCostUsd: GeminiService.estimateCostUsd(usage),
+          usageEventType: 'AI_SCAN' as const,
+        };
+      },
+    );
   }
 
   private rankCandidates<

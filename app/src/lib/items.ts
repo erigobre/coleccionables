@@ -207,12 +207,26 @@ export interface MarketPriceResult {
   collectorNotes: string;
 }
 
-export function lookupMarketPrice(accessToken: string, id: string) {
+// Antes de cobrar: dice si ya hay un precio guardado (y de cuándo), para que
+// la pantalla ofrezca "usar ese dato (menos FT)" vs "consultar uno nuevo (más
+// FT)" — el usuario elige siempre, nunca se decide en silencio.
+export interface MarketPricePeek {
+  cached: { market: MarketPriceResult; fetchedAt: string; ftCost: number | null } | null;
+  fresh: { ftCost: number | null };
+}
+
+export function peekMarketPrice(accessToken: string, id: string) {
+  return apiFetch<MarketPricePeek>(`/items/${id}/market-price`, { accessToken });
+}
+
+export function lookupMarketPrice(accessToken: string, id: string, mode: 'cached' | 'fresh') {
   return apiFetch<{
     purchasePrice: string | null;
     currency: string;
     market: MarketPriceResult;
-  }>(`/items/${id}/market-price`, { method: 'POST', accessToken });
+    fetchedAt: string;
+    fromCache: boolean;
+  }>(`/items/${id}/market-price`, { method: 'POST', body: { mode }, accessToken });
 }
 
 // Lo que devuelve Gemini al analizar fotos (api/src/ai/ai.types.ts). Todo es
