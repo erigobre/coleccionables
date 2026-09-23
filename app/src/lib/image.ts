@@ -25,3 +25,17 @@ export async function compressPhoto(uri: string): Promise<CompressedPhoto> {
 export function compressPhotos(uris: string[]): Promise<CompressedPhoto[]> {
   return Promise.all(uris.map(compressPhoto));
 }
+
+// Bug conocido de cámara en Android: el buffer de píxeles a veces no viene
+// rotado según la orientación real del teléfono (una foto horizontal se
+// guarda como si fuera vertical y viceversa), aunque el EXIF sí trae el tag
+// correcto. Se corrige aquí, justo tras tomar la foto, para que el resto del
+// flujo (preview, compressPhoto, subida) ya trabaje con la imagen bien orientada.
+const EXIF_ROTATION_DEGREES: Record<number, number> = { 3: 180, 6: 90, 8: 270 };
+
+export async function normalizeCameraOrientation(uri: string, exif?: { Orientation?: number } | null): Promise<string> {
+  const rotation = exif?.Orientation ? EXIF_ROTATION_DEGREES[exif.Orientation] : undefined;
+  if (!rotation) return uri;
+  const result = await manipulateAsync(uri, [{ rotate: rotation }], { format: SaveFormat.JPEG });
+  return result.uri;
+}

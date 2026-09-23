@@ -15,6 +15,10 @@ export interface ExtractedItemData {
   releaseYear?: number;
   originalSetNumber?: string;
   uniqueIdentifier?: string;
+  purchasePrice?: number;
+  // Frase corta (máx. 140 caracteres) para prellenar las notas del objeto: el
+  // dato más interesante que la IA encontró al buscar el producto en la web.
+  collectorSummary?: string;
   comicCoverNumber?: string;
   comicIssueNumber?: string;
   comicWriter?: string;
@@ -39,6 +43,16 @@ export interface MarketPriceResult {
 export interface ImageInput {
   buffer: Buffer;
   mimetype: string;
+}
+
+// Recuadro (fracciones 0-1 del ancho/alto de la foto) que Gemini ubica sobre
+// el objeto principal en analyzePhotos, usado para recortar en código (sin IA,
+// con sharp) el avatar cuadrado interno del objeto — ver StorageService.
+export interface BoundingBox {
+  xMin: number;
+  yMin: number;
+  xMax: number;
+  yMax: number;
 }
 
 // Conteo de tokens que devuelve Gemini en cada respuesta (usageMetadata), para
@@ -73,6 +87,13 @@ export interface GeminiCallResult<T> {
   result: T;
   usage: GeminiUsage;
   moderation?: ModerationSignal;
+  boundingBox?: BoundingBox;
+}
+
+// Resultado de comparar visualmente la foto del objeto a identificar contra
+// hasta N candidatos etiquetados A, B, C... (ver GeminiService.compareCandidates).
+export interface VisualCompareResult {
+  scores: Record<string, number>;
 }
 
 // Resultado de buscar un producto por código de barras (EAN/UPC). `found` es

@@ -10,9 +10,12 @@ import { colors } from '../../theme/tokens';
 interface ItemFormFieldsProps {
   values: ItemFormValues;
   onChange: <K extends keyof ItemFormValues>(field: K, value: ItemFormValues[K]) => void;
+  // Al crear un objeto, el SKU/UPC/ISBN solo tiene sentido si se llegó por
+  // escaneo de código de barras; al editar siempre se muestra (default true).
+  showUniqueIdentifier?: boolean;
 }
 
-export function ItemFormFields({ values, onChange }: ItemFormFieldsProps) {
+export function ItemFormFields({ values, onChange, showUniqueIdentifier = true }: ItemFormFieldsProps) {
   return (
     <View>
       <TextField
@@ -55,11 +58,13 @@ export function ItemFormFields({ values, onChange }: ItemFormFieldsProps) {
         keyboardType="number-pad"
       />
       <TextField label="Número de set original" value={values.originalSetNumber} onChangeText={(text) => onChange('originalSetNumber', text)} />
-      <TextField
-        label="Identificador único (SKU/UPC/ISBN)"
-        value={values.uniqueIdentifier}
-        onChangeText={(text) => onChange('uniqueIdentifier', text)}
-      />
+      {showUniqueIdentifier ? (
+        <TextField
+          label="Identificador único (SKU/UPC/ISBN)"
+          value={values.uniqueIdentifier}
+          onChangeText={(text) => onChange('uniqueIdentifier', text)}
+        />
+      ) : null}
       <TextField
         label="Precio de compra (MXN)"
         value={values.purchasePrice}

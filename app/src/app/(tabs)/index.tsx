@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { useAuth } from '../../context/auth-context';
@@ -40,8 +41,9 @@ function FavoriteCard({ item, onOpen }: { item: Item; onOpen: () => void }) {
 
 export default function HomeScreen() {
   const { user, accessToken } = useAuth();
-  const { costOf } = useFt();
+  const { costOf, balance } = useFt();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const firstName = user?.name?.split(' ')[0] ?? '';
   const scanCost = costOf('SCAN_HAVE_IT');
 
@@ -71,7 +73,8 @@ export default function HomeScreen() {
   const favorites = items?.filter((item) => item.isFavorite) ?? [];
 
   return (
-    <Screen>
+    <View style={{ flex: 1 }}>
+      <Screen>
       <Text className="font-body-bold text-2xl text-text">Hola{firstName ? `, ${firstName}` : ''} 👋</Text>
       <Text className="mt-1 text-sm text-textMuted">Este es el resumen de tu colección</Text>
 
@@ -83,6 +86,12 @@ export default function HomeScreen() {
             <StatCard label="Objetos totales" value={items.length} onPress={() => router.push('/(tabs)/objetos')} />
             <StatCard label="En wishlist" value={wishlistCount} onPress={() => router.push('/(tabs)/wishlist')} />
           </View>
+
+          {balance != null ? (
+            <View className="mt-3 flex-row gap-3">
+              <StatCard label="Tus FrikiTokens 🪙" value={balance} />
+            </View>
+          ) : null}
 
           {items.length === 0 ? (
             <>
@@ -158,6 +167,15 @@ export default function HomeScreen() {
           )}
         </>
       )}
-    </Screen>
+      </Screen>
+
+      <Pressable
+        onPress={() => router.push('/captura')}
+        className="absolute h-16 w-16 items-center justify-center rounded-full bg-primary shadow-lg"
+        style={{ right: 20, bottom: insets.bottom + 96 }}
+      >
+        <Ionicons name="add" size={30} color={colors.primaryText} />
+      </Pressable>
+    </View>
   );
 }

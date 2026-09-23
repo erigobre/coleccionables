@@ -137,4 +137,11 @@ export class CreateItemDto {
   @IsArray()
   @IsString({ each: true })
   photoUrls?: string[];
+
+  // Recorte 1:1 del objeto (de analyzePhotos, vía bounding box de Gemini). Si
+  // se omite y hay photoUrls, el backend genera un recorte centrado como
+  // respaldo — ver ItemsService.create.
+  @IsOptional()
+  @IsString()
+  avatarUrl?: string;
 }

@@ -26,9 +26,14 @@ import {
   type MarketPricePeek,
   type MarketPriceResult,
 } from '../../../../lib/items';
-import { fetchTags, type Tag } from '../../../../lib/tags';
+import { findOrCreateTag, type Tag } from '../../../../lib/tags';
+import { TagAutocomplete } from '../../../../components/items/TagAutocomplete';
+import { AIProcessingOverlay } from '../../../../components/ui/AIProcessingOverlay';
 import { cancelTransfer, fetchOutgoingTransfers, type OutgoingTransfer } from '../../../../lib/transfers';
+import { useAiProcessing } from '../../../../lib/use-ai-processing';
 import { colors } from '../../../../theme/tokens';
+
+const MARKET_PRICE_STEPS = ['Buscando el precio de mercado...', 'Comparando fuentes...', 'Puliendo resultados...'];
 
 const STATUS_LABEL: Record<string, string> = {
   ACTIVE: '',
@@ -64,21 +69,20 @@ export default function ItemDetailScreen() {
   const [notice, setNotice] = useState<string | null>(null);
   const [item, setItem] = useState<Item | null | undefined>(undefined);
   const [collections, setCollections] = useState<Collection[] | null>(null);
-  const [tags, setTags] = useState<Tag[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [marketPeek, setMarketPeek] = useState<MarketPricePeek | null>(null);
   const [marketPrice, setMarketPrice] = useState<MarketPriceResult | null>(null);
   const [marketPriceInfo, setMarketPriceInfo] = useState<{ fetchedAt: string; fromCache: boolean } | null>(null);
   const [loadingMarketPrice, setLoadingMarketPrice] = useState<'cached' | 'fresh' | null>(null);
   const [applyingNotes, setApplyingNotes] = useState(false);
+  const marketPriceProcessing = useAiProcessing();
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
     try {
-      const [fetchedItem, fetchedCollections, fetchedTags, peek] = await Promise.all([
+      const [fetchedItem, fetchedCollections, peek] = await Promise.all([
         fetchItem(accessToken, id),
         fetchActiveCollections(accessToken),
-        fetchTags(accessToken),
         peekMarketPrice(accessToken, id),
       ]);
       // Con el objeto en transferencia se busca a quién se envió, para poder cancelarla.
@@ -89,7 +93,6 @@ export default function ItemDetailScreen() {
       }
       setItem(fetchedItem);
       setCollections(fetchedCollections);
-      setTags(fetchedTags);
       setPendingTransfer(pending);
       setMarketPeek(peek);
     } catch (err) {
@@ -131,15 +134,31 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const onToggleTag = async (tagId: string) => {
+  const onRemoveTag = async (tagId: string) => {
     if (!accessToken || !item) return;
-    const isLinked = item.tags.some((t) => t.tagId === tagId);
     try {
-      if (isLinked) {
-        await removeItemTag(accessToken, item.id, tagId);
-      } else {
-        await addItemTag(accessToken, item.id, tagId);
-      }
+      await removeItemTag(accessToken, item.id, tagId);
+      await load();
+    } catch (err) {
+      setError(authErrorMessage(err));
+    }
+  };
+
+  const onAddExistingTag = async (tag: Tag) => {
+    if (!accessToken || !item) return;
+    try {
+      await addItemTag(accessToken, item.id, tag.id);
+      await load();
+    } catch (err) {
+      setError(authErrorMessage(err));
+    }
+  };
+
+  const onCreateAndAddTag = async (name: string) => {
+    if (!accessToken || !item) return;
+    try {
+      const tag = await findOrCreateTag(accessToken, name, /^color/i.test(name) ? 'COLOR_PRINCIPAL' : undefined);
+      await addItemTag(accessToken, item.id, tag.id);
       await load();
     } catch (err) {
       setError(authErrorMessage(err));
@@ -194,7 +213,7 @@ export default function ItemDetailScreen() {
     setLoadingMarketPrice(mode);
     setError(null);
     try {
-      const result = await lookupMarketPrice(accessToken, item.id, mode);
+      const result = await marketPriceProcessing.run(() => lookupMarketPrice(accessToken, item.id, mode));
       setMarketPrice(result.market);
       setMarketPriceInfo({ fetchedAt: result.fetchedAt, fromCache: result.fromCache });
       refreshFt();
@@ -225,7 +244,7 @@ export default function ItemDetailScreen() {
     }
   };
 
-  if (item === undefined || collections === null || tags === null) {
+  if (item === undefined || collections === null) {
     if (error) {
       return (
         <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
@@ -323,6 +342,12 @@ export default function ItemDetailScreen() {
         ) : null}
 
         <View className="my-5 rounded-lg border border-border bg-surface p-4">
+          {item.locationAssignment === 'TEMPORAL' ? (
+            <>
+              <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
+              <InfoRow label="Ubicación principal" value={item.permanentLocation?.name ?? 'Sin definir'} />
+            </>
+          ) : null}
           <InfoRow label="Empaque" value={packagingLabel(item.packagingCondition)} />
           <InfoRow label="Estado" value={usageLabel(item.usageState)} />
           <InfoRow label="Conservación" value={item.conservationState ? conservationLabel(item.conservationState) : null} />
@@ -333,7 +358,9 @@ export default function ItemDetailScreen() {
           <InfoRow label="Año de lanzamiento" value={item.releaseYear ? String(item.releaseYear) : null} />
           <InfoRow label="Precio de compra" value={item.purchasePrice ? `${item.purchasePrice} ${item.currency}` : null} />
           <InfoRow label="Cantidad" value={String(item.quantity)} />
-          <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
+          {item.locationAssignment !== 'TEMPORAL' ? (
+            <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
+          ) : null}
           {item.currentSeason ? <InfoRow label="Temporada" value={item.currentSeason.name} /> : null}
           {item.notes ? <InfoRow label="Notas" value={item.notes} /> : null}
         </View>
@@ -356,21 +383,33 @@ export default function ItemDetailScreen() {
         </View>
 
         <Text className="mb-2 text-sm font-semibold text-text">Tags</Text>
-        <View className="mb-5 flex-row flex-wrap gap-2">
-          {tags.map((tag) => {
-            const isLinked = item.tags.some((t) => t.tagId === tag.id);
-            return (
+        <View className="mb-2 flex-row flex-wrap gap-2">
+          {item.tags.length === 0 ? (
+            <Text className="text-sm text-textMuted">Sin tags todavía.</Text>
+          ) : (
+            item.tags.map((linkedTag) => (
               <Pressable
-                key={tag.id}
-                onPress={() => onToggleTag(tag.id)}
+                key={linkedTag.tagId}
+                onPress={() => onRemoveTag(linkedTag.tagId)}
                 disabled={!editable}
-                className={`rounded-full border px-3 py-2 ${isLinked ? 'border-primary bg-surfaceElevated' : 'border-border bg-surfaceElevated'}`}
+                className="flex-row items-center gap-1 rounded-full border border-primary bg-surfaceElevated px-3 py-2"
               >
-                <Text className={`text-sm ${isLinked ? 'text-primary' : 'text-textMuted'}`}>{tag.name}</Text>
+                <Text className="text-sm text-primary">{linkedTag.tag.name}</Text>
+                {editable ? <Ionicons name="close" size={14} color={colors.primary} /> : null}
               </Pressable>
-            );
-          })}
+            ))
+          )}
         </View>
+        {editable && accessToken ? (
+          <View className="mb-5">
+            <TagAutocomplete
+              accessToken={accessToken}
+              excludeNames={item.tags.map((t) => t.tag.name)}
+              onSelectExisting={onAddExistingTag}
+              onCreateNew={onCreateAndAddTag}
+            />
+          </View>
+        ) : null}
 
         <View className="mb-5 rounded-lg border border-border bg-surface p-4">
           <Text className="mb-3 text-sm font-semibold text-text">Precio de mercado</Text>
@@ -509,6 +548,12 @@ export default function ItemDetailScreen() {
           </Pressable>
         </>
       ) : null}
+      <AIProcessingOverlay
+        visible={marketPriceProcessing.visible}
+        done={marketPriceProcessing.done}
+        onHidden={marketPriceProcessing.onHidden}
+        steps={MARKET_PRICE_STEPS}
+      />
     </View>
   );
 }

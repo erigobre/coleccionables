@@ -3,8 +3,8 @@ import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../components/ui/Button';
-import { TextField } from '../components/ui/TextField';
 import { ItemFormFields } from '../components/items/ItemFormFields';
+import { TagAutocomplete } from '../components/items/TagAutocomplete';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import { resolvePhotoUrl } from '../lib/api';
 import { getItemDraft } from '../lib/item-draft';
@@ -12,7 +12,7 @@ import { EMPTY_ITEM_FORM, itemFormIsValid, itemFormToCreateDto, type ItemFormVal
 import { fetchActiveCollections, type Collection } from '../lib/collections';
 import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../lib/locations';
 import { createItem } from '../lib/items';
-import { createTag, fetchTags, findOrCreateTag, type Tag } from '../lib/tags';
+import { findOrCreateTag, searchTags, type Tag } from '../lib/tags';
 import { colors } from '../theme/tokens';
 
 function LocationChipList({
@@ -78,33 +78,6 @@ function CollectionChipList({
   );
 }
 
-function TagChipList({
-  tags,
-  selected,
-  onToggle,
-}: {
-  tags: Tag[];
-  selected: string[];
-  onToggle: (id: string) => void;
-}) {
-  return (
-    <View className="mb-2 flex-row flex-wrap gap-2">
-      {tags.map((tag) => {
-        const isSelected = selected.includes(tag.id);
-        return (
-          <Pressable
-            key={tag.id}
-            onPress={() => onToggle(tag.id)}
-            className={`rounded-full border px-3 py-2 ${isSelected ? 'border-primary bg-surfaceElevated' : 'border-border bg-surfaceElevated'}`}
-          >
-            <Text className={`text-sm ${isSelected ? 'text-primary' : 'text-textMuted'}`}>{tag.name}</Text>
-          </Pressable>
-        );
-      })}
-    </View>
-  );
-}
-
 export default function NewItemScreen() {
   const { accessToken } = useAuth();
   const router = useRouter();
@@ -117,16 +90,15 @@ export default function NewItemScreen() {
   const [values, setValues] = useState<ItemFormValues>(draft?.values ?? EMPTY_ITEM_FORM);
   const [locationId, setLocationId] = useState<string | null>(null);
   const [collectionIds, setCollectionIds] = useState<string[]>([]);
-  const [tagIds, setTagIds] = useState<string[]>([]);
+  // Tags ya existentes elegidos para este objeto (autocomplete, no un catálogo
+  // completo: con miles de tags no tiene sentido cargarlos todos de un jalón).
+  const [selectedTags, setSelectedTags] = useState<Tag[]>([]);
+  // Tags sugeridos por la IA (o escritos a mano) que aún no existen: se crean
+  // hasta guardar, para no dejar tags huérfanos si el usuario abandona el formulario.
+  const [pendingTagNames, setPendingTagNames] = useState<string[]>([]);
 
   const [locations, setLocations] = useState<LocationNode[] | null>(null);
   const [collections, setCollections] = useState<Collection[] | null>(null);
-  const [tags, setTags] = useState<Tag[] | null>(null);
-  // Tags sugeridos por la IA que aún no existen: se crean hasta guardar, para no
-  // dejar tags huérfanos si el usuario abandona el formulario.
-  const [pendingTagNames, setPendingTagNames] = useState<string[]>([]);
-  const [newTagName, setNewTagName] = useState('');
-  const [addingTag, setAddingTag] = useState(false);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -149,24 +121,28 @@ export default function NewItemScreen() {
         setError(authErrorMessage(err));
         setCollections([]);
       });
-    fetchTags(accessToken)
-      .then((fetched) => {
-        setTags(fetched);
-        const suggested = draft?.suggestedTags ?? [];
-        const preselected: string[] = [];
-        const pending: string[] = [];
-        for (const name of suggested) {
-          const existing = fetched.find((tag) => tag.name.toLowerCase() === name.toLowerCase());
-          if (existing) preselected.push(existing.id);
-          else pending.push(name);
-        }
-        setTagIds(preselected);
-        setPendingTagNames(pending);
-      })
-      .catch((err) => {
-        setError(authErrorMessage(err));
-        setTags([]);
-      });
+
+    // Los tags sugeridos por la IA se resuelven uno por uno contra el buscador
+    // (no hay un catálogo completo cargado): si ya existe un tag con ese
+    // nombre se preselecciona, si no, queda pendiente de crear al guardar.
+    const suggested = draft?.suggestedTags ?? [];
+    if (suggested.length > 0) {
+      Promise.all(suggested.map((name) => searchTags(accessToken, name).catch(() => [] as Tag[])))
+        .then((resultsByName) => {
+          const preselected: Tag[] = [];
+          const pending: string[] = [];
+          suggested.forEach((name, index) => {
+            const match = resultsByName[index].find((tag) => tag.name.toLowerCase() === name.toLowerCase());
+            if (match) preselected.push(match);
+            else pending.push(name);
+          });
+          setSelectedTags(preselected);
+          setPendingTagNames(pending);
+        })
+        .catch(() => {
+          setPendingTagNames(suggested);
+        });
+    }
   }, [accessToken, draft]);
 
   useEffect(() => {
@@ -181,26 +157,6 @@ export default function NewItemScreen() {
     setCollectionIds((prev) => (prev.includes(id) ? prev.filter((c) => c !== id) : [...prev, id]));
   };
 
-  const toggleTag = (id: string) => {
-    setTagIds((prev) => (prev.includes(id) ? prev.filter((t) => t !== id) : [...prev, id]));
-  };
-
-  const onAddTag = async () => {
-    if (!accessToken || newTagName.trim().length === 0) return;
-    setAddingTag(true);
-    setError(null);
-    try {
-      const tag = await createTag(accessToken, { name: newTagName.trim() });
-      setTags((prev) => [...(prev ?? []), tag]);
-      setTagIds((prev) => [...prev, tag.id]);
-      setNewTagName('');
-    } catch (err) {
-      setError(authErrorMessage(err));
-    } finally {
-      setAddingTag(false);
-    }
-  };
-
   const onSave = async () => {
     if (!accessToken || !itemFormIsValid(values)) return;
     setSaving(true);
@@ -211,12 +167,13 @@ export default function NewItemScreen() {
           findOrCreateTag(accessToken, name, /^color/i.test(name) ? 'COLOR_PRINCIPAL' : undefined),
         ),
       );
-      const allTagIds = [...tagIds, ...createdTags.map((tag) => tag.id)];
+      const allTagIds = [...selectedTags.map((tag) => tag.id), ...createdTags.map((tag) => tag.id)];
       const dto = itemFormToCreateDto(values, {
         locationId: locationId ?? undefined,
         collectionIds: collectionIds.length ? collectionIds : undefined,
         tagIds: allTagIds.length ? allTagIds : undefined,
         photoUrls: photoUrls.length ? photoUrls : undefined,
+        avatarUrl: draft?.avatarUrl,
       });
       const item = await createItem(accessToken, dto);
       router.replace(`/(tabs)/objetos/${item.id}`);
@@ -227,7 +184,7 @@ export default function NewItemScreen() {
     }
   };
 
-  if (locations === null || collections === null || tags === null) {
+  if (locations === null || collections === null) {
     if (error) {
       return (
         <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
@@ -265,7 +222,7 @@ export default function NewItemScreen() {
         {draft?.notice ?? 'Llena los datos manualmente.'} Los campos marcados con * son obligatorios.
       </Text>
 
-      <ItemFormFields values={values} onChange={onChange} />
+      <ItemFormFields values={values} onChange={onChange} showUniqueIdentifier={draft?.source === 'barcode'} />
 
       <Text className="mb-1.5 text-sm font-medium text-textSecondary">Ubicación</Text>
       <LocationChipList options={flattenLocationTree(locations)} value={locationId} onChange={setLocationId} />
@@ -274,9 +231,18 @@ export default function NewItemScreen() {
       <CollectionChipList collections={collections} selected={collectionIds} onToggle={toggleCollection} />
 
       <Text className="mb-1.5 text-sm font-medium text-textSecondary">Tags</Text>
-      <TagChipList tags={tags} selected={tagIds} onToggle={toggleTag} />
-      {pendingTagNames.length > 0 ? (
+      {selectedTags.length > 0 || pendingTagNames.length > 0 ? (
         <View className="mb-2 flex-row flex-wrap gap-2">
+          {selectedTags.map((tag) => (
+            <Pressable
+              key={tag.id}
+              onPress={() => setSelectedTags((prev) => prev.filter((t) => t.id !== tag.id))}
+              className="flex-row items-center gap-1 rounded-full border border-primary bg-surfaceElevated px-3 py-2"
+            >
+              <Text className="text-sm text-primary">{tag.name}</Text>
+              <Ionicons name="close" size={14} color={colors.primary} />
+            </Pressable>
+          ))}
           {pendingTagNames.map((name) => (
             <Pressable
               key={name}
@@ -289,18 +255,14 @@ export default function NewItemScreen() {
           ))}
         </View>
       ) : null}
-      <View className="mb-6 flex-row items-end gap-2">
-        <View className="flex-1">
-          <TextField label="Nuevo tag" value={newTagName} onChangeText={setNewTagName} placeholder="Ej. Color rojo" />
-        </View>
-        <Pressable
-          onPress={onAddTag}
-          disabled={addingTag || newTagName.trim().length === 0}
-          className="mb-4 h-14 w-14 items-center justify-center rounded-md bg-secondary"
-        >
-          {addingTag ? <ActivityIndicator color={colors.white} /> : <Ionicons name="add" size={22} color={colors.white} />}
-        </Pressable>
-      </View>
+      {accessToken ? (
+        <TagAutocomplete
+          accessToken={accessToken}
+          excludeNames={[...selectedTags.map((tag) => tag.name), ...pendingTagNames]}
+          onSelectExisting={(tag) => setSelectedTags((prev) => [...prev, tag])}
+          onCreateNew={(name) => setPendingTagNames((prev) => [...prev, name])}
+        />
+      ) : null}
 
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 

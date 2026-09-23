@@ -128,6 +128,8 @@ export function itemFormFromExtracted(extracted: ExtractedItemData): ItemFormVal
     releaseYear: extracted.releaseYear ? String(extracted.releaseYear) : '',
     originalSetNumber: extracted.originalSetNumber ?? '',
     uniqueIdentifier: extracted.uniqueIdentifier ?? '',
+    purchasePrice: extracted.purchasePrice ? String(extracted.purchasePrice) : '',
+    notes: extracted.collectorSummary ?? '',
     comicCoverNumber: extracted.comicCoverNumber ?? '',
     comicIssueNumber: extracted.comicIssueNumber ?? '',
     comicWriter: extracted.comicWriter ?? '',
@@ -179,7 +181,13 @@ function scalarFields(values: ItemFormValues) {
 
 export function itemFormToCreateDto(
   values: ItemFormValues,
-  extra: { locationId?: string; collectionIds?: string[]; tagIds?: string[]; photoUrls?: string[] },
+  extra: {
+    locationId?: string;
+    collectionIds?: string[];
+    tagIds?: string[];
+    photoUrls?: string[];
+    avatarUrl?: string;
+  },
 ): CreateItemDto {
   return { ...scalarFields(values), ...extra };
 }

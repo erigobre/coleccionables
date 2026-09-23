@@ -5,14 +5,19 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import { insufficientFtMessage, useFt } from '../context/ft-context';
 import { ApiError } from '../lib/api';
 import { setItemDraft } from '../lib/item-draft';
 import { EMPTY_ITEM_FORM, itemFormFromExtracted } from '../lib/item-form';
+import { normalizeCameraOrientation } from '../lib/image';
 import { analyzeItemPhotos, lookupBarcode, uploadItemPhotos } from '../lib/items';
+import { useAiProcessing } from '../lib/use-ai-processing';
 import { colors } from '../theme/tokens';
+
+const ANALYZE_STEPS = ['Analizando el objeto...', 'Buscando el producto exacto...', 'Puliendo resultados...'];
 
 const MAX_PHOTOS = 4;
 
@@ -35,6 +40,7 @@ export default function CapturaScreen() {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<'analizar' | 'manual' | 'codigo' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const analyzing = useAiProcessing();
 
   const goToForm = () => router.replace('/new');
 
@@ -47,8 +53,9 @@ export default function CapturaScreen() {
     if (!cameraRef.current || !cameraReady) return;
     setError(null);
     try {
-      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      addPhotos([picture.uri]);
+      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: true });
+      const uri = await normalizeCameraOrientation(picture.uri, picture.exif);
+      addPhotos([uri]);
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -97,7 +104,7 @@ export default function CapturaScreen() {
       notice = `Código leído: ${data}. Solo se buscan códigos EAN/UPC; llena los datos manualmente.`;
     }
 
-    setItemDraft({ values, photoUrls: [], suggestedTags, notice });
+    setItemDraft({ values, photoUrls: [], suggestedTags, notice, source: 'barcode' });
     goToForm();
   };
 
@@ -106,13 +113,15 @@ export default function CapturaScreen() {
     setBusy('analizar');
     setError(null);
     try {
-      const { extracted, photoUrls } = await analyzeItemPhotos(accessToken, photos);
+      const { extracted, photoUrls, avatarUrl } = await analyzing.run(() => analyzeItemPhotos(accessToken, photos));
       refreshFt();
       setItemDraft({
         values: itemFormFromExtracted(extracted),
         photoUrls,
+        avatarUrl,
         suggestedTags: extracted.suggestedTags ?? [],
         notice: 'Revisa lo que detectó la IA y corrige lo que haga falta.',
+        source: 'ai',
       });
       goToForm();
     } catch (err) {
@@ -136,7 +145,7 @@ export default function CapturaScreen() {
     } catch {
       notice = 'No se pudieron subir las fotos por un problema de conexión; podrás agregarlas después desde el objeto.';
     }
-    setItemDraft({ values: EMPTY_ITEM_FORM, photoUrls, suggestedTags: [], notice });
+    setItemDraft({ values: EMPTY_ITEM_FORM, photoUrls, suggestedTags: [], notice, source: 'manual' });
     goToForm();
   };
 
@@ -210,7 +219,6 @@ export default function CapturaScreen() {
           </View>
           <Button
             label="Llenado manual"
-            ftCost={0}
             variant="ghost"
             onPress={onManual}
             loading={busy === 'manual'}
@@ -220,6 +228,12 @@ export default function CapturaScreen() {
             Al analizar, la foto se envía a un servicio de IA para reconocer el objeto.
           </Text>
         </View>
+        <AIProcessingOverlay
+          visible={analyzing.visible}
+          done={analyzing.done}
+          onHidden={analyzing.onHidden}
+          steps={ANALYZE_STEPS}
+        />
       </View>
     );
   }

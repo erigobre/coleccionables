@@ -5,25 +5,39 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import { insufficientFtMessage, useFt } from '../context/ft-context';
 import { ApiError, resolvePhotoUrl } from '../lib/api';
 import { setItemDraft } from '../lib/item-draft';
 import { itemFormFromExtracted } from '../lib/item-form';
+import { normalizeCameraOrientation } from '../lib/image';
 import { usageLabel } from '../lib/item-enums';
 import { identifyItemPhotos, uploadItemPhotos, type IdentifyResult, type ItemMatch } from '../lib/items';
+import { useAiProcessing } from '../lib/use-ai-processing';
 import { createWishlistItem } from '../lib/wishlist';
 import { colors } from '../theme/tokens';
 
 const MAX_PHOTOS = 3;
+const SEARCH_STEPS = ['Analizando el objeto...', 'Comparando con tu colección...', 'Puliendo resultados...'];
 
 function sinceLabel(match: ItemMatch): string {
   const date = new Date(match.item.acquisitionDate ?? match.item.createdAt);
   return date.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-function MatchCard({ match, highlight, onOpen }: { match: ItemMatch; highlight?: boolean; onOpen: () => void }) {
+function MatchCard({
+  match,
+  highlight,
+  onOpen,
+  showVisualScore,
+}: {
+  match: ItemMatch;
+  highlight?: boolean;
+  onOpen: () => void;
+  showVisualScore?: boolean;
+}) {
   const { item } = match;
   const photo = item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined;
   return (
@@ -53,6 +67,11 @@ function MatchCard({ match, highlight, onOpen }: { match: ItemMatch; highlight?:
             <Text className="text-[11px] text-dangerText">Vendido</Text>
           </View>
         ) : null}
+        {showVisualScore && match.visualScore !== undefined ? (
+          <View className="mt-1 self-start rounded-full bg-surfaceElevated px-2.5 py-0.5">
+            <Text className="text-[11px] text-textSecondary">{match.visualScore}% parecido</Text>
+          </View>
+        ) : null}
       </View>
       <View className="justify-center pr-3">
         <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
@@ -77,6 +96,7 @@ export default function YaLoTengoScreen() {
   const [busy, setBusy] = useState<'buscar' | 'coleccion' | 'wishlist' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<IdentifyResult | null>(null);
+  const searching = useAiProcessing();
 
   const addPhotos = (uris: string[]) => {
     setPhotos((prev) => [...prev, ...uris].slice(0, MAX_PHOTOS));
@@ -87,8 +107,9 @@ export default function YaLoTengoScreen() {
     if (!cameraRef.current || !cameraReady) return;
     setError(null);
     try {
-      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8 });
-      addPhotos([picture.uri]);
+      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: true });
+      const uri = await normalizeCameraOrientation(picture.uri, picture.exif);
+      addPhotos([uri]);
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -110,7 +131,7 @@ export default function YaLoTengoScreen() {
     setBusy('buscar');
     setError(null);
     try {
-      setResult(await identifyItemPhotos(accessToken, photos));
+      setResult(await searching.run(() => identifyItemPhotos(accessToken, photos)));
       refreshFt();
     } catch (err) {
       setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
@@ -137,6 +158,7 @@ export default function YaLoTengoScreen() {
         photoUrls,
         suggestedTags: result.extracted.suggestedTags ?? [],
         notice: 'Revisa lo que detectó la IA y corrige lo que haga falta.',
+        source: 'ai',
       });
       router.replace('/new');
     } catch (err) {
@@ -222,7 +244,12 @@ export default function YaLoTengoScreen() {
           <View className="mt-6">
             <Text className="mb-3 font-body-bold text-lg text-text">Objetos similares</Text>
             {similar.map((match) => (
-              <MatchCard key={match.item.id} match={match} onOpen={() => router.push(`/(tabs)/objetos/${match.item.id}`)} />
+              <MatchCard
+                key={match.item.id}
+                match={match}
+                showVisualScore={!alreadyOwned}
+                onOpen={() => router.push(`/(tabs)/objetos/${match.item.id}`)}
+              />
             ))}
           </View>
         ) : result.matches.length === 0 && !result.soldMatches.length ? (
@@ -283,7 +310,7 @@ export default function YaLoTengoScreen() {
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
           <Button
-            label="Buscar en mi colección"
+            label="Rastrear"
             ftCost={costOf('SCAN_HAVE_IT')}
             onPress={onSearch}
             loading={busy === 'buscar'}
@@ -295,6 +322,12 @@ export default function YaLoTengoScreen() {
             Al buscar, la foto se envía a un servicio de IA para reconocer el objeto.
           </Text>
         </View>
+        <AIProcessingOverlay
+          visible={searching.visible}
+          done={searching.done}
+          onHidden={searching.onHidden}
+          steps={SEARCH_STEPS}
+        />
       </View>
     );
   }

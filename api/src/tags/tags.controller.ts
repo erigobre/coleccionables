@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
@@ -16,8 +16,8 @@ export class TagsController {
   }
 
   @Get()
-  findAll(@CurrentUser() user: AuthenticatedUser) {
-    return this.tagsService.findAll(user.id);
+  findAll(@CurrentUser() user: AuthenticatedUser, @Query('q') q?: string) {
+    return this.tagsService.findAll(user.id, q);
   }
 
   @Delete(':id')

@@ -54,12 +54,21 @@ export class ItemsService {
       await this.assertOwnedTags(ownerId, dto.tagIds);
     }
 
-    const { locationId, collectionIds, tagIds, photoUrls, ...fields } = dto;
+    const { locationId, collectionIds, tagIds, photoUrls, avatarUrl, ...fields } = dto;
+
+    // El avatar 1:1 se usa para el re-ranking visual de "¿Ya lo tengo?" (y a
+    // futuro como miniatura de UI). Si vino de analyzePhotos (recorte preciso
+    // por bounding box de Gemini) se usa tal cual; si no (alta manual o por
+    // código de barras), se genera aquí un recorte cuadrado centrado
+    // determinista (sin IA) de la primera foto, para que todo objeto tenga uno.
+    const resolvedAvatarUrl =
+      avatarUrl ?? (photoUrls?.length ? await this.buildFallbackAvatar(photoUrls[0]) : undefined);
 
     return this.prisma.item.create({
       data: {
         ownerId,
         ...fields,
+        avatarUrl: resolvedAvatarUrl ?? null,
         acquisitionDate: dto.acquisitionDate ? new Date(dto.acquisitionDate) : undefined,
         currentLocationId: locationId ?? null,
         permanentLocationId: locationId ?? null,
@@ -73,6 +82,12 @@ export class ItemsService {
       },
       include: ITEM_INCLUDE,
     });
+  }
+
+  private async buildFallbackAvatar(photoUrl: string): Promise<string | undefined> {
+    const image = await this.storageService.readImage(photoUrl);
+    if (!image) return undefined;
+    return this.storageService.saveAvatar(image);
   }
 
   // Vista principal de Objetos: los vendidos desaparecen (plan §5.3.9.4).
@@ -323,7 +338,7 @@ export class ItemsService {
     return this.ftService.runChargedAction(
       { organizationId, userId: ownerId, service: 'SCAN_HAVE_IT', idempotencyKey },
       async () => {
-        const { result: extracted, usage, moderation } = await this.geminiService.analyzePhotos(files);
+        const { result: extracted, usage, moderation, boundingBox } = await this.geminiService.analyzePhotos(files);
         await this.handleModerationSignal(organizationId, ownerId, 'identify', moderation);
         const matchResult = await this.match(ownerId, {
           name: extracted.name,
@@ -332,13 +347,81 @@ export class ItemsService {
           category: Object.values(ItemCategory).find((c) => c === extracted.category),
           tags: extracted.suggestedTags,
         });
+
+        const { matches, hasMatch, visualCostUsd } = await this.applyVisualRerank(
+          files[0],
+          boundingBox,
+          matchResult.matches,
+          matchResult.hasMatch,
+        );
+
         return {
-          data: { extracted, ...matchResult },
-          realCostUsd: GeminiService.estimateCostUsd(usage),
+          data: { extracted, ...matchResult, matches, hasMatch },
+          realCostUsd: GeminiService.estimateCostUsd(usage) + visualCostUsd,
           usageEventType: 'AI_SCAN' as const,
         };
       },
     );
+  }
+
+  // Etapa 2 del re-ranking "¿Ya lo tengo?" (etapa 1 = puntaje por texto, sin
+  // tocar — ver similarity.ts): compara la foto de consulta contra los
+  // avatares de los top-3 candidatos por texto. Solo se confirma un match si
+  // el mejor puntaje visual supera VISUAL_MATCH_THRESHOLD (config, default 70);
+  // si no, se mantiene "no lo tienes" y esos candidatos se muestran igual como
+  // "objetos similares" con su puntaje visual como badge.
+  private async applyVisualRerank<M extends { item: { id: string; avatarUrl?: string | null; photos: { url: string }[] }; score: number }>(
+    queryFile: ImageInput,
+    boundingBox: import('../ai/ai.types.js').BoundingBox | undefined,
+    matches: M[],
+    fallbackHasMatch: boolean,
+  ): Promise<{ matches: (M & { visualScore?: number })[]; hasMatch: boolean; visualCostUsd: number }> {
+    const topCandidates = matches.slice(0, 3);
+    if (topCandidates.length === 0) {
+      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0 };
+    }
+
+    const labels = ['A', 'B', 'C'];
+    const resolved = await Promise.all(
+      topCandidates.map(async (match, index) => {
+        const url = match.item.avatarUrl ?? match.item.photos[0]?.url;
+        const image = url ? await this.storageService.readImage(url) : null;
+        return image ? { label: labels[index], image, match } : null;
+      }),
+    );
+    const candidates = resolved.filter((c): c is { label: string; image: ImageInput; match: M } => c !== null);
+
+    if (candidates.length === 0) {
+      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0 };
+    }
+
+    const queryImage = await this.storageService.cropToAvatar(queryFile, boundingBox);
+    const { result: visual, usage } = await this.geminiService.compareCandidates(
+      queryImage,
+      candidates.map(({ label, image }) => ({ label, image })),
+    );
+
+    const scoreByItemId = new Map(candidates.map((c) => [c.match.item.id, visual.scores[c.label] ?? 0]));
+    const scoredMatches = matches.map((match) => ({
+      ...match,
+      visualScore: scoreByItemId.get(match.item.id),
+    }));
+
+    const threshold = await this.ftService.getConfigValue('VISUAL_MATCH_THRESHOLD', 70);
+    let best: { itemId: string; score: number } | null = null;
+    for (const [itemId, score] of scoreByItemId) {
+      if (!best || score > best.score) best = { itemId, score };
+    }
+    const confirmed = best && best.score >= threshold ? best : null;
+
+    const reordered = confirmed
+      ? [
+          scoredMatches.find((m) => m.item.id === confirmed.itemId)!,
+          ...scoredMatches.filter((m) => m.item.id !== confirmed.itemId),
+        ]
+      : scoredMatches;
+
+    return { matches: reordered, hasMatch: !!confirmed, visualCostUsd: GeminiService.estimateCostUsd(usage) };
   }
 
   // Antes de cobrar nada: le dice a la app si ya hay un precio de mercado
@@ -460,11 +543,14 @@ export class ItemsService {
       async () => {
         // Ojo: NO se sube la foto en paralelo con el análisis (a diferencia de
         // antes) — si la moderación la rechaza, no debe quedar guardada.
-        const { result: extracted, usage, moderation } = await this.geminiService.analyzePhotos(files);
+        const { result: extracted, usage, moderation, boundingBox } = await this.geminiService.analyzePhotos(files);
         await this.handleModerationSignal(organizationId, ownerId, 'analyzePhotos', moderation);
-        const photoUrls = await Promise.all(files.map((file) => this.storageService.saveCompressedImage(file)));
+        const [photoUrls, avatarUrl] = await Promise.all([
+          Promise.all(files.map((file) => this.storageService.saveCompressedImage(file))),
+          this.storageService.saveAvatar(files[0], boundingBox),
+        ]);
         return {
-          data: { extracted, photoUrls },
+          data: { extracted, photoUrls, avatarUrl },
           realCostUsd: GeminiService.estimateCostUsd(usage),
           usageEventType: 'AI_SCAN' as const,
         };

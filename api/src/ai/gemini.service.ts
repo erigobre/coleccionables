@@ -7,7 +7,6 @@ import {
   HarmProbability,
   Type,
   type GenerateContentResponse,
-  type Schema,
   type SafetySetting,
 } from '@google/genai';
 import {
@@ -18,12 +17,14 @@ import {
 } from '@prisma/client';
 import type {
   BarcodeLookupResult,
+  BoundingBox,
   ExtractedItemData,
   GeminiCallResult,
   GeminiUsage,
   ImageInput,
   MarketPriceResult,
   ModerationSignal,
+  VisualCompareResult,
 } from './ai.types.js';
 
 const MODEL = 'gemini-flash-latest';
@@ -56,50 +57,42 @@ const WATCHED_HARM_CATEGORIES = new Set<HarmCategory>([
   HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
 ]);
 
-const ITEM_SCHEMA: Schema = {
-  type: Type.OBJECT,
-  properties: {
-    name: { type: Type.STRING },
-    category: { type: Type.STRING, enum: Object.values(ItemCategory) },
-    packagingCondition: { type: Type.STRING, enum: Object.values(PackagingCondition) },
-    usageState: { type: Type.STRING, enum: Object.values(UsageState) },
-    conservationState: { type: Type.STRING, enum: Object.values(ConservationState) },
-    brand: { type: Type.STRING },
-    toyLine: { type: Type.STRING },
-    edition: { type: Type.STRING },
-    scale: { type: Type.STRING },
-    designer: { type: Type.STRING },
-    releaseYear: { type: Type.INTEGER },
-    originalSetNumber: { type: Type.STRING },
-    uniqueIdentifier: { type: Type.STRING },
-    comicCoverNumber: { type: Type.STRING },
-    comicIssueNumber: { type: Type.STRING },
-    comicWriter: { type: Type.STRING },
-    comicPenciler: { type: Type.STRING },
-    comicInker: { type: Type.STRING },
-    comicColorist: { type: Type.STRING },
-    comicPublisher: { type: Type.STRING },
-    suggestedTags: { type: Type.ARRAY, items: { type: Type.STRING } },
-    // Moderación: se piden como parte del mismo análisis (no una llamada
-    // aparte) para no duplicar el costo de IA. Ver ModerationSignal.
-    isLikelyCollectible: { type: Type.BOOLEAN },
-    containsIdentifiablePerson: { type: Type.BOOLEAN },
-    moderationNote: { type: Type.STRING },
-  },
-  required: ['suggestedTags', 'isLikelyCollectible', 'containsIdentifiablePerson'],
-};
+// Antes se forzaba la forma de la respuesta con `responseSchema`, pero eso es
+// incompatible con la herramienta `googleSearch` (no se pueden combinar en la
+// misma llamada — ver lookupBarcode/lookupMarketPrice). Para poder buscar el
+// producto en la web y así identificarlo con más precisión, se le pide al
+// modelo por prompt que responda ÚNICAMENTE con un JSON con esta forma y se
+// parsea de forma tolerante (parseAnalyzeResponse).
+const ANALYZE_PROMPT = `Eres un experto catalogador de coleccionables (juguetes, art toys, estatuas, cómics, libros, figuras de acción, esculturas, pinturas).
 
-const ANALYZE_PROMPT = `Eres un experto catalogador de coleccionables (juguetes, art toys, estatuas, cómics, libros, figuras de acción).
-Analiza las fotos adjuntas de un objeto coleccionable y extrae la información estructurada que puedas identificar con confianza.
-Si no puedes determinar un campo con certeza, omítelo (no inventes datos).
-Siempre incluye en "suggestedTags" al menos un intento de identificar el color principal del objeto, y si reconoces la franquicia/personaje, inclúyela también como tag.
+Analiza las fotos adjuntas de un objeto coleccionable. Usa la búsqueda web para identificar el producto exacto (franquicia, línea, edición, fabricante, año, número de set, precio de referencia) en vez de limitarte solo a lo que se ve en la imagen — como harías si buscaras este producto para comprarlo o venderlo.
+
+Responde a cada uno de estos campos. Es preferible arriesgar una respuesta razonable (y que el usuario la corrija si hace falta) a dejar el campo vacío: solo omite un campo si de verdad no hay forma de estimarlo ni con la imagen ni con la búsqueda.
+
+- "name": nombre del objeto tal como se vendería (marca + línea + personaje/modelo).
+- "category": EXACTAMENTE uno de estos valores (usa el código, no la etiqueta): LIBRO (Libro), COMIC (Cómic), ART_TOY (Art Toy), ESTATUA (Estatua), FIGURA_ACCION (Figura de acción), JUGUETE (Juguete), ESCULTURA (Escultura), PINTURA (Pintura), OTRO (Otro).
+- "packagingCondition": EXACTAMENTE uno de: SUELTO (sin caja/empaque), BLISTER_SELLADO (blister o caja sellada sin abrir), BLISTER_ABIERTO (blister o caja ya abierta), CON_CAJA_SIN_BLISTER (tiene caja pero no blister). Básate en lo que se ve en la foto.
+- "usageState": EXACTAMENTE uno de: NUEVO, USADO, ABIERTO. Básate en lo que se ve en la foto.
+- "conservationState": EXACTAMENTE uno de: MINT (perfecto estado), NEAR_MINT (casi perfecto, defectos mínimos), BUEN_ESTADO (uso visible pero cuidado), CON_DETALLES (daños o desgaste notorio). Evalúa el estado físico visible en la foto.
+- "brand": marca o fabricante (ej. Hasbro, Funko, McFarlane Toys, Marvel Comics).
+- "toyLine": línea de juguete, serie o modelo.
+- "edition": edición o variante (ej. "Edición limitada", "Exclusivo SDCC", "Chase").
+- "scale": escala o altura (ej. "1:6", "18cm", "1/10").
+- "designer": diseñador o artista, si el producto lo atribuye a alguien en particular.
+- "releaseYear": año de lanzamiento original, como número.
+- "originalSetNumber": número de set/modelo/SKU del fabricante impreso en la caja (no el código de barras EAN/UPC).
+- "purchasePrice": precio de compra promedio actual de este producto (de reventa/segunda mano si es coleccionable, o precio de lista si sigue en venta como nuevo), como número. Usa la moneda que encuentres en la búsqueda.
+- "collectorSummary": una sola frase en español (máximo 140 caracteres) dirigida al propio coleccionista, con el dato más interesante que encontraste sobre este objeto (rareza, tirada limitada, curiosidad de producción, por qué le importaría a un coleccionista). No repitas simplemente el nombre del objeto.
+- Si la categoría es Cómic o Libro, además intenta: "comicCoverNumber", "comicIssueNumber", "comicWriter", "comicPenciler", "comicInker", "comicColorist", "comicPublisher".
+- "suggestedTags": array de tags cortos en español. SIEMPRE incluye al menos el color principal del objeto, y si reconoces la franquicia/personaje inclúyela también como tag.
+- "boundingBox": recuadro que encierra COMPLETO el objeto principal en la PRIMERA foto, como fracción del ancho/alto de esa imagen (0 a 1): {"xMin":, "yMin":, "xMax":, "yMax":}. Se usa para recortarlo después, así que abarca el objeto entero sin cortarlo pero sin incluir de más el fondo.
 
 Además, evalúa las fotos para moderación de contenido (esto es tan importante como los datos del objeto):
 - "isLikelyCollectible": true si las fotos muestran principalmente un objeto coleccionable; false si muestran otra cosa (una persona, un paisaje, un documento, una pantalla, etc.).
 - "containsIdentifiablePerson": true SOLO si se ve el rostro de una persona real y reconocible (una fotografía de un ser humano de carne y hueso). Una figura de acción, muñeco, busto, estatua o arte que representa un rostro humano NO cuenta como persona real: en esos casos responde false.
 - "moderationNote": si marcaste isLikelyCollectible en false o containsIdentifiablePerson en true, describe brevemente en español y de forma neutral qué se ve en la foto (para que un moderador humano lo entienda sin ver la imagen). Si no hay nada que señalar, deja este campo vacío.
 
-Responde únicamente con el JSON solicitado.`;
+Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown, sin explicaciones antes o después) con los campos de arriba.`;
 
 @Injectable()
 export class GeminiService {
@@ -119,30 +112,163 @@ export class GeminiService {
       model: MODEL,
       contents: [{ role: 'user', parts: [{ text: ANALYZE_PROMPT }, ...imageParts] }],
       config: {
-        responseMimeType: 'application/json',
-        responseSchema: ITEM_SCHEMA,
+        tools: [{ googleSearch: {} }],
         safetySettings: SAFETY_SETTINGS,
       },
     });
 
     const usage = this.extractUsage(response);
     const moderation = this.extractModerationSignal(response);
-    const text = response.text ?? '{}';
+    const parsed = this.parseAnalyzeResponse(response.text ?? '');
+    moderation.isLikelyCollectible = parsed.isLikelyCollectible;
+    moderation.containsIdentifiablePerson = parsed.containsIdentifiablePerson;
+    moderation.moderationNote = parsed.moderationNote;
+    return { result: parsed.extracted, usage, moderation, boundingBox: parsed.boundingBox };
+  }
+
+  private parseAnalyzeResponse(text: string): {
+    extracted: ExtractedItemData;
+    isLikelyCollectible: boolean | null;
+    containsIdentifiablePerson: boolean | null;
+    moderationNote: string | null;
+    boundingBox?: BoundingBox;
+  } {
+    const empty = {
+      extracted: { suggestedTags: [] } as ExtractedItemData,
+      isLikelyCollectible: null,
+      containsIdentifiablePerson: null,
+      moderationNote: null,
+    };
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1 || end < start) return empty;
+
     try {
-      const parsed = JSON.parse(text) as Partial<ExtractedItemData> & {
-        isLikelyCollectible?: boolean;
-        containsIdentifiablePerson?: boolean;
-        moderationNote?: string;
+      const parsed = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+      const str = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+      const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+      const year = num(parsed.releaseYear);
+      const summary = str(parsed.collectorSummary);
+      const tags = Array.isArray(parsed.suggestedTags)
+        ? parsed.suggestedTags.map(str).filter((tag): tag is string => !!tag)
+        : [];
+
+      const extracted: ExtractedItemData = {
+        name: str(parsed.name),
+        category: Object.values(ItemCategory).find((value) => value === parsed.category),
+        packagingCondition: Object.values(PackagingCondition).find((value) => value === parsed.packagingCondition),
+        usageState: Object.values(UsageState).find((value) => value === parsed.usageState),
+        conservationState: Object.values(ConservationState).find((value) => value === parsed.conservationState),
+        brand: str(parsed.brand),
+        toyLine: str(parsed.toyLine),
+        edition: str(parsed.edition),
+        scale: str(parsed.scale),
+        designer: str(parsed.designer),
+        releaseYear: year && year > 1800 && year < 2200 ? Math.trunc(year) : undefined,
+        originalSetNumber: str(parsed.originalSetNumber),
+        purchasePrice: num(parsed.purchasePrice),
+        collectorSummary: summary ? summary.slice(0, 140) : undefined,
+        comicCoverNumber: str(parsed.comicCoverNumber),
+        comicIssueNumber: str(parsed.comicIssueNumber),
+        comicWriter: str(parsed.comicWriter),
+        comicPenciler: str(parsed.comicPenciler),
+        comicInker: str(parsed.comicInker),
+        comicColorist: str(parsed.comicColorist),
+        comicPublisher: str(parsed.comicPublisher),
+        suggestedTags: tags,
       };
-      const { isLikelyCollectible, containsIdentifiablePerson, moderationNote, ...itemFields } = parsed;
-      moderation.isLikelyCollectible = isLikelyCollectible ?? null;
-      moderation.containsIdentifiablePerson = containsIdentifiablePerson ?? null;
-      moderation.moderationNote = moderationNote?.trim() || null;
-      return { result: { suggestedTags: [], ...itemFields }, usage, moderation };
+
+      return {
+        extracted,
+        isLikelyCollectible: typeof parsed.isLikelyCollectible === 'boolean' ? parsed.isLikelyCollectible : null,
+        containsIdentifiablePerson:
+          typeof parsed.containsIdentifiablePerson === 'boolean' ? parsed.containsIdentifiablePerson : null,
+        moderationNote: str(parsed.moderationNote) ?? null,
+        boundingBox: this.parseBoundingBox(parsed.boundingBox),
+      };
     } catch (error) {
       this.logger.error(`No se pudo parsear la respuesta de análisis de IA: ${text}`, error);
-      return { result: { suggestedTags: [] }, usage, moderation };
+      return empty;
     }
+  }
+
+  // Valida que el bounding box venga con las 4 fracciones 0-1 esperadas y con
+  // el orden correcto (xMin < xMax, yMin < yMax); si algo no cuadra, se
+  // descarta en vez de arriesgar un recorte incorrecto en StorageService.
+  private parseBoundingBox(value: unknown): BoundingBox | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+    const box = value as Record<string, unknown>;
+    const frac = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : undefined);
+    const xMin = frac(box.xMin);
+    const yMin = frac(box.yMin);
+    const xMax = frac(box.xMax);
+    const yMax = frac(box.yMax);
+    if (xMin === undefined || yMin === undefined || xMax === undefined || yMax === undefined) return undefined;
+    if (xMin >= xMax || yMin >= yMax) return undefined;
+    return { xMin, yMin, xMax, yMax };
+  }
+
+  // Compara visualmente la foto del objeto a identificar contra hasta 3
+  // candidatos (avatares recortados de objetos ya guardados) etiquetados A, B,
+  // C... A diferencia de analyzePhotos/lookupBarcode/lookupMarketPrice, esta
+  // llamada NO necesita `googleSearch` (es pura comparación visual entre
+  // imágenes ya dadas), así que sí puede usar `responseSchema` para forzar un
+  // JSON válido — sin el parseo tolerante que necesitan los otros métodos.
+  async compareCandidates(
+    query: ImageInput,
+    candidates: { label: string; image: ImageInput }[],
+  ): Promise<GeminiCallResult<VisualCompareResult>> {
+    const parts = [
+      { text: 'Foto del objeto a identificar:' },
+      { inlineData: { data: query.buffer.toString('base64'), mimeType: query.mimetype } },
+      ...candidates.flatMap((candidate) => [
+        { text: `Objeto candidato ${candidate.label}:` },
+        { inlineData: { data: candidate.image.buffer.toString('base64'), mimeType: candidate.image.mimetype } },
+      ]),
+    ];
+
+    const prompt = `Eres un experto en identificar coleccionables (juguetes, art toys, estatuas, figuras de acción, cómics) a partir de fotos.
+
+Te doy una foto de un objeto a identificar y ${candidates.length} foto(s) de objetos candidatos (${candidates.map((c) => c.label).join(', ')}), cada uno ya guardado en el inventario de un coleccionista.
+
+Para CADA candidato, evalúa qué tan probable es que sea el MISMO objeto físico exacto que el objeto a identificar (no solo el mismo modelo/línea genérica, sino la misma pieza: mismas proporciones, color, empaque, accesorios y detalles visibles). Da un puntaje de 0 a 100, donde 100 significa certeza absoluta de que es el mismo objeto y 0 significa que claramente no lo es. Sé estricto: diferencias de color, escala, edición o accesorios deben bajar mucho el puntaje aunque se trate del mismo personaje/franquicia.`;
+
+    const response = await this.client.models.generateContent({
+      model: MODEL,
+      contents: [{ role: 'user', parts: [{ text: prompt }, ...parts] }],
+      config: {
+        safetySettings: SAFETY_SETTINGS,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            scores: {
+              type: Type.OBJECT,
+              properties: Object.fromEntries(
+                candidates.map((candidate) => [candidate.label, { type: Type.NUMBER }]),
+              ),
+            },
+          },
+          required: ['scores'],
+        },
+      },
+    });
+
+    const usage = this.extractUsage(response);
+    const result: VisualCompareResult = { scores: {} };
+    try {
+      const parsed = JSON.parse(response.text ?? '{}') as { scores?: Record<string, unknown> };
+      for (const candidate of candidates) {
+        const raw = parsed.scores?.[candidate.label];
+        const score = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+        result.scores[candidate.label] = Math.min(100, Math.max(0, Math.round(score)));
+      }
+    } catch (error) {
+      this.logger.error(`No se pudo parsear la respuesta de comparación visual: ${response.text}`, error);
+      for (const candidate of candidates) result.scores[candidate.label] = 0;
+    }
+
+    return { result, usage };
   }
 
   // Combina las 2 fuentes de señal de seguridad que expone el SDK de Gemini:

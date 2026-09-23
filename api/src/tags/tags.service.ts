@@ -18,7 +18,17 @@ export class TagsService {
     });
   }
 
-  findAll(ownerId: string) {
+  // Sin `q`, se listan los tags del usuario (uso interno/admin); con `q` se
+  // busca por texto y se limita el resultado, porque un usuario con miles de
+  // tags no puede recibirlos todos de un jalón cada vez que abre un formulario.
+  findAll(ownerId: string, q?: string) {
+    if (q && q.trim().length > 0) {
+      return this.prisma.tag.findMany({
+        where: { ownerId, name: { contains: q.trim(), mode: 'insensitive' } },
+        orderBy: { name: 'asc' },
+        take: 20,
+      });
+    }
     return this.prisma.tag.findMany({ where: { ownerId }, orderBy: { name: 'asc' } });
   }
 

@@ -77,6 +77,7 @@ export interface Item {
   locationAssignment: LocationAssignment;
   currentSeasonId: string | null;
   returnedFromSeason: boolean;
+  avatarUrl: string | null;
   createdAt: string;
   updatedAt: string;
   photos: ItemPhoto[];
@@ -118,6 +119,7 @@ export interface CreateItemDto {
   collectionIds?: string[];
   tagIds?: string[];
   photoUrls?: string[];
+  avatarUrl?: string;
 }
 
 // El backend gestiona ubicación/colecciones/tags/fotos con endpoints propios de
@@ -246,6 +248,8 @@ export interface ExtractedItemData {
   releaseYear?: number;
   originalSetNumber?: string;
   uniqueIdentifier?: string;
+  purchasePrice?: number;
+  collectorSummary?: string;
   comicCoverNumber?: string;
   comicIssueNumber?: string;
   comicWriter?: string;
@@ -259,6 +263,7 @@ export interface ExtractedItemData {
 export interface AnalyzeItemResult {
   extracted: ExtractedItemData;
   photoUrls: string[];
+  avatarUrl?: string;
 }
 
 // Las fotos de cámara se redimensionan/comprimen en el cliente antes de subir
@@ -324,6 +329,9 @@ export type MatchedItem = ItemScalar & {
 export interface ItemMatch {
   item: MatchedItem;
   score: number;
+  // Puntaje 0-100 de comparación visual (Gemini) contra el avatar del
+  // candidato; solo viene en los top-3 candidatos considerados por identify().
+  visualScore?: number;
 }
 
 export interface IdentifyResult {

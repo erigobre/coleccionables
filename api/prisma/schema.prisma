@@ -576,6 +576,12 @@ model Item {
   lastMarketPriceResult Json?
   lastMarketPriceAt     DateTime?
 
+  // Recorte 1:1 del objeto (bounding box de Gemini o, si no, cuadrado
+  // centrado determinista) — usado para el re-ranking visual de "¿Ya lo
+  // tengo?" y como miniatura de UI. Nullable: los objetos creados antes de
+  // esta función no lo tienen y caen de vuelta a photos[0] al compararlos.
+  avatarUrl String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
