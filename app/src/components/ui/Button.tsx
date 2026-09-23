@@ -7,6 +7,9 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
+  // Si se pasa (incluido 0), agrega "🪙<n>FT" al final del label con "FT" en
+  // tamaño reducido, tipo superíndice, para dejar claro que es una moneda.
+  ftCost?: number | null;
 }
 
 // Alturas/radios/tipografía exactos de docs/01-IDENTIDAD-VISUAL.md §Botones.
@@ -38,7 +41,7 @@ const SPINNER_COLOR: Record<NonNullable<ButtonProps['variant']>, string> = {
   ghost: colors.primary,
 };
 
-export function Button({ label, onPress, loading, disabled, variant = 'primary' }: ButtonProps) {
+export function Button({ label, onPress, loading, disabled, variant = 'primary', ftCost }: ButtonProps) {
   const isDisabled = disabled || loading;
 
   return (
@@ -58,6 +61,13 @@ export function Button({ label, onPress, loading, disabled, variant = 'primary' 
           }`}
         >
           {label}
+          {ftCost != null ? (
+            <Text>
+              {' 🪙'}
+              {ftCost}
+              <Text style={{ fontSize: 10 }}>FT</Text>
+            </Text>
+          ) : null}
         </Text>
       )}
     </Pressable>

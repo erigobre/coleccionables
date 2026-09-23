@@ -184,28 +184,33 @@ export default function CapturaScreen() {
 
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
-          <Button
-            label={costOf('CREATE_WITH_AI') != null ? `Analizar (${costOf('CREATE_WITH_AI')} FT)` : 'Analizar'}
-            onPress={onAnalyze}
-            loading={busy === 'analizar'}
-            disabled={busy === 'manual'}
-          />
           <View className="flex-row gap-3">
-            <View className="flex-1">
-              {photos.length < MAX_PHOTOS ? (
-                <Button label="+Fotos" variant="ghost" onPress={() => setAdding(true)} disabled={busy !== null} />
-              ) : null}
-            </View>
-            <View className="flex-1">
+            <View style={{ flex: 8 }}>
               <Button
-                label="Llenado manual"
+                label="Analizar"
+                ftCost={costOf('CREATE_WITH_AI')}
+                onPress={onAnalyze}
+                loading={busy === 'analizar'}
+                disabled={busy === 'manual'}
+              />
+            </View>
+            <View style={{ flex: 4 }}>
+              <Button
+                label="+ 📷"
                 variant="ghost"
-                onPress={onManual}
-                loading={busy === 'manual'}
-                disabled={busy === 'analizar'}
+                onPress={() => setAdding(true)}
+                disabled={busy !== null || photos.length >= MAX_PHOTOS}
               />
             </View>
           </View>
+          <Button
+            label="Llenado manual"
+            ftCost={0}
+            variant="ghost"
+            onPress={onManual}
+            loading={busy === 'manual'}
+            disabled={busy === 'analizar'}
+          />
           <Text className="text-center text-xs text-textMuted">
             Al analizar, la foto se envía a un servicio de IA para reconocer el objeto.
           </Text>
@@ -287,22 +292,11 @@ export default function CapturaScreen() {
               <Text className="text-sm text-white">Volver</Text>
             </Pressable>
           ) : (
-            <View className="items-end gap-2">
-              <Pressable
-                onPress={onManual}
-                disabled={busy !== null}
-                className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
-              >
-                <Text className="text-sm text-white">Manual</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => router.replace('/(tabs)/objetos/ya-lo-tengo')}
-                disabled={busy !== null}
-                className="h-9 items-center justify-center rounded-full bg-primary px-3"
-              >
-                <Text className="font-body-medium text-xs text-primaryText">¿Ya lo tengo?</Text>
-              </Pressable>
-            </View>
+            // Espaciador: mantiene centrado el disparador (mismo ancho que el
+            // botón de galería del otro lado). El flujo siempre empieza con
+            // fotos, así que aquí ya no van accesos directos a "Manual" ni
+            // "¿Ya lo tengo?".
+            <View className="h-12 w-12" />
           )}
         </View>
 

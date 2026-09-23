@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import { File, Paths } from 'expo-file-system';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
@@ -44,6 +46,7 @@ export default function LocationDetailScreen() {
 
   const [qrImage, setQrImage] = useState<string | null>(null);
   const [loadingQr, setLoadingQr] = useState(false);
+  const [sharingQr, setSharingQr] = useState(false);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
@@ -122,6 +125,24 @@ export default function LocationDetailScreen() {
     }
   };
 
+  const onShareQr = async () => {
+    if (!qrImage || !node) return;
+    setError(null);
+    setSharingQr(true);
+    try {
+      const base64 = qrImage.split(',')[1] ?? qrImage;
+      const file = new File(Paths.cache, `ubicacion-${node.id}-qr.png`);
+      if (file.exists) file.delete();
+      file.create();
+      file.write(base64, { encoding: 'base64' });
+      await Sharing.shareAsync(file.uri, { mimeType: 'image/png', dialogTitle: 'Compartir código QR' });
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setSharingQr(false);
+    }
+  };
+
   if (node === undefined) {
     if (error) {
       return (
@@ -189,8 +210,11 @@ export default function LocationDetailScreen() {
           Genera un código para imprimir y pegar físicamente en esta ubicación.
         </Text>
         {qrImage ? (
-          <View className="items-center rounded-md bg-white p-3">
-            <Image source={{ uri: qrImage }} style={{ width: 180, height: 180 }} resizeMode="contain" />
+          <View className="gap-3">
+            <View className="items-center rounded-md bg-white p-3">
+              <Image source={{ uri: qrImage }} style={{ width: 180, height: 180 }} resizeMode="contain" />
+            </View>
+            <Button label="Compartir QR" variant="secondary" onPress={onShareQr} loading={sharingQr} />
           </View>
         ) : (
           <Button label="Generar código QR" variant="secondary" onPress={onShowQr} loading={loadingQr} />

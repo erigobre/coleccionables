@@ -10,6 +10,7 @@ import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { categoryLabel } from '../../lib/item-enums';
+import { openObjetosScreen } from '../../lib/navigation';
 import { deleteWishlistItem, fetchWishlist, updateWishlistItem, type WishlistItem } from '../../lib/wishlist';
 import { colors } from '../../theme/tokens';
 
@@ -187,7 +188,7 @@ export default function WishlistScreen() {
       <View className="mb-4 flex-row items-center justify-between">
         <Text className="font-display text-[22px] uppercase tracking-wide text-text">Wishlist</Text>
         <Pressable
-          onPress={() => router.push('/(tabs)/objetos/ya-lo-tengo')}
+          onPress={() => openObjetosScreen(router, 'ya-lo-tengo')}
           className="flex-row items-center rounded-full bg-secondary px-3.5 py-2"
         >
           <Ionicons name="camera" size={16} color={colors.white} />

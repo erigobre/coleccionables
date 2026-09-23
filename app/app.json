@@ -53,7 +53,8 @@
           "photosPermission": "Frikidex necesita acceder a tus fotos para agregarlas a tus objetos."
         }
       ],
-      "expo-font"
+      "expo-font",
+      "expo-sharing"
     ],
     "extra": {
       "router": {

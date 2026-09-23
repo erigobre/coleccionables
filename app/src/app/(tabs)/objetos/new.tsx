@@ -131,11 +131,24 @@ export default function NewItemScreen() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // El llenado manual debe estar disponible siempre: si alguna de estas tres
+  // listas falla (red inestable, etc.) se cae a vacío en vez de dejar el
+  // formulario bloqueado para siempre en la pantalla de error.
   const loadFormData = useCallback(() => {
     if (!accessToken) return;
     setError(null);
-    fetchLocationTree(accessToken).then(setLocations).catch((err) => setError(authErrorMessage(err)));
-    fetchActiveCollections(accessToken).then(setCollections).catch((err) => setError(authErrorMessage(err)));
+    fetchLocationTree(accessToken)
+      .then(setLocations)
+      .catch((err) => {
+        setError(authErrorMessage(err));
+        setLocations([]);
+      });
+    fetchActiveCollections(accessToken)
+      .then(setCollections)
+      .catch((err) => {
+        setError(authErrorMessage(err));
+        setCollections([]);
+      });
     fetchTags(accessToken)
       .then((fetched) => {
         setTags(fetched);
@@ -150,7 +163,10 @@ export default function NewItemScreen() {
         setTagIds(preselected);
         setPendingTagNames(pending);
       })
-      .catch((err) => setError(authErrorMessage(err)));
+      .catch((err) => {
+        setError(authErrorMessage(err));
+        setTags([]);
+      });
   }, [accessToken, draft]);
 
   useEffect(() => {
