@@ -170,6 +170,12 @@ export function registerRequest(dto: {
   return apiFetch<AuthTokens>('/auth/register', { method: 'POST', body: dto });
 }
 
+export function checkUsernameAvailability(username: string) {
+  return apiFetch<{ available: boolean; suggestion: string | null }>(
+    `/auth/username-availability?username=${encodeURIComponent(username)}`,
+  );
+}
+
 export function loginRequest(dto: { email: string; password: string }) {
   return apiFetch<AuthTokens>('/auth/login', { method: 'POST', body: dto });
 }

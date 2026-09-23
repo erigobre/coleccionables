@@ -27,6 +27,27 @@ export class AuthService {
     private readonly ftService: FtService,
   ) {}
 
+  // Chequeo en vivo desde el registro (plan: bloquear el alta hasta que el
+  // usuario elegido esté libre). Si está tomado, sugiere el mismo nombre con
+  // un sufijo numérico aleatorio que también verificamos libre.
+  async checkUsernameAvailability(rawUsername: string) {
+    const username = rawUsername.toLowerCase();
+    const existing = await this.prisma.user.findUnique({ where: { username } });
+    if (!existing) {
+      return { available: true, suggestion: null };
+    }
+
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const suffix = Math.floor(Math.random() * 9000 + 1000);
+      const candidate = `${username}${suffix}`.slice(0, 20);
+      const taken = await this.prisma.user.findUnique({ where: { username: candidate } });
+      if (!taken) {
+        return { available: false, suggestion: candidate };
+      }
+    }
+    return { available: false, suggestion: null };
+  }
+
   async register(dto: RegisterDto) {
     const username = dto.username.toLowerCase();
     const [existingEmail, existingUsername] = await Promise.all([
