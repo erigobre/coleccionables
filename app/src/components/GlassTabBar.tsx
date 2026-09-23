@@ -27,25 +27,7 @@ const TAB_META: Record<string, { active: IconName; inactive: IconName; label: st
   perfil: { active: 'person', inactive: 'person-outline', label: 'Perfil' },
 };
 
-// Pantallas de cámara a pantalla completa: aquí la barra flotante taparía el
-// disparador y los botones de abajo, así que se oculta mientras están activas.
-const ROUTES_WITHOUT_TAB_BAR = new Set(['captura', 'ya-lo-tengo']);
-
-// El tab "objetos" es en realidad un Stack anidado; hay que mirar su ruta
-// interna activa (no solo el nombre del tab) para saber si hay que ocultar la barra.
-function getFocusedLeafRouteName(route: TabBarRoute & { state?: { index: number; routes: TabBarRoute[] } }): string {
-  let current: TabBarRoute & { state?: { index: number; routes: TabBarRoute[] } } = route;
-  while (current.state) {
-    current = current.state.routes[current.state.index] as typeof current;
-  }
-  return current.name;
-}
-
 export function GlassTabBar({ state, navigation, insets }: TabBarProps) {
-  const focusedRoute = state.routes[state.index];
-  const focusedLeafName = getFocusedLeafRouteName(focusedRoute as Parameters<typeof getFocusedLeafRouteName>[0]);
-  if (ROUTES_WITHOUT_TAB_BAR.has(focusedLeafName)) return null;
-
   return (
     <View
       pointerEvents="box-none"

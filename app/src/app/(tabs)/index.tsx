@@ -7,7 +7,6 @@ import { Screen } from '../../components/ui/Screen';
 import { useAuth } from '../../context/auth-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { fetchItems, type Item } from '../../lib/items';
-import { openObjetosScreen } from '../../lib/navigation';
 import { fetchWishlist } from '../../lib/wishlist';
 import { colors } from '../../theme/tokens';
 
@@ -89,11 +88,11 @@ export default function HomeScreen() {
                 <Text className="mb-5 text-sm text-textMuted">
                   Toma una foto y la IA rellena la ficha por ti. Después podrás ubicarlo, compartirlo o transferirlo.
                 </Text>
-                <Button label="Agregar objeto" onPress={() => openObjetosScreen(router, 'captura')} />
+                <Button label="Agregar objeto" onPress={() => router.push('/captura')} />
               </View>
 
               <Pressable
-                onPress={() => openObjetosScreen(router, 'ya-lo-tengo')}
+                onPress={() => router.push('/ya-lo-tengo')}
                 className="mt-4 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">
@@ -108,7 +107,7 @@ export default function HomeScreen() {
           ) : (
             <>
               <Pressable
-                onPress={() => openObjetosScreen(router, 'ya-lo-tengo')}
+                onPress={() => router.push('/ya-lo-tengo')}
                 className="mt-8 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">

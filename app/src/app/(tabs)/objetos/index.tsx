@@ -276,7 +276,7 @@ export default function ObjetosScreen() {
       </ScrollView>
 
       <Pressable
-        onPress={() => router.push('/(tabs)/objetos/captura')}
+        onPress={() => router.push('/captura')}
         className="absolute h-16 w-16 items-center justify-center rounded-full bg-primary shadow-lg"
         style={{ right: 20, bottom: insets.bottom + 96 }}
       >

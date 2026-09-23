@@ -7,8 +7,10 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../../global.css';
+import { CloseHeaderButton } from '../components/CloseHeaderButton';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { FtProvider } from '../context/ft-context';
+import { colors } from '../theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
@@ -48,6 +50,32 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
+        {/* Modales de pantalla completa, fuera de cualquier tab: así entrar a la
+            cámara desde Home/Wishlist/Objetos nunca deja a un tab con su stack
+            interno "atorado" en la cámara, ni la barra de tabs queda visible
+            encima (no forman parte de ningún tab). */}
+        <Stack.Screen
+          name="captura"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: true,
+            headerTransparent: true,
+            headerTintColor: colors.white,
+            headerTitle: '',
+            headerLeft: () => <CloseHeaderButton />,
+          }}
+        />
+        <Stack.Screen
+          name="ya-lo-tengo"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: true,
+            headerTransparent: true,
+            headerTintColor: colors.white,
+            headerTitle: '',
+            headerLeft: () => <CloseHeaderButton />,
+          }}
+        />
       </Stack.Protected>
     </Stack>
   );

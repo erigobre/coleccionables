@@ -5,16 +5,16 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '../../../components/ui/Button';
-import { authErrorMessage, useAuth } from '../../../context/auth-context';
-import { insufficientFtMessage, useFt } from '../../../context/ft-context';
-import { ApiError, resolvePhotoUrl } from '../../../lib/api';
-import { setItemDraft } from '../../../lib/item-draft';
-import { itemFormFromExtracted } from '../../../lib/item-form';
-import { usageLabel } from '../../../lib/item-enums';
-import { identifyItemPhotos, uploadItemPhotos, type IdentifyResult, type ItemMatch } from '../../../lib/items';
-import { createWishlistItem } from '../../../lib/wishlist';
-import { colors } from '../../../theme/tokens';
+import { Button } from '../components/ui/Button';
+import { authErrorMessage, useAuth } from '../context/auth-context';
+import { insufficientFtMessage, useFt } from '../context/ft-context';
+import { ApiError, resolvePhotoUrl } from '../lib/api';
+import { setItemDraft } from '../lib/item-draft';
+import { itemFormFromExtracted } from '../lib/item-form';
+import { usageLabel } from '../lib/item-enums';
+import { identifyItemPhotos, uploadItemPhotos, type IdentifyResult, type ItemMatch } from '../lib/items';
+import { createWishlistItem } from '../lib/wishlist';
+import { colors } from '../theme/tokens';
 
 const MAX_PHOTOS = 3;
 
@@ -331,7 +331,7 @@ export default function YaLoTengoScreen() {
             </Pressable>
           ) : (
             <Pressable
-              onPress={() => router.replace('/(tabs)/objetos/captura')}
+              onPress={() => router.replace('/captura')}
               className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
             >
               <Text className="text-sm text-white">Objeto nuevo</Text>

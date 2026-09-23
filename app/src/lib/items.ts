@@ -1,4 +1,5 @@
 import { apiFetch, apiUpload } from './api';
+import { compressPhotos } from './image';
 import type { Collection } from './collections';
 import type {
   ConservationState,
@@ -260,10 +261,13 @@ export interface AnalyzeItemResult {
   photoUrls: string[];
 }
 
-// El backend comprime las fotos, así que se mandan tal cual salen de la cámara.
-export function analyzeItemPhotos(accessToken: string, photoUris: string[]) {
+// Las fotos de cámara se redimensionan/comprimen en el cliente antes de subir
+// (compressPhotos): sin esto, el archivo original de varias MB puede fallar a
+// mitad de la subida en ciertos dispositivos/redes antes de llegar al backend.
+export async function analyzeItemPhotos(accessToken: string, photoUris: string[]) {
+  const compressed = await compressPhotos(photoUris);
   const form = new FormData();
-  photoUris.forEach((uri, index) => {
+  compressed.forEach((uri, index) => {
     form.append('photos', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
   });
   return apiUpload<AnalyzeItemResult>('/items/analyze', form, accessToken);
@@ -271,8 +275,9 @@ export function analyzeItemPhotos(accessToken: string, photoUris: string[]) {
 
 // Sube fotos sin análisis IA (camino "Manual"); devuelve las URLs relativas.
 export async function uploadItemPhotos(accessToken: string, photoUris: string[]): Promise<string[]> {
+  const compressed = await compressPhotos(photoUris);
   return Promise.all(
-    photoUris.map(async (uri, index) => {
+    compressed.map(async (uri, index) => {
       const form = new FormData();
       form.append('file', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
       const { url } = await apiUpload<{ url: string }>('/storage/upload', form, accessToken);
@@ -330,9 +335,10 @@ export interface IdentifyResult {
 
 // Identifica el objeto de la foto y lo busca en la colección. No guarda las fotos
 // en el servidor: si el usuario decide agregarlo, se suben después.
-export function identifyItemPhotos(accessToken: string, photoUris: string[]) {
+export async function identifyItemPhotos(accessToken: string, photoUris: string[]) {
+  const compressed = await compressPhotos(photoUris);
   const form = new FormData();
-  photoUris.forEach((uri, index) => {
+  compressed.forEach((uri, index) => {
     form.append('photos', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
   });
   return apiUpload<IdentifyResult>('/items/identify', form, accessToken);

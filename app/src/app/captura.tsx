@@ -5,14 +5,14 @@ import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Button } from '../../../components/ui/Button';
-import { authErrorMessage, useAuth } from '../../../context/auth-context';
-import { insufficientFtMessage, useFt } from '../../../context/ft-context';
-import { ApiError } from '../../../lib/api';
-import { setItemDraft } from '../../../lib/item-draft';
-import { EMPTY_ITEM_FORM, itemFormFromExtracted } from '../../../lib/item-form';
-import { analyzeItemPhotos, lookupBarcode, uploadItemPhotos } from '../../../lib/items';
-import { colors } from '../../../theme/tokens';
+import { Button } from '../components/ui/Button';
+import { authErrorMessage, useAuth } from '../context/auth-context';
+import { insufficientFtMessage, useFt } from '../context/ft-context';
+import { ApiError } from '../lib/api';
+import { setItemDraft } from '../lib/item-draft';
+import { EMPTY_ITEM_FORM, itemFormFromExtracted } from '../lib/item-form';
+import { analyzeItemPhotos, lookupBarcode, uploadItemPhotos } from '../lib/items';
+import { colors } from '../theme/tokens';
 
 const MAX_PHOTOS = 4;
 
@@ -121,18 +121,23 @@ export default function CapturaScreen() {
     }
   };
 
+  // El llenado manual no debe quedar bloqueado por un problema de red al subir
+  // las fotos: si la subida falla, se sigue al formulario sin fotos (se pueden
+  // agregar después desde el objeto ya creado) en vez de dejar al usuario
+  // atrapado en la cámara sin forma de continuar.
   const onManual = async () => {
     if (!accessToken) return;
     setBusy('manual');
     setError(null);
+    let photoUrls: string[] = [];
+    let notice: string | undefined;
     try {
-      const photoUrls = photos.length ? await uploadItemPhotos(accessToken, photos) : [];
-      setItemDraft({ values: EMPTY_ITEM_FORM, photoUrls, suggestedTags: [] });
-      goToForm();
-    } catch (err) {
-      setError(authErrorMessage(err));
-      setBusy(null);
+      photoUrls = await uploadItemPhotos(accessToken, photos);
+    } catch {
+      notice = 'No se pudieron subir las fotos por un problema de conexión; podrás agregarlas después desde el objeto.';
     }
+    setItemDraft({ values: EMPTY_ITEM_FORM, photoUrls, suggestedTags: [], notice });
+    goToForm();
   };
 
   if (!permission) {
