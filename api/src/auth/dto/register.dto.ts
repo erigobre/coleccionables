@@ -1,4 +1,4 @@
-import { Equals, IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { Equals, IsEmail, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -20,8 +20,13 @@ export class RegisterDto {
   password: string;
 
   // Checkbox obligatorio de "Acepto la política de privacidad y las
-  // condiciones de uso" — debe venir en `true` explícitamente. La versión
-  // exacta aceptada se guarda en auth.service.ts, no aquí.
+  // condiciones de uso" en la app ya actualizada. Las versiones publicadas en
+  // las tiendas ANTES de que este campo existiera no lo mandan — por
+  // compatibilidad se acepta que venga ausente (esas cuentas simplemente no
+  // quedan con versión/fecha de aceptación registrada), pero si viene debe
+  // ser explícitamente `true`. La versión exacta aceptada se guarda en
+  // auth.service.ts, no aquí.
+  @IsOptional()
   @Equals(true, { message: 'Debes aceptar la política de privacidad y las condiciones de uso' })
-  acceptedLegal: boolean;
+  acceptedLegal?: boolean;
 }

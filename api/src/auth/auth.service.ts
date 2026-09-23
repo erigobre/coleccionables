@@ -88,9 +88,16 @@ export class AuthService {
           name: dto.name,
           username,
           role: 'OWNER',
-          privacyVersionAccepted: PRIVACY_POLICY_VERSION,
-          termsVersionAccepted: TERMS_OF_USE_VERSION,
-          legalAcceptedAt: new Date(),
+          // Solo se graba si la app mandó el checkbox explícitamente en `true`
+          // (apps ya publicadas antes de este campo no lo mandan — ver
+          // register.dto.ts).
+          ...(dto.acceptedLegal
+            ? {
+                privacyVersionAccepted: PRIVACY_POLICY_VERSION,
+                termsVersionAccepted: TERMS_OF_USE_VERSION,
+                legalAcceptedAt: new Date(),
+              }
+            : {}),
         },
       });
 
