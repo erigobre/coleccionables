@@ -1,21 +1,27 @@
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
-// Las fotos de cámaras modernas pesan varios MB; sin comprimir, la subida
-// multipart puede fallar en ciertos dispositivos/redes antes de llegar al
-// servidor (se ve como "no se pudo conectar" sin que el backend reciba nada).
-// Se reduce a un ancho razonable para reconocimiento por IA y se comprime.
-export async function compressPhoto(uri: string): Promise<string> {
-  try {
-    const result = await manipulateAsync(uri, [{ resize: { width: 1280 } }], {
-      compress: 0.6,
-      format: SaveFormat.JPEG,
-    });
-    return result.uri;
-  } catch {
-    return uri;
-  }
+export interface CompressedPhoto {
+  uri: string;
+  base64: string;
 }
 
-export function compressPhotos(uris: string[]): Promise<string[]> {
+// Las fotos de cámaras modernas pesan varios MB; se reduce a un ancho
+// razonable para reconocimiento por IA y se comprime. Se pide el base64 en la
+// misma llamada nativa porque las fotos viajan al backend en el cuerpo JSON
+// (no como multipart/FormData: eso falla en Android bajo la New Architecture
+// de React Native con "Unsupported FormData part implementation" — ver lib/items.ts).
+export async function compressPhoto(uri: string): Promise<CompressedPhoto> {
+  const result = await manipulateAsync(uri, [{ resize: { width: 1280 } }], {
+    compress: 0.6,
+    format: SaveFormat.JPEG,
+    base64: true,
+  });
+  if (!result.base64) {
+    throw new Error('No se pudo procesar la foto');
+  }
+  return { uri: result.uri, base64: result.base64 };
+}
+
+export function compressPhotos(uris: string[]): Promise<CompressedPhoto[]> {
   return Promise.all(uris.map(compressPhoto));
 }

@@ -1,17 +1,4 @@
-import {
-  Body,
-  Controller,
-  Delete,
-  Get,
-  Param,
-  Patch,
-  Post,
-  Query,
-  UploadedFiles,
-  UseGuards,
-  UseInterceptors,
-} from '@nestjs/common';
-import { FilesInterceptor } from '@nestjs/platform-express';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { IdempotencyKey } from '../common/decorators/idempotency-key.decorator.js';
@@ -23,6 +10,7 @@ import { ChangeLocationDto } from './dto/change-location.dto.js';
 import { MatchItemDto } from './dto/match-item.dto.js';
 import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
 import { LookupMarketPriceDto } from './dto/lookup-market-price.dto.js';
+import { AnalyzePhotosDto } from './dto/analyze-photos.dto.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -50,26 +38,33 @@ export class ItemsController {
   }
 
   // Analiza fotos con IA y las sube ya comprimidas (plan §5.3.6-9). Cobra FT
-  // (CREATE_WITH_AI); requiere el header Idempotency-Key.
+  // (CREATE_WITH_AI); requiere el header Idempotency-Key. Las fotos llegan en
+  // base64 dentro del JSON (ver AnalyzePhotosDto), no como multipart.
   @Post('analyze')
-  @UseInterceptors(FilesInterceptor('photos'))
   analyze(
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFiles() photos: Express.Multer.File[],
+    @Body() dto: AnalyzePhotosDto,
     @IdempotencyKey() idempotencyKey: string,
   ) {
+    const photos = dto.photos.map((photo) => ({
+      buffer: Buffer.from(photo.imageBase64, 'base64'),
+      mimetype: photo.mimeType ?? 'image/jpeg',
+    }));
     return this.itemsService.analyzePhotos(user.id, user.organizationId, photos, idempotencyKey);
   }
 
   // "¿Ya lo tengo?": identifica el objeto de la foto y lo busca en la
   // colección. Cobra FT (SCAN_HAVE_IT); requiere Idempotency-Key.
   @Post('identify')
-  @UseInterceptors(FilesInterceptor('photos'))
   identify(
     @CurrentUser() user: AuthenticatedUser,
-    @UploadedFiles() photos: Express.Multer.File[],
+    @Body() dto: AnalyzePhotosDto,
     @IdempotencyKey() idempotencyKey: string,
   ) {
+    const photos = dto.photos.map((photo) => ({
+      buffer: Buffer.from(photo.imageBase64, 'base64'),
+      mimetype: photo.mimeType ?? 'image/jpeg',
+    }));
     return this.itemsService.identify(user.id, user.organizationId, photos, idempotencyKey);
   }
 

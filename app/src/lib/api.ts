@@ -60,7 +60,7 @@ async function throwIfError(response: Response): Promise<unknown> {
 
 // FrikiTokens: toda acción que cobra FT necesita un Idempotency-Key (para que
 // un reintento de red no cobre 2 veces la misma acción). Se genera una llave
-// nueva por cada llamada a apiFetch/apiUpload y se reutiliza en el reintento
+// nueva por cada llamada a apiFetch y se reutiliza en el reintento
 // interno tras un refresh de token (sigue siendo la misma acción lógica).
 // No hace falta que sea criptográficamente única: solo distinguir intentos
 // de la misma acción entre sí.
@@ -137,28 +137,6 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
 // Las fotos se guardan en la BD como ruta relativa del backend (`/uploads/x.jpg`).
 export function resolvePhotoUrl(url: string): string {
   return /^https?:\/\//.test(url) ? url : `${API_BASE_URL}${url}`;
-}
-
-// Para multipart NO se fija Content-Type: fetch lo arma con el boundary correcto.
-export async function apiUpload<T>(path: string, form: FormData, accessToken: string): Promise<T> {
-  const idempotencyKey = generateIdempotencyKey();
-  const request = (token: string) =>
-    fetch(`${API_BASE_URL}${path}`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}`, 'Idempotency-Key': idempotencyKey },
-      body: form,
-    });
-
-  const response = await request(accessToken);
-
-  if (response.status === 401) {
-    const newToken = await refreshAccessToken();
-    if (newToken) {
-      return (await throwIfError(await request(newToken))) as T;
-    }
-  }
-
-  return (await throwIfError(response)) as T;
 }
 
 export function registerRequest(dto: {

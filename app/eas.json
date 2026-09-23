@@ -11,9 +11,6 @@
       },
       "ios": {
         "buildConfiguration": "Release"
-      },
-      "env": {
-        "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     },
     "production": {
@@ -23,9 +20,6 @@
       },
       "ios": {
         "buildConfiguration": "Release"
-      },
-      "env": {
-        "EXPO_PUBLIC_USE_RN_FETCH": "1"
       }
     }
   },

@@ -1,4 +1,4 @@
-import { apiFetch, apiUpload } from './api';
+import { apiFetch } from './api';
 import { compressPhotos } from './image';
 import type { Collection } from './collections';
 import type {
@@ -262,25 +262,25 @@ export interface AnalyzeItemResult {
 }
 
 // Las fotos de cámara se redimensionan/comprimen en el cliente antes de subir
-// (compressPhotos): sin esto, el archivo original de varias MB puede fallar a
-// mitad de la subida en ciertos dispositivos/redes antes de llegar al backend.
+// (compressPhotos) y viajan como base64 dentro del JSON, no como multipart:
+// FormData.append({uri,name,type}) + fetch() falla en Android bajo la New
+// Architecture de React Native con "Unsupported FormData part implementation".
 export async function analyzeItemPhotos(accessToken: string, photoUris: string[]) {
   const compressed = await compressPhotos(photoUris);
-  const form = new FormData();
-  compressed.forEach((uri, index) => {
-    form.append('photos', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
-  });
-  return apiUpload<AnalyzeItemResult>('/items/analyze', form, accessToken);
+  const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
+  return apiFetch<AnalyzeItemResult>('/items/analyze', { method: 'POST', body: { photos }, accessToken });
 }
 
 // Sube fotos sin análisis IA (camino "Manual"); devuelve las URLs relativas.
 export async function uploadItemPhotos(accessToken: string, photoUris: string[]): Promise<string[]> {
   const compressed = await compressPhotos(photoUris);
   return Promise.all(
-    compressed.map(async (uri, index) => {
-      const form = new FormData();
-      form.append('file', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
-      const { url } = await apiUpload<{ url: string }>('/storage/upload', form, accessToken);
+    compressed.map(async (photo) => {
+      const { url } = await apiFetch<{ url: string }>('/storage/upload', {
+        method: 'POST',
+        body: { imageBase64: photo.base64, mimeType: 'image/jpeg' },
+        accessToken,
+      });
       return url;
     }),
   );
@@ -337,9 +337,6 @@ export interface IdentifyResult {
 // en el servidor: si el usuario decide agregarlo, se suben después.
 export async function identifyItemPhotos(accessToken: string, photoUris: string[]) {
   const compressed = await compressPhotos(photoUris);
-  const form = new FormData();
-  compressed.forEach((uri, index) => {
-    form.append('photos', { uri, name: `foto-${index}.jpg`, type: 'image/jpeg' } as unknown as Blob);
-  });
-  return apiUpload<IdentifyResult>('/items/identify', form, accessToken);
+  const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
+  return apiFetch<IdentifyResult>('/items/identify', { method: 'POST', body: { photos }, accessToken });
 }
