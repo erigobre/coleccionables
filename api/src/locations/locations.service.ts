@@ -123,7 +123,13 @@ export class LocationsService {
 
   async getQrImage(ownerId: string, id: string) {
     const location = await this.assertOwnedLocation(ownerId, id);
-    const dataUrl = await QRCode.toDataURL(location.qrToken);
+    // width alto + margen: a 132px (default) el QR es casi imposible de leer
+    // ya impreso o a distancia normal de cámara.
+    const dataUrl = await QRCode.toDataURL(location.qrToken, {
+      width: 600,
+      margin: 3,
+      errorCorrectionLevel: 'M',
+    });
     return { qrToken: location.qrToken, qrImageDataUrl: dataUrl };
   }
 
