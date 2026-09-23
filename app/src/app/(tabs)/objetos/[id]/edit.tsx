@@ -6,7 +6,7 @@ import { ItemFormFields } from '../../../../components/items/ItemFormFields';
 import { PhotoManager } from '../../../../components/items/PhotoManager';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { EMPTY_ITEM_FORM, itemFormFromItem, itemFormIsValid, itemFormToUpdateDto, type ItemFormValues } from '../../../../lib/item-form';
-import { fetchItem, updateItem, type ItemPhoto } from '../../../../lib/items';
+import { deleteItem, fetchItem, updateItem, type ItemPhoto } from '../../../../lib/items';
 import { colors } from '../../../../theme/tokens';
 
 export default function EditItemScreen() {
@@ -18,6 +18,7 @@ export default function EditItemScreen() {
   const [photos, setPhotos] = useState<ItemPhoto[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -56,6 +57,19 @@ export default function EditItemScreen() {
     }
   };
 
+  const onDelete = async () => {
+    if (!accessToken || !id) return;
+    setDeleting(true);
+    setError(null);
+    try {
+      await deleteItem(accessToken, id);
+      router.replace('/(tabs)/objetos');
+    } catch (err) {
+      setError(authErrorMessage(err));
+      setDeleting(false);
+    }
+  };
+
   if (!loaded) {
     return (
       <View className="flex-1 items-center justify-center bg-background">
@@ -79,6 +93,9 @@ export default function EditItemScreen() {
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 
       <Button label="Guardar cambios" onPress={onSave} loading={saving} disabled={!itemFormIsValid(values)} />
+      <View className="mt-3">
+        <Button label="Eliminar objeto" variant="destructive" onPress={onDelete} loading={deleting} />
+      </View>
     </ScrollView>
   );
 }

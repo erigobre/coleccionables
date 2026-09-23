@@ -26,7 +26,7 @@ export default function ObjetosStackLayout() {
       />
       <Stack.Screen name="[id]/edit" options={{ title: 'Editar objeto' }} />
       <Stack.Screen name="[id]/ubicacion" options={{ title: 'Cambiar ubicación', presentation: 'modal' }} />
-      <Stack.Screen name="[id]/vender" options={{ title: 'Vender objeto', presentation: 'modal' }} />
+      <Stack.Screen name="[id]/vender" options={{ title: 'Transferir objeto', presentation: 'modal' }} />
       <Stack.Screen name="transferencias" options={{ title: 'Transferencias' }} />
     </Stack>
   );

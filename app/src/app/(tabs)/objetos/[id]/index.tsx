@@ -3,6 +3,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
 import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
@@ -17,7 +18,6 @@ import {
 import {
   addItemToCollection,
   addItemTag,
-  deleteItem,
   fetchItem,
   lookupMarketPrice,
   peekMarketPrice,
@@ -59,6 +59,7 @@ export default function ItemDetailScreen() {
   const { refresh: refreshFt } = useFt();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const pagerRef = useRef<ScrollView>(null);
   const [photoIndex, setPhotoIndex] = useState(0);
@@ -70,7 +71,6 @@ export default function ItemDetailScreen() {
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [tags, setTags] = useState<Tag[] | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [deleting, setDeleting] = useState(false);
   const [marketPeek, setMarketPeek] = useState<MarketPricePeek | null>(null);
   const [marketPrice, setMarketPrice] = useState<MarketPriceResult | null>(null);
   const [marketPriceInfo, setMarketPriceInfo] = useState<{ fetchedAt: string; fromCache: boolean } | null>(null);
@@ -148,19 +148,6 @@ export default function ItemDetailScreen() {
       await load();
     } catch (err) {
       setError(authErrorMessage(err));
-    }
-  };
-
-  const onDelete = async () => {
-    if (!accessToken || !item) return;
-    setDeleting(true);
-    setError(null);
-    try {
-      await deleteItem(accessToken, item.id);
-      router.back();
-    } catch (err) {
-      setError(authErrorMessage(err));
-      setDeleting(false);
     }
   };
 
@@ -282,7 +269,8 @@ export default function ItemDetailScreen() {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: 80 }}>
+    <View className="flex-1">
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: insets.bottom + 240 }}>
       <View className="relative w-full bg-surface" style={{ aspectRatio: 4 / 5 }}>
         {item.photos.length > 0 ? (
           <ScrollView
@@ -495,11 +483,8 @@ export default function ItemDetailScreen() {
 
         {editable ? (
           <View className="gap-3">
-            <Button label="Editar objeto" onPress={() => router.push(`/(tabs)/objetos/${item.id}/edit`)} />
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
             <Button label="Compartir enlace" variant="ghost" onPress={onShare} loading={sharing} />
-            <Button label="Vendido" variant="ghost" onPress={() => router.push(`/(tabs)/objetos/${item.id}/vender`)} />
-            <Button label="Eliminar objeto" variant="destructive" onPress={onDelete} loading={deleting} />
             <Pressable onPress={onUnshare} className="items-center py-2">
               <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
             </Pressable>
@@ -511,5 +496,25 @@ export default function ItemDetailScreen() {
         )}
       </Animated.View>
     </ScrollView>
+
+      {editable ? (
+        <>
+          <Pressable
+            onPress={() => router.push(`/(tabs)/objetos/${item.id}/vender`)}
+            className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
+            style={{ right: 20, bottom: insets.bottom + 164 }}
+          >
+            <Ionicons name="swap-horizontal" size={24} color={colors.white} />
+          </Pressable>
+          <Pressable
+            onPress={() => router.push(`/(tabs)/objetos/${item.id}/edit`)}
+            className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+            style={{ right: 20, bottom: insets.bottom + 96 }}
+          >
+            <Ionicons name="pencil" size={22} color={colors.primaryText} />
+          </Pressable>
+        </>
+      ) : null}
+    </View>
   );
 }
