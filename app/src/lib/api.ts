@@ -171,7 +171,7 @@ export function registerRequest(dto: {
 }
 
 export function checkUsernameAvailability(username: string) {
-  return apiFetch<{ available: boolean; suggestion: string | null }>(
+  return apiFetch<{ available: boolean; suggestion: string | null; blocked: boolean }>(
     `/auth/username-availability?username=${encodeURIComponent(username)}`,
   );
 }

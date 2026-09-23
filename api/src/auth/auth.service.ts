@@ -4,6 +4,7 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
 import { FtService } from '../ft/ft.service.js';
+import { isUsernameProfane } from './profanity/username-filter.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { JwtPayload } from './auth.types.js';
@@ -32,9 +33,13 @@ export class AuthService {
   // un sufijo numérico aleatorio que también verificamos libre.
   async checkUsernameAvailability(rawUsername: string) {
     const username = rawUsername.toLowerCase();
+    if (isUsernameProfane(username)) {
+      return { available: false, suggestion: null, blocked: true };
+    }
+
     const existing = await this.prisma.user.findUnique({ where: { username } });
     if (!existing) {
-      return { available: true, suggestion: null };
+      return { available: true, suggestion: null, blocked: false };
     }
 
     for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -42,14 +47,18 @@ export class AuthService {
       const candidate = `${username}${suffix}`.slice(0, 20);
       const taken = await this.prisma.user.findUnique({ where: { username: candidate } });
       if (!taken) {
-        return { available: false, suggestion: candidate };
+        return { available: false, suggestion: candidate, blocked: false };
       }
     }
-    return { available: false, suggestion: null };
+    return { available: false, suggestion: null, blocked: false };
   }
 
   async register(dto: RegisterDto) {
     const username = dto.username.toLowerCase();
+    if (isUsernameProfane(username)) {
+      throw new ConflictException('Ese usuario no está permitido');
+    }
+
     const [existingEmail, existingUsername] = await Promise.all([
       this.prisma.user.findUnique({ where: { email: dto.email } }),
       this.prisma.user.findUnique({ where: { username } }),

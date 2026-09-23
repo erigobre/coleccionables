@@ -12,7 +12,7 @@ import { colors } from '../../theme/tokens';
 // Solo minúsculas, números y guion bajo: debe coincidir con RegisterDto en el backend.
 const USERNAME_REGEX = /^[a-z0-9_]{3,20}$/;
 
-type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken';
+type UsernameStatus = 'idle' | 'checking' | 'available' | 'taken' | 'blocked';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -36,7 +36,7 @@ export default function RegisterScreen() {
     setUsernameStatus('checking');
     try {
       const result = await checkUsernameAvailability(username);
-      setUsernameStatus(result.available ? 'available' : 'taken');
+      setUsernameStatus(result.blocked ? 'blocked' : result.available ? 'available' : 'taken');
       setUsernameSuggestion(result.suggestion);
     } catch {
       // Si falla el chequeo se deja "idle": el usuario puede reintentar tocando fuera de nuevo.
@@ -51,7 +51,7 @@ export default function RegisterScreen() {
     setUsernameStatus('checking');
     try {
       const result = await checkUsernameAvailability(suggested);
-      setUsernameStatus(result.available ? 'available' : 'taken');
+      setUsernameStatus(result.blocked ? 'blocked' : result.available ? 'available' : 'taken');
       setUsernameSuggestion(result.suggestion);
     } catch {
       setUsernameStatus('idle');
@@ -94,7 +94,7 @@ export default function RegisterScreen() {
         <Text className="mb-1.5 text-sm font-medium text-textSecondary">Usuario</Text>
         <View
           className={`h-14 flex-row items-center rounded-md border bg-surfaceElevated pr-4 ${
-            usernameStatus === 'taken' ? 'border-danger' : 'border-border'
+            usernameStatus === 'taken' || usernameStatus === 'blocked' ? 'border-danger' : 'border-border'
           }`}
         >
           <LinearGradient
@@ -129,6 +129,10 @@ export default function RegisterScreen() {
               </Text>
             </Pressable>
           ) : null}
+        </View>
+      ) : usernameStatus === 'blocked' ? (
+        <View className="mb-4">
+          <Text className="text-xs text-danger">Ese usuario no está permitido. Elige otro.</Text>
         </View>
       ) : (
         <View className="mb-4" />
