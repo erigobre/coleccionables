@@ -10,7 +10,7 @@
 // probar exactamente qué texto aceptó cada usuario.
 export const PRIVACY_POLICY_VERSION = '2026-09-23';
 const UPDATED_AT = '23 de septiembre de 2026';
-const CONTACT_EMAIL = 'iamkikelo@gmail.com';
+const CONTACT_EMAIL = 'privacidad@appgo.mx';
 
 const LEGAL_ENTITY_NAME = 'Aplicaciones y Soluciones Digitales GO';
 const LEGAL_ENTITY_RFC = 'ASD1903057GA';
