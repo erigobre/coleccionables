@@ -76,6 +76,22 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             headerLeft: () => <CloseHeaderButton />,
           }}
         />
+        {/* El formulario de alta también vive fuera de los tabs: llega siempre
+            por un replace desde captura/ya-lo-tengo, así que al ser hermano de
+            (tabs) en este mismo stack conserva el historial de vuelta (el
+            "atrás" cae en la pantalla desde la que se abrió la cámara). */}
+        <Stack.Screen
+          name="new"
+          options={{
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.background },
+            headerShadowVisible: false,
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+            headerTitle: 'Nuevo objeto',
+            headerLeft: () => <CloseHeaderButton variant="plain" />,
+          }}
+        />
       </Stack.Protected>
     </Stack>
   );

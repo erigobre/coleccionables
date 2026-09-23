@@ -2,18 +2,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
-import { Button } from '../../../components/ui/Button';
-import { TextField } from '../../../components/ui/TextField';
-import { ItemFormFields } from '../../../components/items/ItemFormFields';
-import { authErrorMessage, useAuth } from '../../../context/auth-context';
-import { resolvePhotoUrl } from '../../../lib/api';
-import { getItemDraft } from '../../../lib/item-draft';
-import { EMPTY_ITEM_FORM, itemFormIsValid, itemFormToCreateDto, type ItemFormValues } from '../../../lib/item-form';
-import { fetchActiveCollections, type Collection } from '../../../lib/collections';
-import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../../../lib/locations';
-import { createItem } from '../../../lib/items';
-import { createTag, fetchTags, findOrCreateTag, type Tag } from '../../../lib/tags';
-import { colors } from '../../../theme/tokens';
+import { Button } from '../components/ui/Button';
+import { TextField } from '../components/ui/TextField';
+import { ItemFormFields } from '../components/items/ItemFormFields';
+import { authErrorMessage, useAuth } from '../context/auth-context';
+import { resolvePhotoUrl } from '../lib/api';
+import { getItemDraft } from '../lib/item-draft';
+import { EMPTY_ITEM_FORM, itemFormIsValid, itemFormToCreateDto, type ItemFormValues } from '../lib/item-form';
+import { fetchActiveCollections, type Collection } from '../lib/collections';
+import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../lib/locations';
+import { createItem } from '../lib/items';
+import { createTag, fetchTags, findOrCreateTag, type Tag } from '../lib/tags';
+import { colors } from '../theme/tokens';
 
 function LocationChipList({
   options,

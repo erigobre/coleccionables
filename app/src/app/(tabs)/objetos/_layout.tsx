@@ -1,4 +1,5 @@
 import { Stack } from 'expo-router';
+import { CloseHeaderButton } from '../../../components/CloseHeaderButton';
 import { colors } from '../../../theme/tokens';
 
 export default function ObjetosStackLayout() {
@@ -13,8 +14,16 @@ export default function ObjetosStackLayout() {
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
-      <Stack.Screen name="new" options={{ title: 'Nuevo objeto' }} />
-      <Stack.Screen name="[id]/index" options={{ title: 'Objeto' }} />
+      {/* Se puede llegar aquí recién creado el objeto desde /new (fuera de este
+          stack, vía replace), sin historial local que dé un botón "Atrás" por
+          defecto — este botón siempre puede volver al catálogo. */}
+      <Stack.Screen
+        name="[id]/index"
+        options={{
+          title: 'Objeto',
+          headerLeft: () => <CloseHeaderButton variant="plain" fallbackTo="/(tabs)/objetos" />,
+        }}
+      />
       <Stack.Screen name="[id]/edit" options={{ title: 'Editar objeto' }} />
       <Stack.Screen name="[id]/ubicacion" options={{ title: 'Cambiar ubicación', presentation: 'modal' }} />
       <Stack.Screen name="[id]/vender" options={{ title: 'Vender objeto', presentation: 'modal' }} />

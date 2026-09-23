@@ -138,7 +138,7 @@ export default function YaLoTengoScreen() {
         suggestedTags: result.extracted.suggestedTags ?? [],
         notice: 'Revisa lo que detectó la IA y corrige lo que haga falta.',
       });
-      router.replace('/(tabs)/objetos/new');
+      router.replace('/new');
     } catch (err) {
       setError(authErrorMessage(err));
       setBusy(null);

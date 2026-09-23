@@ -92,7 +92,12 @@ export function useAuth(): AuthContextValue {
   return ctx;
 }
 
+// El detalle real del error (nombre + mensaje de la excepción JS/fetch) se
+// agrega al final para poder diagnosticar fallas de red en producción sin
+// acceso a la consola del dispositivo — sin esto, cualquier error no-ApiError
+// se veía idéntico ("no se pudo conectar") sin importar la causa real.
 export function authErrorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
-  return 'No se pudo conectar con el servidor. Intenta de nuevo.';
+  const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+  return `No se pudo conectar con el servidor. Intenta de nuevo.\n[${detail}]`;
 }

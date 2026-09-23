@@ -36,7 +36,7 @@ export default function CapturaScreen() {
   const [busy, setBusy] = useState<'analizar' | 'manual' | 'codigo' | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const goToForm = () => router.replace('/(tabs)/objetos/new');
+  const goToForm = () => router.replace('/new');
 
   const addPhotos = (uris: string[]) => {
     setPhotos((prev) => [...prev, ...uris].slice(0, MAX_PHOTOS));
