@@ -44,7 +44,10 @@ export interface ItemFormValues {
 
 export const EMPTY_ITEM_FORM: ItemFormValues = {
   name: '',
-  category: null,
+  // La categoría ya no la elige el usuario: es un dato interno de apoyo para
+  // búsquedas avanzadas. Al llenar manual queda "Otro"; la IA la reasigna
+  // en itemFormFromExtracted cuando sí logra detectarla.
+  category: 'OTRO',
   packagingCondition: null,
   usageState: null,
   conservationState: null,
@@ -113,7 +116,7 @@ export function itemFormFromExtracted(extracted: ExtractedItemData): ItemFormVal
   return {
     ...EMPTY_ITEM_FORM,
     name: extracted.name ?? '',
-    category: pickOption(CATEGORY_OPTIONS, extracted.category),
+    category: pickOption(CATEGORY_OPTIONS, extracted.category) ?? 'OTRO',
     packagingCondition: pickOption(PACKAGING_OPTIONS, extracted.packagingCondition),
     usageState: pickOption(USAGE_OPTIONS, extracted.usageState),
     conservationState: pickOption(CONSERVATION_OPTIONS, extracted.conservationState),
@@ -140,12 +143,7 @@ function toIsoDate(date: Date): string {
 }
 
 export function itemFormIsValid(values: ItemFormValues): boolean {
-  return (
-    values.name.trim().length > 0 &&
-    values.category !== null &&
-    values.packagingCondition !== null &&
-    values.usageState !== null
-  );
+  return values.name.trim().length > 0 && values.packagingCondition !== null && values.usageState !== null;
 }
 
 function scalarFields(values: ItemFormValues) {

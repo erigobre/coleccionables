@@ -9,12 +9,7 @@ import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { insufficientFtMessage, useFt } from '../../../../context/ft-context';
 import { fetchActiveCollections, type Collection } from '../../../../lib/collections';
-import {
-  categoryLabel,
-  conservationLabel,
-  packagingLabel,
-  usageLabel,
-} from '../../../../lib/item-enums';
+import { conservationLabel, packagingLabel, usageLabel } from '../../../../lib/item-enums';
 import {
   addItemToCollection,
   addItemTag,
@@ -328,7 +323,6 @@ export default function ItemDetailScreen() {
         ) : null}
 
         <View className="my-5 rounded-lg border border-border bg-surface p-4">
-          <InfoRow label="Categoría" value={categoryLabel(item.category)} />
           <InfoRow label="Empaque" value={packagingLabel(item.packagingCondition)} />
           <InfoRow label="Estado" value={usageLabel(item.usageState)} />
           <InfoRow label="Conservación" value={item.conservationState ? conservationLabel(item.conservationState) : null} />

@@ -3,13 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { ChipSelect } from '../ui/ChipSelect';
 import { DatePickerField } from '../ui/DatePickerField';
 import { TextField } from '../ui/TextField';
-import {
-  CATEGORY_OPTIONS,
-  CONSERVATION_OPTIONS,
-  PACKAGING_OPTIONS,
-  USAGE_OPTIONS,
-  isComicCategory,
-} from '../../lib/item-enums';
+import { CONSERVATION_OPTIONS, PACKAGING_OPTIONS, USAGE_OPTIONS, isComicCategory } from '../../lib/item-enums';
 import type { ItemFormValues } from '../../lib/item-form';
 import { colors } from '../../theme/tokens';
 
@@ -26,13 +20,6 @@ export function ItemFormFields({ values, onChange }: ItemFormFieldsProps) {
         value={values.name}
         onChangeText={(text) => onChange('name', text)}
         placeholder="Ej. Batman: The Killing Joke"
-      />
-
-      <ChipSelect
-        label="Categoría *"
-        options={CATEGORY_OPTIONS}
-        value={values.category}
-        onChange={(value) => onChange('category', value)}
       />
 
       <ChipSelect
