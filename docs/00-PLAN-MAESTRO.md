@@ -1,5 +1,5 @@
 > Documento vivo. No se escribe código de la app hasta que este documento esté validado por el usuario y se reciba el "GO".
-> Última actualización: 2026-09-20 — Autor: Claude (planeación) + iamkikelo@gmail.com (owner del producto)
+> Última actualización: 2026-09-23 — Autor: Claude (planeación) + iamkikelo@gmail.com (owner del producto)
 
 # Plan Maestro — Frikidex
 
@@ -13,6 +13,17 @@
 | 4 | Alcance MVP: ¿colecciones/ubicaciones compartidas en v1? | **NO** — se deja para **v1.1**. V1 lanza solo con cuentas/colecciones/ubicaciones individuales |
 
 Estas decisiones ya están reflejadas en el resto del documento (stack en §3, checklist en §8).
+
+## DECISIONES CONFIRMADAS (2026-09-23) — Landing, cobros y legal
+
+| # | Tema | Decisión |
+|---|---|---|
+| 21 | Precio entre canales de pago | **Mismo precio en los 3 canales** (StoreKit, Google Play Billing, Stripe) — sin diferenciación por plataforma |
+| 22 | Planes v1 | **Solo mensual**; el plan anual queda diferido a una fase futura |
+| 23 | Almacenamiento de la waitlist | **Base de datos propia de la app** (tabla `Waitlist`), no un servicio externo (Mailchimp, etc.) |
+| 24 | Entidad legal para avisos/términos | **Aplicaciones y Soluciones Digitales GO**, RFC `ASD1903057GA`, domicilio: Helena, Lote 4, Interior C4, Col. Jardines del Sur, Cancún, Benito Juárez, Quintana Roo, C.P. 77536 |
+
+**Alcance recortado explícitamente (decisión de scoping, no del usuario):** el épico completo de pasarelas de pago (StoreKit + Google Play Billing + Stripe + panel superadmin "Pasarelas de pago" con credenciales encriptadas) se **difiere** a la Fase 10 tal como ya estaba planeado — ver nota ahí. Esta vuelta de trabajo (2026-09-23) solo construyó: precios FT dinámicos consumidos por la landing, waitlist real, y páginas legales versionadas — no procesamiento de pagos real todavía.
 
 ## DECISIONES NO BLOQUEANTES CONFIRMADAS (2026-09-20)
 
@@ -329,6 +340,7 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
 - [ ] **Fase 8 — Notificaciones**
   - [ ] Push de temporada ("recuerda regresar tus objetos de Halloween")
   - [ ] Push de transferencia recibida
+  - [ ] **(Diferido, 2026-09-23)** Proveedor real de correo transaccional (confirmación de la waitlist, y en general cualquier notificación por email) — hoy `WaitlistService` solo guarda el registro en BD, no envía nada; anotado para retomar en esta fase, no bloquea el lanzamiento v1
 
 - [ ] **Fase 9 — Backend Superadmin (web)**
   - [ ] Listado de usuarios + búsqueda/filtros
@@ -337,9 +349,29 @@ Propuesta simple para v1 (sin necesidad de vectores/embeddings al inicio):
   - [ ] Toggle de cuenta patrocinada
 
 - [ ] **Fase 10 — SaaS/Pagos (fase 2 de negocio, no bloquea lanzamiento v1 según lo dicho por el usuario)**
-  - [ ] Definir paquetes y precios
-  - [ ] Integración pasarela de pago (Stripe u otra)
+  - [x] Definir paquetes y precios *(catálogo `FtPackage`/`FtPlan` en BD, 2026-09-23 — ver Fase 12.5; el cobro real sigue pendiente)*
+  - [ ] **Integración pasarela de pago — épico completo, DIFERIDO explícitamente (2026-09-23):**
+    - [ ] StoreKit (iOS)
+    - [ ] Google Play Billing (Android)
+    - [ ] Stripe (web/Frikidex.com)
+    - [ ] Panel superadmin "Pasarelas de pago" con credenciales encriptadas por canal
+    - *Decisión de scoping: mismo precio en los 3 canales, solo plan mensual en v1 (ver decisiones #21-22). Nada de esto está construido todavía — la landing y el catálogo de FT ya muestran precios reales, pero no hay flujo de compra/cobro funcional.*
   - [ ] Enforcement de límites por paquete (ej. máx. objetos, máx. colaboradores)
+
+- [x] **Fase 12.5 — Landing pública (frikidex.com), legal y precios FT dinámicos** *(codeado 2026-09-23)*
+  - [x] Modelos `FtPackage`/`FtPlan` (catálogo de precios) + `Waitlist`, migración escrita a mano (sin BD local disponible), seed con los mismos valores que ya traía la landing como fallback
+  - [x] `GET /ft/packages`, `GET /ft/plans`, `GET /ft/services/public` (controlador público sin auth, separado del `FtController` protegido)
+  - [x] Waitlist real: `POST /waitlist` con honeypot + rate-limit por IP en memoria + checkbox de consentimiento, reemplaza el `localStorage` anterior
+  - [x] Landing (`api/public/index.html`) consume `/ft/packages` y `/ft/plans` con caché de 5 min en `localStorage` y **fallback** a los valores hardcodeados si la API falla; el toggle mensual/anual de planes ya no depende del texto del precio (`data-plan="..."`) para evitar romperse cuando el precio real difiera del fallback
+  - [x] Páginas legales versionadas: `/aviso-de-privacidad` y `/condiciones-de-uso` (alias de las ya existentes `/privacidad`/`/terminos`), con `PRIVACY_POLICY_VERSION`/`TERMS_OF_USE_VERSION` grabadas en el usuario (`privacyVersionAccepted`, `termsVersionAccepted`, `legalAcceptedAt`) al registrarse — wireado en API (DTO + `AuthService`) y en la app (checkbox obligatorio en `register.tsx`)
+  - [x] Requisitos de publicación: favicon, meta OG/Twitter (usa la portada de Facebook aprobada), `robots.txt`, `sitemap.xml`
+  - [x] **Reorganización de assets aprobados** (antes sueltos en una carpeta `landing/` fuera del frontend real) — ubicación final:
+    - Landing servida en producción: `api/public/index.html` (antes `landing/frikidex-landing.html`)
+    - Íconos/portada: `api/public/assets/` (`frikidex-icono*.png/svg`, `frikidex-portada-facebook.png/svg`)
+    - Modelo financiero (no público): `docs/finanzas/frikidex-frikitokens-rentabilidad.xlsx`
+    - La carpeta `landing/` fue eliminada — ya no debe recrearse
+  - [x] La landing se sirve desde el mismo backend NestJS ya desplegado en Coolify (`ServeStaticModule.forRoot` apuntando a `api/public/`, montado en `/`), así las llamadas relativas (`/ft/packages`, `/waitlist`, `/aviso-de-privacidad`) funcionan sin importar el dominio final
+  - [ ] **Pendiente de confirmación del usuario antes de ejecutar (cambio de infraestructura compartida):** conectar `frikidex.com` como dominio adicional de la app ya desplegada en Coolify, y decidir la redirección `frikidex.app` → `frikidex.com` para la landing (`frikidex.app` se queda para enlaces públicos de objetos y descargas de la app, según decisión #11 de branding)
 
 - [ ] **Fase 11 — QA y pulido**
   - [ ] Pruebas de los flujos de permisos compartidos (colección/ubicación) — foco especial, es lo más propenso a bugs

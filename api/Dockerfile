@@ -26,6 +26,7 @@ COPY --from=build /repo/api/node_modules ./api/node_modules
 COPY --from=build /repo/api/package.json ./api/package.json
 COPY --from=build /repo/api/dist ./api/dist
 COPY --from=build /repo/api/prisma ./api/prisma
+COPY --from=build /repo/api/public ./api/public
 
 WORKDIR /repo/api
 EXPOSE 3000

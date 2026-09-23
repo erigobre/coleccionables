@@ -5,6 +5,8 @@ import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
 import { FtService } from '../ft/ft.service.js';
 import { isUsernameProfane } from './profanity/username-filter.js';
+import { PRIVACY_POLICY_VERSION } from '../legal/privacy-policy.page.js';
+import { TERMS_OF_USE_VERSION } from '../legal/terms-of-use.page.js';
 import type { RegisterDto } from './dto/register.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
 import type { JwtPayload } from './auth.types.js';
@@ -86,6 +88,9 @@ export class AuthService {
           name: dto.name,
           username,
           role: 'OWNER',
+          privacyVersionAccepted: PRIVACY_POLICY_VERSION,
+          termsVersionAccepted: TERMS_OF_USE_VERSION,
+          legalAcceptedAt: new Date(),
         },
       });
 

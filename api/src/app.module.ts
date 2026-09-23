@@ -20,14 +20,24 @@ import { ShareModule } from './share/share.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { FtModule } from './ft/ft.module.js';
 import { LegalModule } from './legal/legal.module.js';
+import { WaitlistModule } from './waitlist/waitlist.module.js';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
-    ServeStaticModule.forRoot({
-      rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
-    }),
+    ServeStaticModule.forRoot(
+      {
+        rootPath: join(process.cwd(), 'uploads'),
+        serveRoot: '/uploads',
+      },
+      // Landing de frikidex.com: sirve api/public/ en la raíz. express.static
+      // solo responde a GET/HEAD y solo si el archivo existe, así que no
+      // interfiere con las rutas de la API (POST /auth/register, GET /ft/*, etc.).
+      {
+        rootPath: join(process.cwd(), 'public'),
+        serveRoot: '/',
+      },
+    ),
     PrismaModule,
     AuthModule,
     UsersModule,
@@ -44,6 +54,7 @@ import { LegalModule } from './legal/legal.module.js';
     AdminModule,
     FtModule,
     LegalModule,
+    WaitlistModule,
   ],
   controllers: [AppController],
   providers: [AppService],

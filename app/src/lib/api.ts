@@ -166,6 +166,7 @@ export function registerRequest(dto: {
   username: string;
   email: string;
   password: string;
+  acceptedLegal: boolean;
 }) {
   return apiFetch<AuthTokens>('/auth/register', { method: 'POST', body: dto });
 }

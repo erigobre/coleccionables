@@ -1,0 +1,1050 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Frikidex — La dex de tus juguetes y cómics</title>
+<meta name="description" content="Escanea cualquier juguete o cómic y descubre al instante si ya lo tienes. Frikidex organiza tu colección, te dice dónde guardaste cada pieza y cuánto vale hoy.">
+<link rel="canonical" href="https://frikidex.com/">
+<link rel="icon" type="image/png" href="/assets/frikidex-icono-cuadrado.png">
+<link rel="apple-touch-icon" href="/assets/frikidex-icono-cuadrado.png">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Frikidex">
+<meta property="og:title" content="Frikidex — La dex de tus juguetes y cómics">
+<meta property="og:description" content="Escanea cualquier juguete o cómic y descubre al instante si ya lo tienes. Frikidex organiza tu colección, te dice dónde guardaste cada pieza y cuánto vale hoy.">
+<meta property="og:url" content="https://frikidex.com/">
+<meta property="og:image" content="https://frikidex.com/assets/frikidex-portada-facebook.png">
+<meta property="og:locale" content="es_MX">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Frikidex — La dex de tus juguetes y cómics">
+<meta name="twitter:description" content="Escanea cualquier juguete o cómic y descubre al instante si ya lo tienes.">
+<meta name="twitter:image" content="https://frikidex.com/assets/frikidex-portada-facebook.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+:root{
+  --violeta:#6D4AFF; --violeta-2:#4B2FD6;
+  --lima:#C6F432; --lima-2:#E2FF8A;
+  --noche:#16122B; --noche-deep:#0F0C1F;
+  --card:#221C3D; --elev:#2E2752;
+  --papel:#F5F0E6; --coral:#FF6B57;
+  --txt:#F5F0E6; --txt-2:#CFC8E6; --txt-3:#A79FC4;
+  --r-card:24px; --r-in:20px; --r-btn:14px;
+  --display:'Bungee',Impact,'Arial Black',sans-serif;
+  --body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px);
+  padding-bottom:env(safe-area-inset-bottom,0px);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(78px + env(safe-area-inset-top,0px))}
+body{
+  margin:0;background:var(--noche);color:var(--txt);font-family:var(--body);
+  font-size:16px;line-height:1.5;overflow-x:hidden;
+}
+img{max-width:100%}
+a{color:var(--lima);text-decoration:none}
+a:hover{color:var(--lima-2)}
+h1,h2,h3,.disp{font-family:var(--display);font-weight:400;letter-spacing:.01em;line-height:1.05;margin:0}
+p{margin:0 0 1em}
+.wrap{width:100%;max-width:1160px;margin:0 auto;padding:0 20px;position:relative;z-index:1}
+.sec{padding:84px 0;position:relative}
+.eyebrow{font-size:13px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--txt-3);margin-bottom:14px}
+.lead{color:var(--txt-2);font-size:18px;max-width:62ch}
+.lima{color:var(--lima)}
+.center{text-align:center}
+.center .lead{margin-left:auto;margin-right:auto}
+
+/* ---------- botones ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:52px;padding:0 24px;
+  border:none;border-radius:var(--r-btn);font-family:var(--display);font-size:16px;cursor:pointer;
+  text-transform:uppercase;transition:transform .12s ease,background .18s ease,box-shadow .18s ease;text-align:center}
+.btn:active{transform:translateY(2px)}
+.btn-1{background:var(--lima);color:var(--noche);box-shadow:0 5px 0 #8FB417}
+.btn-1:hover{background:var(--lima-2);color:var(--noche)}
+.btn-2{background:var(--violeta);color:#fff;box-shadow:0 5px 0 #3A22A8}
+.btn-2:hover{background:var(--violeta-2);color:#fff}
+.btn-3{background:transparent;color:var(--lima);border:2px solid var(--lima)}
+.btn-3:hover{background:rgba(198,244,50,.12);color:var(--lima)}
+.btn-sm{min-height:44px;font-size:13px;padding:0 16px;box-shadow:none}
+.btn[disabled]{background:var(--elev);color:var(--txt-3);box-shadow:none;cursor:not-allowed}
+
+/* ---------- nav ---------- */
+header.nav{position:fixed;top:0;left:0;right:0;z-index:60;background:rgba(15,12,31,.86);
+  backdrop-filter:blur(8px);border-bottom:2px solid var(--elev);padding-top:env(safe-area-inset-top,0px)}
+.nav-in{display:flex;align-items:center;gap:20px;height:78px}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-size:20px;color:var(--txt)}
+.brand svg{width:38px;height:38px;flex:0 0 38px}
+.brand-txt{display:flex;flex-direction:column;line-height:1}
+.slogan{font-family:var(--body);font-weight:500;font-size:9px;letter-spacing:.12em;color:var(--txt-3);margin-top:5px;white-space:nowrap}
+@media(min-width:520px){.slogan{font-size:10px}}
+.nav-links{display:none;gap:22px;margin-left:auto}
+.nav-links a{font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--txt-2)}
+.nav-links a:hover{color:var(--lima)}
+.nav-cta{margin-left:auto}
+@media(min-width:980px){.nav-links{display:flex}.nav-cta{margin-left:0}}
+
+/* ---------- fondo arcade ---------- */
+.dots{position:absolute;inset:0;pointer-events:none;opacity:.3;z-index:0;
+  background-image:radial-gradient(var(--violeta) 3px,transparent 3px);background-size:18px 18px;
+  -webkit-mask-image:radial-gradient(circle at 12% 88%,#000 0 320px,transparent 330px),radial-gradient(circle at 92% 6%,#000 0 280px,transparent 290px);
+  mask-image:radial-gradient(circle at 12% 88%,#000 0 320px,transparent 330px),radial-gradient(circle at 92% 6%,#000 0 280px,transparent 290px);
+  -webkit-mask-composite:source-over;mask-composite:add}
+.scan-lines{position:fixed;inset:0;pointer-events:none;z-index:55;opacity:.16;
+  background:repeating-linear-gradient(to bottom,rgba(0,0,0,.6) 0 1px,transparent 1px 3px)}
+
+/* ---------- hero ---------- */
+.hero{padding-top:132px;padding-bottom:56px;background:var(--noche-deep);position:relative;overflow:hidden}
+.hero-grid{display:grid;gap:44px;align-items:center}
+@media(min-width:980px){.hero-grid{grid-template-columns:1.05fr .95fr;gap:56px}}
+.hero h1{font-size:clamp(40px,9vw,78px)}
+.hero h1 .lima{display:inline-block}
+.badge-pill{display:inline-flex;align-items:center;gap:8px;background:var(--lima);color:var(--noche);
+  font-family:var(--display);font-size:12px;padding:8px 16px;border-radius:999px;margin-bottom:20px}
+.blink{animation:blink 1.1s steps(2,start) infinite}
+@keyframes blink{50%{opacity:.15}}
+.hero-cta{display:flex;flex-wrap:wrap;gap:14px;margin-top:28px}
+.hero-note{margin-top:16px;font-size:14px;color:var(--txt-3)}
+
+/* teléfono */
+.phone{position:relative;width:min(320px,86vw);margin:0 auto;border:4px solid var(--elev);border-radius:36px;
+  background:var(--noche);padding:14px;box-shadow:0 24px 0 rgba(0,0,0,.35)}
+.phone-screen{background:var(--noche-deep);border-radius:24px;overflow:hidden;padding:16px}
+.viewfinder{position:relative;height:190px;border-radius:16px;background:var(--elev);display:flex;align-items:center;justify-content:center}
+.viewfinder .corner{position:absolute;width:34px;height:34px;border:5px solid var(--lima);border-radius:6px}
+.c-tl{top:12px;left:12px;border-right:0;border-bottom:0}
+.c-tr{top:12px;right:12px;border-left:0;border-bottom:0}
+.c-bl{bottom:12px;left:12px;border-right:0;border-top:0}
+.c-br{bottom:12px;right:12px;border-left:0;border-top:0}
+.viewfinder .beam{position:absolute;left:10px;right:10px;height:4px;background:var(--lima);border-radius:4px;
+  box-shadow:0 0 18px var(--lima);animation:beam 2.6s ease-in-out infinite}
+@keyframes beam{0%,100%{top:22px}50%{top:160px}}
+.vf-label{font-family:var(--display);font-size:12px;color:var(--txt-3)}
+.result{margin-top:14px;background:var(--card);border-radius:var(--r-in);padding:14px;display:none}
+.result.on{display:block;animation:pop .32s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{from{transform:scale(.82);opacity:0}to{transform:scale(1);opacity:1}}
+.tag-coral{display:inline-block;background:var(--coral);color:var(--noche);font-weight:700;font-size:12px;padding:3px 10px;border-radius:999px}
+.ficha-num{font-family:var(--display);font-size:12px;color:var(--lima);margin-top:8px}
+.ficha-name{font-weight:700;font-size:17px;margin:4px 0 2px}
+.ficha-meta{font-size:13px;color:var(--txt-2)}
+.ft-chip{display:inline-flex;align-items:center;gap:6px;background:var(--elev);color:var(--lima);
+  font-family:var(--display);font-size:11px;padding:6px 10px;border-radius:999px;margin-top:10px}
+
+/* marquesina */
+.marquee{background:var(--lima);color:var(--noche);padding:12px 0;overflow:hidden;white-space:nowrap;border-top:3px solid var(--noche);border-bottom:3px solid var(--noche)}
+.marquee span{display:inline-block;font-family:var(--display);font-size:15px;padding-right:36px;animation:slide 22s linear infinite}
+@keyframes slide{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ---------- cards ---------- */
+.grid{display:grid;gap:18px}
+.g2{grid-template-columns:1fr}
+.g3{grid-template-columns:1fr}
+@media(min-width:720px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr 1fr}}
+@media(min-width:1000px){.g3{grid-template-columns:repeat(3,1fr)}}
+.card{background:var(--card);border-radius:var(--r-card);padding:24px;border:2px solid transparent;transition:transform .2s ease,border-color .2s ease}
+.card:hover{transform:translateY(-5px);border-color:var(--violeta)}
+.card h3{font-size:19px;margin-bottom:10px;color:var(--txt)}
+.card p{color:var(--txt-2);font-size:15px;margin:0}
+.ico{width:52px;height:52px;border-radius:14px;background:var(--elev);display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+.ico svg{width:26px;height:26px;stroke:var(--lima);fill:none;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+
+/* problema */
+.prob{background:var(--violeta);border-radius:var(--r-card);padding:36px 26px;text-align:center}
+.prob h2{font-size:clamp(26px,5.4vw,42px);color:#fff}
+.prob p{color:#F1ECFF;font-size:18px;max-width:56ch;margin:0 auto}
+.prob-line{padding:14px 0}
+.prob-line + .prob-line{border-top:1px solid rgba(255,255,255,.14)}
+.prob-line:first-of-type{padding-top:26px}
+
+/* tabla comparativa */
+.table-scroll{overflow-x:auto;border-radius:var(--r-card);background:var(--card);-webkit-overflow-scrolling:touch}
+table{border-collapse:collapse;width:100%;min-width:660px}
+th,td{padding:15px 16px;text-align:left;border-bottom:1px solid var(--elev);font-size:14px;vertical-align:top}
+thead th{font-family:var(--display);font-size:12px;color:var(--txt-3);text-transform:uppercase;background:var(--noche-deep)}
+thead th.us{color:var(--noche);background:var(--lima)}
+tbody td.us{background:rgba(198,244,50,.09);color:var(--txt);font-weight:700}
+td.feat{font-weight:700;color:var(--txt)}
+td small{display:block;color:var(--txt-3);font-weight:400;font-size:12px;margin-top:3px}
+.yes{color:var(--lima);font-weight:700}
+.no{color:var(--txt-3)}
+
+/* frikitokens */
+.ft-sec{background:var(--noche-deep);position:relative;overflow:hidden}
+.ft-costs{display:grid;gap:12px;margin-top:26px}
+@media(min-width:720px){.ft-costs{grid-template-columns:1fr 1fr}}
+.cost-row{display:flex;align-items:center;justify-content:space-between;gap:14px;background:var(--card);border-radius:var(--r-in);padding:16px 18px}
+.cost-row b{font-weight:700;font-size:15px}
+.cost-row small{display:block;color:var(--txt-3);font-size:13px;font-weight:400}
+.cost-badge{font-family:var(--display);font-size:13px;color:var(--noche);background:var(--lima);padding:7px 12px;border-radius:999px;white-space:nowrap}
+.cost-free{background:var(--elev);color:var(--lima)}
+
+.switch{display:inline-flex;background:var(--card);border-radius:999px;padding:6px;margin:0 auto 26px;gap:4px}
+.switch button{border:none;background:transparent;color:var(--txt-2);font-family:var(--display);font-size:13px;
+  padding:11px 20px;border-radius:999px;cursor:pointer}
+.switch button.on{background:var(--lima);color:var(--noche)}
+
+.plan{background:var(--card);border-radius:var(--r-card);padding:26px;display:flex;flex-direction:column;border:3px solid transparent;position:relative}
+.plan.best{border-color:var(--lima)}
+.plan .flag{position:absolute;top:-15px;left:50%;transform:translateX(-50%);background:var(--lima);color:var(--noche);
+  font-family:var(--display);font-size:11px;padding:6px 14px;border-radius:999px;white-space:nowrap}
+.plan h3{font-size:22px}
+.price{font-family:var(--display);font-size:42px;margin:14px 0 2px;color:var(--lima)}
+.price span{font-family:var(--body);font-size:14px;color:var(--txt-3);font-weight:500}
+.plan ul{list-style:none;padding:0;margin:18px 0 24px;display:flex;flex-direction:column;gap:11px}
+.plan li{position:relative;padding-left:28px;font-size:15px;color:var(--txt-2)}
+.plan li::before{content:"";position:absolute;left:0;top:6px;width:16px;height:16px;border-radius:4px;
+  background:var(--lima);clip-path:polygon(14% 44%,0 60%,40% 100%,100% 22%,84% 8%,38% 66%)}
+.plan .btn{width:100%;margin-top:auto}
+
+.packs{display:grid;gap:16px;margin-top:20px}
+@media(min-width:720px){.packs{grid-template-columns:repeat(3,1fr)}}
+.pack{background:var(--card);border-radius:var(--r-in);padding:22px;text-align:center;border:2px solid var(--elev);cursor:pointer;transition:transform .18s ease,border-color .18s ease}
+.pack:hover{transform:translateY(-4px);border-color:var(--lima)}
+.pack .amt{font-family:var(--display);font-size:32px;color:var(--lima)}
+.pack .mx{font-family:var(--display);font-size:24px;margin-top:8px}
+.pack small{display:block;color:var(--txt-3);font-size:13px;margin-top:6px}
+
+/* calculadora */
+.calc{background:var(--card);border-radius:var(--r-card);padding:26px;margin-top:34px}
+.calc label{display:block;font-family:var(--display);font-size:13px;color:var(--txt-3);margin-bottom:12px;text-transform:uppercase}
+input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:14px;border-radius:999px;background:var(--elev);outline:none}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:30px;height:30px;border-radius:8px;background:var(--lima);border:3px solid var(--noche);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:30px;height:30px;border-radius:8px;background:var(--lima);border:3px solid var(--noche);cursor:pointer}
+.calc-out{display:grid;gap:14px;margin-top:22px}
+@media(min-width:620px){.calc-out{grid-template-columns:1fr 1fr 1fr}}
+.stat{background:var(--elev);border-radius:var(--r-in);padding:16px;text-align:center}
+.stat b{display:block;font-family:var(--display);font-size:26px;color:var(--lima)}
+.stat small{color:var(--txt-3);font-size:13px}
+
+/* faq */
+.faq-item{background:var(--card);border-radius:var(--r-in);margin-bottom:12px;overflow:hidden}
+.faq-q{width:100%;background:none;border:none;color:var(--txt);font-family:var(--body);font-weight:700;font-size:16px;
+  text-align:left;padding:20px;display:flex;justify-content:space-between;gap:14px;cursor:pointer;align-items:center}
+.faq-q span{color:var(--lima);font-family:var(--display);font-size:20px;flex:0 0 auto;transition:transform .2s ease}
+.faq-item.open .faq-q span{transform:rotate(45deg)}
+.faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease}
+.faq-a p{padding:0 20px 20px;color:var(--txt-2);font-size:15px;margin:0}
+.faq-item.open .faq-a{max-height:420px}
+
+/* cta final */
+.final{background:var(--lima);color:var(--noche);border-radius:var(--r-card);padding:44px 26px;text-align:center}
+.final h2{font-size:clamp(28px,6vw,48px);color:var(--noche)}
+.final p{color:#2A3A05;max-width:52ch;margin:16px auto 26px;font-weight:500}
+.form{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;max-width:520px;margin:0 auto}
+input[type=email],select{flex:1 1 220px;min-height:52px;border-radius:var(--r-btn);border:3px solid var(--noche);
+  background:#fff;color:var(--noche);font-family:var(--body);font-size:16px;padding:0 16px}
+input[type=email]::placeholder{color:#5B5470}
+.form .btn{flex:1 1 200px}
+.form-msg{margin-top:18px;font-weight:700;display:none}
+.form-msg.on{display:block}
+
+/* footer */
+footer{background:var(--noche-deep);padding:44px 0 34px;border-top:2px solid var(--elev)}
+.foot{display:flex;flex-wrap:wrap;gap:20px;align-items:center;justify-content:space-between}
+.foot small{color:var(--txt-3);font-size:13px}
+
+/* modal */
+.modal{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;padding:20px;
+  padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:calc(20px + env(safe-area-inset-bottom,0px));
+  background:rgba(15,12,31,.86)}
+.modal.on{display:flex}
+.modal-box{background:var(--card);border:3px solid var(--violeta);border-radius:var(--r-card);padding:28px;
+  width:100%;max-width:520px;max-height:86vh;overflow-y:auto}
+.modal-box h3{font-size:24px;margin-bottom:8px}
+.modal-close{float:right;background:var(--elev);border:none;color:var(--txt);width:38px;height:38px;border-radius:10px;
+  font-size:20px;cursor:pointer;font-family:var(--display)}
+.modal ul{list-style:none;padding:0;margin:16px 0}
+.modal li{padding:11px 0;border-bottom:1px solid var(--elev);display:flex;justify-content:space-between;gap:12px;font-size:15px;color:var(--txt-2)}
+.modal li b{color:var(--txt)}
+
+/* transición: el sitio se desenfoca y el logo gira al frente */
+#wipe{position:fixed;inset:0;z-index:99;pointer-events:none;display:none;align-items:center;justify-content:center;
+  background:rgba(15,12,31,0);perspective:900px}
+#wipe.on{display:flex}
+#wipe .logo{width:clamp(76px,26vw,120px);height:clamp(76px,26vw,120px);transform-style:preserve-3d;will-change:transform,opacity}
+#wipe .logo svg{width:100%;height:100%;display:block;filter:drop-shadow(0 12px 26px rgba(0,0,0,.55))}
+
+#pixel.on{display:block}
+
+/* reveal */
+.rv{opacity:0;transform:translateY(26px)}
+.rv.in{opacity:1;transform:none;transition:opacity .55s ease,transform .55s cubic-bezier(.2,.9,.3,1)}
+@media(prefers-reduced-motion:reduce){
+  .rv{opacity:1;transform:none}
+  .beam,.marquee span,.blink{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div class="scan-lines" aria-hidden="true"></div>
+<div id="wipe" aria-hidden="true"><div class="logo">
+  <svg viewBox="0 0 120 120"><rect width="120" height="120" rx="28" fill="#6D4AFF"></rect><path d="M22 40 V30 Q22 22 30 22 H40 M80 22 H90 Q98 22 98 30 V40 M98 80 V90 Q98 98 90 98 H80 M40 98 H30 Q22 98 22 90 V80" fill="none" stroke="#C6F432" stroke-width="7" stroke-linecap="round"></path><text x="54" y="84" text-anchor="middle" font-family="Bungee, sans-serif" font-size="68" fill="#F5F0E6">F</text><path d="M88 52 L90.6 58.4 L97 61 L90.6 63.6 L88 70 L85.4 63.6 L79 61 L85.4 58.4 Z" fill="#C6F432"></path></svg>
+</div></div>
+
+<div id="page">
+<header class="nav">
+  <div class="wrap nav-in">
+    <a class="brand" href="#top" data-nav>
+      <svg viewBox="0 0 120 120" role="img" aria-label="Frikidex">
+        <rect width="120" height="120" rx="28" fill="#6D4AFF"></rect>
+        <path d="M22 40 V30 Q22 22 30 22 H40 M80 22 H90 Q98 22 98 30 V40 M98 80 V90 Q98 98 90 98 H80 M40 98 H30 Q22 98 22 90 V80" fill="none" stroke="#C6F432" stroke-width="7" stroke-linecap="round"></path>
+        <text x="54" y="84" text-anchor="middle" font-family="Bungee, sans-serif" font-size="68" fill="#F5F0E6">F</text>
+        <path d="M88 52 L90.6 58.4 L97 61 L90.6 63.6 L88 70 L85.4 63.6 L79 61 L85.4 58.4 Z" fill="#C6F432"></path>
+      </svg>
+      <span class="brand-txt">
+        <span>FRIKI<span class="lima">DEX</span></span>
+        <small class="slogan">LA DEX DE TUS COLECCIONABLES</small>
+      </span>
+    </a>
+    <nav class="nav-links">
+      <a href="#como" data-nav>Cómo funciona</a>
+      <a href="#poderes" data-nav>Poderes</a>
+      <a href="#vs" data-nav>Comparativa</a>
+      <a href="#frikitokens" data-nav>FrikiTokens</a>
+      <a href="#planes" data-nav>Planes</a>
+    </nav>
+    <button class="btn btn-1 btn-sm nav-cta" data-modal="waitlist">Unirme</button>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero" id="top">
+  <div class="dots" aria-hidden="true"></div>
+  <div class="wrap hero-grid">
+    <div>
+      <div class="badge-pill"><span class="blink">●</span> PRÓXIMAMENTE EN iOS Y ANDROID</div>
+      <h1>NUNCA MÁS<br>COMPRES<br><span class="lima">UN REPETIDO</span></h1>
+      <p class="lead" style="margin-top:22px">
+        Apunta la cámara a cualquier juguete, figura o cómic. Frikidex lo identifica al
+        instante, te dice si ya está en tu colección y en qué caja lo guardaste.
+      </p>
+      <div class="hero-cta">
+        <button class="btn btn-1" data-modal="waitlist">Apartar mi lugar</button>
+        <button class="btn btn-3" data-nav-to="#frikitokens">Ver FrikiTokens</button>
+      </div>
+      <p class="hero-note">En español, por y para coleccionistas.</p>
+    </div>
+    <div>
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="viewfinder">
+            <span class="corner c-tl"></span><span class="corner c-tr"></span>
+            <span class="corner c-bl"></span><span class="corner c-br"></span>
+            <span class="beam"></span>
+            <span class="vf-label">ESCANEANDO…</span>
+          </div>
+          <div class="result" id="demoResult">
+            <span class="tag-coral">¡Ya lo tienes!</span>
+            <div class="ficha-num">#042 · FIGURA · ESC. 1:12</div>
+            <div class="ficha-name">Figura articulada · Serie 3</div>
+            <div class="ficha-meta">Vitrina sala → Estante B</div>
+            <div class="ficha-meta">En tu colección desde 2023 · Nuevo</div>
+            <span class="ft-chip">◆ 1 FT USADO</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="marquee" aria-hidden="true">
+  <span>ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · </span><span>ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · ESCANEA · IDENTIFICA · COLECCIONA · </span>
+</div>
+
+<!-- PROBLEMA -->
+<section class="sec" id="problema">
+  <div class="wrap rv">
+    <div class="prob">
+      <h2>"CREO QUE ESTA YA LA TENGO…"</h2>
+      <p class="prob-line">Estás en la tienda, en el tianguis o en la convención…</p>
+      <p class="prob-line">La figura está ahí y ¡a buen precio!</p>
+      <p class="prob-line">¿No te acuerdas si ya la compraste?</p>
+      <p class="prob-line"><strong style="color:#fff">Frikidex resuelve eso en tres segundos.</strong></p>
+    </div>
+  </div>
+</section>
+
+<!-- COMO FUNCIONA -->
+<section class="sec" id="como" style="background:var(--noche-deep);padding-top:70px">
+  <div class="wrap">
+    <div class="center rv">
+      <div class="eyebrow">Cómo funciona</div>
+      <h2 style="font-size:clamp(28px,6vw,46px)">TRES PASOS Y YA</h2>
+    </div>
+    <div class="grid g3" style="margin-top:38px">
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><circle cx="12" cy="12" r="3"/></svg></div>
+        <h3>1 · Apunta</h3>
+        <p>Abre la cámara y encuadra el objeto. Funciona con la figura suelta, en blister o con el código de barras.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/><circle cx="12" cy="12" r="3.2"/></svg></div>
+        <h3>2 · Frikidex piensa</h3>
+        <p>La IA reconoce la pieza y llena sola la ficha: marca, línea, edición, año, escala, diseñador. En cómics, hasta escritor y dibujante.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg></div>
+        <h3>3 · Sabes qué hacer</h3>
+        <p>Si ya lo tienes, te dice dónde está guardado y desde cuándo. Si no, lo agregas a tu colección o a tu wishlist de un toque.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PODERES -->
+<section class="sec" id="poderes">
+  <div class="dots" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="center rv">
+      <div class="eyebrow">Lo que trae adentro</div>
+      <h2 style="font-size:clamp(28px,6vw,46px)">TUS <span class="lima">PODERES</span></h2>
+      <p class="lead" style="margin-top:16px">Tomamos lo mejor de las apps que ya usan los coleccionistas y lo juntamos en una sola, en español.</p>
+    </div>
+    <div class="grid g3" style="margin-top:40px">
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M7 11v5M10 11v5M14 11v5M17 11v5"/></svg></div>
+        <h3>Juguetes y cómics juntos</h3>
+        <p>Figuras, art toys, estatuas, sets de bloques, cómics, libros y arte en una sola colección. No necesitas tres apps distintas.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z"/><circle cx="12" cy="10" r="2.5"/></svg></div>
+        <h3>Sabes dónde está cada pieza</h3>
+        <p>Bodega → Estante → Caja. Ubicaciones anidadas con código QR imprimible: escaneas la caja y ves todo lo que hay dentro sin abrirla.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 5-7 4 5"/><path d="M3 21h18"/></svg></div>
+        <h3>Cuánto vale hoy</h3>
+        <p>Precio actual de mercado con búsqueda en vivo, comparado contra lo que pagaste. Sabes si tu colección subió o bajó.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 12h9M13 8l4 4-4 4"/><path d="M17 4h3v16h-3"/></svg></div>
+        <h3>Transferencias entre frikis</h3>
+        <p>¿Vendiste o regalaste una pieza? Envíasela a otro usuario. Él la acepta y la pieza pasa a su colección con todo su historial.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M8 3v4M16 3v4M3 9h18"/><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 14l2.5 2.5L16 11"/></svg></div>
+        <h3>Temporadas</h3>
+        <p>¿Sacas la decoración de Halloween o Navidad cada año? Marca la temporada y ve tachando pieza por pieza cuando la guardes. No se pierde nada.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M12 3v12M8 11l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></div>
+        <h3>Exporta todo</h3>
+        <p>Tu inventario completo en PDF o Excel, con fotos y valores. Sirve para tu aseguradora, para una venta o para dejar todo en orden.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M5 12a7 7 0 0 1 14 0"/><path d="M3 12h2M19 12h2"/><rect x="8" y="12" width="8" height="8" rx="2"/></svg></div>
+        <h3>Funciona sin internet</h3>
+        <p>En la convención no hay señal, siempre. Consulta tu colección sin conexión y sincroniza cuando vuelvas a tener red.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg></div>
+        <h3>Historial de cada objeto</h3>
+        <p>Cuándo lo compraste, en cuánto, cómo cambió de ubicación y de precio. La vida entera de cada pieza.</p>
+      </div>
+      <div class="card rv">
+        <div class="ico"><svg viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><rect x="2" y="7" width="20" height="5" rx="1"/><path d="M12 20V7M12 7S10.5 3 8.5 3a2 2 0 0 0 0 4M12 7s1.5-4 3.5-4a2 2 0 0 1 0 4"/></svg></div>
+        <h3>Comparte sin que instalen nada</h3>
+        <p>Cada pieza tiene su página pública. Mándala por WhatsApp y del otro lado se ve completa, aunque no tengan la app.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- COMPARATIVA -->
+<section class="sec" id="vs" style="background:var(--noche-deep)">
+  <div class="wrap">
+    <div class="center rv">
+      <div class="eyebrow">Comparativa honesta</div>
+      <h2 style="font-size:clamp(28px,6vw,46px)">POR QUÉ <span class="lima">FRIKIDEX</span></h2>
+      <p class="lead" style="margin-top:16px">Hay apps buenísimas allá afuera. El problema es que cada una resuelve un pedacito.</p>
+    </div>
+    <div class="table-scroll rv" style="margin-top:34px">
+      <table>
+        <thead>
+          <tr>
+            <th>&nbsp;</th>
+            <th class="us">Frikidex</th>
+            <th>Apps de cartas</th>
+            <th>Apps de cómics</th>
+            <th>Hoja de cálculo</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="feat">Juguetes y cómics en una app</td>
+            <td class="us yes">Sí</td><td class="no">Solo cartas</td><td class="no">Solo cómics</td><td class="no">Tú lo armas</td>
+          </tr>
+          <tr>
+            <td class="feat">Identifica por foto con IA<small>Sin depender de un catálogo cerrado</small></td>
+            <td class="us yes">Sí</td><td>Solo cartas del catálogo</td><td>Portada o código de barras</td><td class="no">No</td>
+          </tr>
+          <tr>
+            <td class="feat">Te avisa si ya lo tienes<small>En el momento, frente al objeto</small></td>
+            <td class="us yes">Sí, es el botón principal</td><td>Indirecto</td><td>Indirecto</td><td class="no">Si te acuerdas de abrirla</td>
+          </tr>
+          <tr>
+            <td class="feat">Dónde está guardado en tu casa<small>Bodega → estante → caja, con QR</small></td>
+            <td class="us yes">Sí</td><td class="no">No</td><td>Campo de texto</td><td class="no">Manual</td>
+          </tr>
+          <tr>
+            <td class="feat">Precio de mercado</td>
+            <td class="us yes">Incluido, con búsqueda en vivo</td><td>Sí, en su plan pago</td><td>Suscripción extra aparte</td><td class="no">A mano</td>
+          </tr>
+          <tr>
+            <td class="feat">Temporadas y rotación de piezas</td>
+            <td class="us yes">Sí</td><td class="no">No</td><td class="no">No</td><td class="no">No</td>
+          </tr>
+          <tr>
+            <td class="feat">Transferir piezas a otro coleccionista</td>
+            <td class="us yes">Sí</td><td>Solo analiza el trato</td><td class="no">No</td><td class="no">No</td>
+          </tr>
+          <tr>
+            <td class="feat">Completamente en español</td>
+            <td class="us yes">Sí, y en pesos</td><td class="no">Inglés</td><td class="no">Inglés</td><td>—</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:13px;color:var(--txt-3);margin-top:14px">Comparativa basada en la información pública de las apps líderes de cada categoría a la fecha. Todas ellas son excelentes en lo suyo; nosotros atacamos otro problema.</p>
+  </div>
+</section>
+
+<!-- FRIKITOKENS -->
+<section class="sec ft-sec" id="frikitokens">
+  <div class="dots" aria-hidden="true"></div>
+  <div class="wrap">
+    <div class="center rv">
+      <div class="eyebrow">La moneda de la app</div>
+      <h2 style="font-size:clamp(30px,7vw,52px)">FRIKI<span class="lima">TOKENS</span></h2>
+      <p class="lead" style="margin-top:16px">
+        Cada vez que la IA trabaja por ti (reconocer un objeto, llenar su ficha o buscar su
+        precio real), gasta un poco de poder. Ese poder son los FrikiTokens. Todo lo demás
+        en la app es gratis, siempre.
+      </p>
+    </div>
+
+    <div class="ft-costs rv">
+      <div class="cost-row"><div><b>¿Ya lo tengo?</b><small>Escaneo rápido contra tu colección</small></div><span class="cost-badge">1 FT</span></div>
+      <div class="cost-row"><div><b>Alta con IA</b><small>Ficha completa llenada sola</small></div><span class="cost-badge">2 FT</span></div>
+      <div class="cost-row"><div><b>Actualizar con IA</b><small>Re-analizar una pieza</small></div><span class="cost-badge">2 FT</span></div>
+      <div class="cost-row"><div><b>Precio de mercado</b><small>Búsqueda en vivo del valor actual</small></div><span class="cost-badge">5 FT</span></div>
+      <div class="cost-row"><div><b>Organizar, mover, etiquetar, QR</b><small>Todo el manejo de tu colección</small></div><span class="cost-badge cost-free">GRATIS</span></div>
+      <div class="cost-row"><div><b>Exportar, compartir, transferir</b><small>Tu colección es tuya</small></div><span class="cost-badge cost-free">GRATIS</span></div>
+    </div>
+
+    <!-- calculadora -->
+    <div class="calc rv">
+      <label for="slider">¿Cuántas piezas registras o escaneas al mes?</label>
+      <input type="range" id="slider" min="5" max="200" value="40" step="5" aria-describedby="calcOut">
+      <div class="calc-out" id="calcOut">
+        <div class="stat"><b id="sPiezas">40</b><small>piezas al mes</small></div>
+        <div class="stat"><b id="sTokens">120</b><small>FrikiTokens que necesitas</small></div>
+        <div class="stat"><b id="sPlan">Coleccionista</b><small>plan recomendado</small></div>
+      </div>
+      <p style="font-size:13px;color:var(--txt-3);margin:16px 0 0">Calculado con un escaneo, un alta y una consulta de precio ocasional por pieza.</p>
+    </div>
+
+    <div class="center rv" style="margin-top:56px">
+      <h3 style="font-size:clamp(22px,4.6vw,32px)">¿PREFIERES COMPRARLOS SUELTOS?</h3>
+      <p class="lead" style="margin-top:12px">Paquetes que <strong class="lima">nunca caducan</strong>. Se suman a tu cuenta y se gastan solo cuando tú quieras.</p>
+    </div>
+    <div class="packs rv" id="packs"></div>
+    <p class="center" style="font-size:13px;color:var(--txt-3);margin-top:18px">Los paquetes y sus precios se administran desde el panel de Frikidex; aquí se muestran los que estén activos.</p>
+  </div>
+</section>
+
+<!-- PLANES -->
+<section class="sec" id="planes">
+  <div class="wrap">
+    <div class="center rv">
+      <div class="eyebrow">Suscripciones</div>
+      <h2 style="font-size:clamp(28px,6vw,46px)">ELIGE TU <span class="lima">NIVEL</span></h2>
+      <p class="lead" style="margin-top:16px">Los planes incluyen FrikiTokens cada mes. Es la forma más barata de usarlos.</p>
+    </div>
+    <div class="center" style="margin-top:26px">
+      <div class="switch rv" role="group" aria-label="Periodo de pago">
+        <button id="bMensual" class="on" type="button">Mensual</button>
+        <button id="bAnual" type="button">Anual · 2 meses gratis</button>
+      </div>
+    </div>
+    <div class="grid g3" style="margin-top:12px">
+      <div class="plan rv">
+        <h3>NOVATO</h3>
+        <div class="price">$0 <span>/ siempre</span></div>
+        <ul>
+          <li>Hasta 50 objetos</li>
+          <li><b data-ft="novato">20</b> FrikiTokens al mes</li>
+          <li>Ubicaciones y QR</li>
+          <li>Modo sin conexión</li>
+        </ul>
+        <button class="btn btn-3" data-modal="waitlist">Empezar gratis</button>
+      </div>
+      <div class="plan best rv">
+        <span class="flag">EL MÁS ELEGIDO</span>
+        <h3>COLECCIONISTA</h3>
+        <div class="price" data-plan="coleccionista" data-m="$99" data-a="$990">$99 <span data-ms="/ mes" data-as="/ año">/ mes</span></div>
+        <ul>
+          <li>Objetos ilimitados</li>
+          <li><b data-ft="coleccionista">250</b> FrikiTokens al mes</li>
+          <li>Precio de mercado incluido</li>
+          <li>Temporadas y transferencias</li>
+          <li>Exportar a PDF y Excel</li>
+        </ul>
+        <button class="btn btn-1" data-modal="waitlist">Quiero este</button>
+      </div>
+      <div class="plan rv">
+        <h3>VITRINA PRO</h3>
+        <div class="price" data-plan="pro" data-m="$199" data-a="$1,990">$199 <span data-ms="/ mes" data-as="/ año">/ mes</span></div>
+        <ul>
+          <li>Todo lo de Coleccionista</li>
+          <li><b data-ft="pro">600</b> FrikiTokens al mes</li>
+          <li>Hasta 3 cuentas (familia o negocio)</li>
+          <li>Reportes de valor para seguros</li>
+          <li>Soporte prioritario</li>
+        </ul>
+        <button class="btn btn-2" data-modal="waitlist">Quiero este</button>
+      </div>
+    </div>
+    <p class="center" style="font-size:13px;color:var(--txt-3);margin-top:22px">
+      Precios en pesos mexicanos con IVA incluido. Los FrikiTokens del plan se renuevan cada mes;
+      los que compras en paquete nunca caducan. Cancelas cuando quieras.
+    </p>
+  </div>
+</section>
+
+<!-- FAQ -->
+<section class="sec" id="faq" style="background:var(--noche-deep)">
+  <div class="wrap" style="max-width:820px">
+    <div class="center rv">
+      <div class="eyebrow">Dudas frecuentes</div>
+      <h2 style="font-size:clamp(28px,6vw,44px)">PREGUNTAS</h2>
+    </div>
+    <div style="margin-top:32px">
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Qué pasa si se me acaban los FrikiTokens? <span>+</span></button><div class="faq-a"><p>Sigues usando la app con normalidad: ves tu colección, la organizas, mueves piezas, imprimes QR, exportas y compartes. Lo único que se pausa son las acciones con IA hasta que se renueven tus tokens del mes o compres un paquete.</p></div></div>
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Los FrikiTokens caducan? <span>+</span></button><div class="faq-a"><p>Los que compras en paquete, nunca. Los de regalo del plan gratuito se renuevan cada mes y no se acumulan. Los incluidos en una suscripción se acumulan hasta el equivalente a dos meses.</p></div></div>
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Y si la IA se equivoca al identificar mi pieza? <span>+</span></button><div class="faq-a"><p>Puedes corregir cualquier campo a mano y eso no cuesta ni un FrikiToken. Si el análisis falla por completo, no se te cobra nada.</p></div></div>
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Quién ve mi colección? <span>+</span></button><div class="faq-a"><p>Solo tú. Tus ubicaciones, tus cajas y lo que hay dentro son privados. Únicamente se vuelve público lo que tú decidas compartir, pieza por pieza.</p></div></div>
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Sirve para cosas que no son juguetes ni cómics? <span>+</span></button><div class="faq-a"><p>Sí. Está pensada para juguetes y cómics, pero funciona igual con art toys, estatuas, esculturas, pinturas y libros.</p></div></div>
+      <div class="faq-item rv"><button class="faq-q" type="button">¿Cuándo sale? <span>+</span></button><div class="faq-a"><p>Estamos en desarrollo. Déjanos tu correo y serás de los primeros en probarla, con FrikiTokens de regalo por haber llegado temprano.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA FINAL -->
+<section class="sec" id="cta">
+  <div class="wrap rv">
+    <div class="final">
+      <h2>SÉ DE LOS PRIMEROS</h2>
+      <p>Déjanos tu correo y te avisamos el día que Frikidex salga. Los que se apunten ahora entran con FrikiTokens extra de regalo.</p>
+      <form class="form" id="waitForm" novalidate>
+        <input type="email" id="email" placeholder="tu@correo.com" aria-label="Tu correo electrónico" required>
+        <select id="quecoleccionas" aria-label="¿Qué coleccionas?">
+          <option value="">¿Qué coleccionas?</option>
+          <option>Figuras y juguetes</option>
+          <option>Cómics</option>
+          <option>Art toys</option>
+          <option>Un poco de todo</option>
+        </select>
+        <input type="text" id="hp1" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+        <button class="btn btn-2" type="submit">Apartar mi lugar</button>
+      </form>
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-top:10px;font-size:13px;color:var(--txt-3);max-width:480px;margin-left:auto;margin-right:auto;text-align:left">
+        <input type="checkbox" id="consent1" style="margin-top:3px" required>
+        <span>Acepto que Frikidex me escriba para avisarme del lanzamiento, según el <a href="/aviso-de-privacidad" style="color:var(--lima)">aviso de privacidad</a>.</span>
+      </label>
+      <div class="form-msg" id="formMsg"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap foot">
+    <div class="brand" style="font-size:17px">
+      <svg viewBox="0 0 120 120" role="img" aria-label="Frikidex">
+        <rect width="120" height="120" rx="28" fill="#6D4AFF"></rect>
+        <path d="M22 40 V30 Q22 22 30 22 H40 M80 22 H90 Q98 22 98 30 V40 M98 80 V90 Q98 98 90 98 H80 M40 98 H30 Q22 98 22 90 V80" fill="none" stroke="#C6F432" stroke-width="7" stroke-linecap="round"></path>
+        <text x="54" y="84" text-anchor="middle" font-family="Bungee, sans-serif" font-size="68" fill="#F5F0E6">F</text>
+        <path d="M88 52 L90.6 58.4 L97 61 L90.6 63.6 L88 70 L85.4 63.6 L79 61 L85.4 58.4 Z" fill="#C6F432"></path>
+      </svg>
+      <span class="brand-txt">
+        <span>FRIKI<span class="lima">DEX</span></span>
+        <small class="slogan">LA DEX DE TUS COLECCIONABLES</small>
+      </span>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:flex-end">
+      <small>Hecho por <a href="https://appgo.mx" target="_blank" rel="noopener">AppGo</a> © 2026</small>
+      <small><a href="/aviso-de-privacidad">Aviso de privacidad</a> · <a href="/condiciones-de-uso">Condiciones de uso</a></small>
+    </div>
+  </div>
+</footer>
+
+</div><!-- /#page -->
+
+<!-- MODALES -->
+<div class="modal" id="m-waitlist" role="dialog" aria-modal="true" aria-label="Apartar mi lugar">
+  <div class="modal-box">
+    <button class="modal-close" data-close>×</button>
+    <h3>APARTA TU LUGAR</h3>
+    <p style="color:var(--txt-2)">Te escribimos el día del lanzamiento y entras con FrikiTokens extra de regalo.</p>
+    <form id="modalForm" novalidate>
+      <input type="email" id="email2" placeholder="tu@correo.com" aria-label="Tu correo electrónico" style="width:100%;margin-bottom:12px" required>
+      <input type="text" id="hp2" name="website" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px;opacity:0">
+      <label style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px;font-size:12px;color:var(--txt-3);text-align:left">
+        <input type="checkbox" id="consent2" style="margin-top:3px" required>
+        <span>Acepto que Frikidex me escriba, según el <a href="/aviso-de-privacidad" style="color:var(--lima)">aviso de privacidad</a>.</span>
+      </label>
+      <button class="btn btn-1" type="submit" style="width:100%">Quiero entrar</button>
+    </form>
+    <div class="form-msg" id="modalMsg" style="color:var(--lima)"></div>
+  </div>
+</div>
+
+<div id="packModals"></div>
+
+
+<script>
+(function(){
+  'use strict';
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var wipe = document.getElementById('wipe');
+  var wlogo = wipe.querySelector('.logo');
+  /* ============================================================
+     PRECIOS — se cargan de verdad desde el backend:
+     GET /ft/packages y GET /ft/plans (mismo origen que esta página).
+     Este objeto es el RESPALDO si la API falla o tarda: mismos
+     valores que el modelo de rentabilidad, para que la página nunca
+     se vea rota. Costo real por FrikiToken: ~$0.11 MXN.
+     ============================================================ */
+  var PRICING = {
+    packs: [
+      {id:'p100',  ft:100,  price:69,  badge:''},
+      {id:'p300',  ft:300,  price:179, badge:'Más vendido'},
+      {id:'p1000', ft:1000, price:499, badge:'Mejor precio'}
+    ],
+    plans: {
+      novato:        {ft:20,  m:0,   a:0},
+      coleccionista: {ft:250, m:99,  a:990},
+      pro:           {ft:600, m:199, a:1990}
+    }
+  };
+  var mx = function(n){ return '$' + n.toLocaleString('es-MX'); };
+  var perFt = function(pk){ return (pk.price/pk.ft); };
+
+  // Mapa del `code` que usa la base de datos al key interno que ya usa el
+  // resto de este archivo (data-ft="pro" en el HTML, por ejemplo).
+  var PLAN_CODE_TO_KEY = {novato:'novato', coleccionista:'coleccionista', 'vitrina-pro':'pro'};
+  var PRICING_CACHE_KEY = 'frikidex_pricing_cache_v1';
+  var PRICING_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos: dato público de bajo cambio
+
+  function readPricingCache(){
+    try{
+      var raw = localStorage.getItem(PRICING_CACHE_KEY);
+      if(!raw) return null;
+      var parsed = JSON.parse(raw);
+      if(!parsed || (Date.now() - parsed.at) > PRICING_CACHE_TTL_MS) return null;
+      return parsed.data;
+    }catch(err){ return null; }
+  }
+  function writePricingCache(data){
+    try{ localStorage.setItem(PRICING_CACHE_KEY, JSON.stringify({at: Date.now(), data: data})); }catch(err){ /* sin storage: no pasa nada */ }
+  }
+
+  // Trae /ft/packages + /ft/plans y, si responden bien, sustituye PRICING y
+  // vuelve a pintar lo que ya se había pintado con el respaldo. Si algo
+  // falla (red caída, API abajo), se queda con el respaldo tal cual estaba.
+  function loadRealPricing(onReady){
+    var cached = readPricingCache();
+    if(cached){ applyPricing(cached); if(onReady) onReady(); return; }
+
+    Promise.all([
+      fetch('/ft/packages').then(function(r){ return r.ok ? r.json() : null; }),
+      fetch('/ft/plans').then(function(r){ return r.ok ? r.json() : null; })
+    ]).then(function(results){
+      var pkgRes = results[0], planRes = results[1];
+      if(!pkgRes || !planRes || !pkgRes.packages || !pkgRes.packages.length || !planRes.plans || !planRes.plans.length){
+        if(onReady) onReady();
+        return;
+      }
+      var next = {
+        packs: pkgRes.packages.map(function(p){
+          return {id: p.code, ft: p.ftAmount, price: p.priceMxnCents/100, badge: p.badge || ''};
+        }),
+        plans: {}
+      };
+      planRes.plans.forEach(function(pl){
+        var key = PLAN_CODE_TO_KEY[pl.code] || pl.code;
+        next.plans[key] = {
+          ft: pl.ftAmountMonthly,
+          m: pl.monthlyPriceMxnCents/100,
+          a: (pl.annualEnabled && pl.annualPriceMxnCents != null) ? pl.annualPriceMxnCents/100 : pl.monthlyPriceMxnCents/100
+        };
+      });
+      writePricingCache(next);
+      applyPricing(next);
+      if(onReady) onReady();
+    }).catch(function(){ if(onReady) onReady(); });
+  }
+
+  /* ---- transición estilo cambio de escena: blur + logo que gira al frente ---- */
+  var page = document.getElementById('page');
+  var MAXBLUR = 16;
+
+  function pixelWipe(midAction, done){
+    if(reduce){ if(midAction) midAction(); if(done) done(); return; }
+    var t0 = null, IN = 430, HOLD = 110, OUT = 400, acted = false;
+    wipe.classList.add('on');
+
+    function ease(x){ return 1 - Math.pow(1-x, 3); }
+
+    function frame(ts){
+      if(t0===null) t0 = ts;
+      var t = ts - t0, phase, p;
+      if(t < IN){ phase='in'; p = t/IN; }
+      else if(t < IN+HOLD){ phase='hold'; p = 1; }
+      else { phase='out'; p = Math.min(1,(t-IN-HOLD)/OUT); }
+
+      var g = phase==='in' ? ease(p) : (phase==='hold' ? 1 : 1-ease(p));
+
+      // el sitio se desenfoca y se oscurece un poco
+      page.style.filter = g > 0.02 ? 'blur(' + (g*MAXBLUR).toFixed(2) + 'px)' : '';
+      wipe.style.background = 'rgba(15,12,31,' + (g*0.66).toFixed(3) + ')';
+
+      // el logo crece girando y se va encogiendo girando
+      var total = phase==='out' ? (720 + ease(p)*360) : ease(p)*720;
+      var scale = phase==='hold' ? 1 : g;
+      wlogo.style.transform = 'rotateY(' + total.toFixed(1) + 'deg) scale(' + scale.toFixed(3) + ')';
+      wlogo.style.opacity = phase==='out' ? Math.max(0, g*1.2).toFixed(2) : Math.min(1, p*2.2).toFixed(2);
+
+      if(phase!=='out' && !acted && t >= IN*0.8){ acted = true; if(midAction) midAction(); }
+
+      if(t < IN+HOLD+OUT){ requestAnimationFrame(frame); }
+      else {
+        page.style.filter = '';
+        wipe.classList.remove('on');
+        wipe.style.background = 'rgba(15,12,31,0)';
+        wlogo.style.transform = 'scale(0)';
+        if(!acted && midAction) midAction();
+        if(done) done();
+      }
+    }
+    wlogo.style.transform = 'scale(0)';
+    wlogo.style.opacity = '0';
+    requestAnimationFrame(frame);
+  }
+
+  /* ---- navegación con transición ---- */
+  function goTo(sel){
+    var el = document.querySelector(sel);
+    if(!el) return;
+    pixelWipe(function(){
+      var top = el.getBoundingClientRect().top + window.pageYOffset - 84;
+      window.scrollTo({top: top, behavior:'auto'});
+    });
+  }
+  document.querySelectorAll('[data-nav]').forEach(function(a){
+    a.addEventListener('click', function(e){ e.preventDefault(); goTo(a.getAttribute('href')); });
+  });
+  document.querySelectorAll('[data-nav-to]').forEach(function(b){
+    b.addEventListener('click', function(){ goTo(b.getAttribute('data-nav-to')); });
+  });
+
+  /* ---- modales con transición ---- */
+  function openModal(id){
+    var m = document.getElementById('m-'+id);
+    if(!m) return;
+    pixelWipe(function(){
+      document.querySelectorAll('.modal.on').forEach(function(x){ x.classList.remove('on'); });
+      m.classList.add('on');
+      var f = m.querySelector('input,button');
+      if(f) f.focus({preventScroll:true});
+    });
+  }
+  function closeModals(){
+    pixelWipe(function(){
+      document.querySelectorAll('.modal.on').forEach(function(x){ x.classList.remove('on'); });
+    });
+  }
+  document.addEventListener('click', function(e){
+    var t = e.target.closest('[data-modal]');
+    if(t){ openModal(t.getAttribute('data-modal')); return; }
+    if(e.target.closest('[data-close]')){ closeModals(); return; }
+    if(e.target.classList.contains('modal')){ closeModals(); }
+  });
+  document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModals(); });
+
+  /* ---- reveal al hacer scroll ---- */
+  var io = new IntersectionObserver(function(entries){
+    entries.forEach(function(en){
+      if(en.isIntersecting){ en.target.classList.add('in'); io.unobserve(en.target); }
+    });
+  }, {threshold:0.12, rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.rv').forEach(function(el, i){
+    el.style.transitionDelay = ((i % 3) * 70) + 'ms';
+    io.observe(el);
+  });
+
+  /* ---- demo del teléfono ---- */
+  var res = document.getElementById('demoResult');
+  function cycle(){
+    res.classList.remove('on');
+    setTimeout(function(){ res.classList.add('on'); }, 1500);
+    setTimeout(cycle, 6200);
+  }
+  cycle();
+
+  /* ---- paquetes y modales generados desde PRICING (reconstruible: se llama
+     de nuevo si /ft/packages responde después del primer pintado) ---- */
+  function renderPacks(){
+    var cont = document.getElementById('packs'), mods = document.getElementById('packModals');
+    if(!cont) return;
+    cont.innerHTML = ''; mods.innerHTML = '';
+    var base = perFt(PRICING.packs[0]);
+    PRICING.packs.forEach(function(pk){
+      var ahorro = Math.round((1 - perFt(pk)/base) * 100);
+      var b = document.createElement('button');
+      b.className = 'pack'; b.type = 'button'; b.setAttribute('data-modal', pk.id);
+      b.innerHTML = '<div class="amt">' + pk.ft.toLocaleString('es-MX') + ' FT</div>' +
+                    '<div class="mx">' + mx(pk.price) + '</div>' +
+                    '<small>$' + perFt(pk).toFixed(2) + ' por FrikiToken' +
+                    (ahorro > 0 ? ' · ahorras ' + ahorro + '%' : '') + '</small>';
+      cont.appendChild(b);
+
+      var m = document.createElement('div');
+      m.className = 'modal'; m.id = 'm-' + pk.id; m.setAttribute('role','dialog');
+      m.setAttribute('aria-modal','true'); m.setAttribute('aria-label','Paquete de ' + pk.ft + ' FrikiTokens');
+      m.innerHTML =
+        '<div class="modal-box"><button class="modal-close" data-close>&times;</button>' +
+        '<h3>' + pk.ft.toLocaleString('es-MX') + ' FRIKITOKENS · ' + mx(pk.price) + '</h3>' +
+        '<p style="color:var(--txt-2)">Con este paquete puedes, por ejemplo:</p><ul>' +
+        '<li>Dar de alta con IA <b>' + Math.floor(pk.ft/2).toLocaleString('es-MX') + ' piezas</b></li>' +
+        '<li>O escanear <b>' + pk.ft.toLocaleString('es-MX') + ' veces</b> en la tienda</li>' +
+        '<li>O consultar <b>' + Math.floor(pk.ft/5).toLocaleString('es-MX') + ' precios</b> de mercado</li>' +
+        '<li>Precio por FrikiToken <b>$' + perFt(pk).toFixed(2) + '</b></li>' +
+        '<li>Caducidad <b>nunca</b></li></ul>' +
+        '<button class="btn btn-1" style="width:100%" data-modal="waitlist">Avísenme cuando pueda comprarlo</button></div>';
+      mods.appendChild(m);
+    });
+  }
+  function bindDataFt(){
+    document.querySelectorAll('[data-ft]').forEach(function(el){
+      var pl = PRICING.plans[el.getAttribute('data-ft')];
+      if(pl) el.textContent = pl.ft.toLocaleString('es-MX');
+    });
+  }
+  renderPacks();
+  bindDataFt();
+
+  /* ---- calculadora ---- */
+  var sl = document.getElementById('slider');
+  function calc(){
+    var n = parseInt(sl.value, 10);
+    var tokens = n*1 + n*2 + Math.round(n*0.3)*5; // escaneo + alta + 30% consultas de precio
+    var P = PRICING.plans;
+    var plan = tokens <= P.novato.ft ? 'Novato'
+             : (tokens <= P.coleccionista.ft ? 'Coleccionista'
+             : (tokens <= P.pro.ft ? 'Vitrina Pro' : 'Vitrina Pro + paquetes'));
+    document.getElementById('sPiezas').textContent = n;
+    document.getElementById('sTokens').textContent = tokens.toLocaleString('es-MX');
+    document.getElementById('sPlan').textContent = plan;
+  }
+  sl.addEventListener('input', calc); calc();
+
+  /* ---- switch mensual/anual (data-plan identifica cada tarjeta, no el
+     texto del precio: así se puede repintar con datos reales sin romperse) ---- */
+  var bm = document.getElementById('bMensual'), ba = document.getElementById('bAnual');
+  function bindPlanPrices(){
+    document.querySelectorAll('.price[data-plan]').forEach(function(p){
+      var pl = PRICING.plans[p.getAttribute('data-plan')];
+      if(!pl) return;
+      p.setAttribute('data-m', mx(pl.m));
+      p.setAttribute('data-a', mx(pl.a));
+      var anual = ba.classList.contains('on');
+      p.childNodes[0].nodeValue = (anual ? mx(pl.a) : mx(pl.m)) + ' ';
+    });
+  }
+  bindPlanPrices();
+
+  function applyPricing(next){
+    PRICING = next;
+    renderPacks();
+    bindDataFt();
+    bindPlanPrices();
+    calc();
+  }
+  loadRealPricing();
+  function setPeriod(anual){
+    bm.classList.toggle('on', !anual); ba.classList.toggle('on', anual);
+    document.querySelectorAll('.price[data-m]').forEach(function(p){
+      var sp = p.querySelector('span');
+      var txt = anual ? p.getAttribute('data-a') : p.getAttribute('data-m');
+      p.childNodes[0].nodeValue = txt + ' ';
+      if(sp) sp.textContent = anual ? sp.getAttribute('data-as') : sp.getAttribute('data-ms');
+    });
+  }
+  bm.addEventListener('click', function(){ setPeriod(false); });
+  ba.addEventListener('click', function(){ setPeriod(true); });
+
+  /* ---- faq ---- */
+  document.querySelectorAll('.faq-q').forEach(function(q){
+    q.addEventListener('click', function(){ q.parentElement.classList.toggle('open'); });
+  });
+
+  /* ---- lista de espera: POST /waitlist (mismo origen que esta página) ---- */
+  function ok(mail){ return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(mail); }
+  function joinWaitlist(payload){
+    return fetch('/waitlist', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    }).then(function(r){ if(!r.ok) throw new Error('waitlist_failed'); return r.json(); });
+  }
+
+  document.getElementById('waitForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var form = this;
+    var m = document.getElementById('email').value.trim();
+    var box = document.getElementById('formMsg');
+    var consent = document.getElementById('consent1');
+    box.classList.add('on');
+    if(!ok(m)){ box.textContent = 'Revisa tu correo, parece incompleto.'; return; }
+    if(consent && !consent.checked){ box.textContent = 'Necesitamos tu autorización para escribirte.'; return; }
+    box.textContent = 'Enviando…';
+    joinWaitlist({
+      email: m,
+      interest: document.getElementById('quecoleccionas').value,
+      source: 'hero',
+      website: document.getElementById('hp1').value
+    }).then(function(){
+      box.textContent = '¡Listo! Te avisamos en cuanto Frikidex salga. 👾';
+      form.reset();
+    }).catch(function(){
+      box.textContent = 'No pudimos guardar tu correo, intenta de nuevo en un momento.';
+    });
+  });
+  document.getElementById('modalForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    var form = this;
+    var m = document.getElementById('email2').value.trim();
+    var box = document.getElementById('modalMsg');
+    var consent = document.getElementById('consent2');
+    box.classList.add('on');
+    if(!ok(m)){ box.textContent = 'Revisa tu correo, parece incompleto.'; return; }
+    if(consent && !consent.checked){ box.textContent = 'Necesitamos tu autorización para escribirte.'; return; }
+    box.textContent = 'Enviando…';
+    joinWaitlist({
+      email: m,
+      source: 'modal',
+      website: document.getElementById('hp2').value
+    }).then(function(){
+      box.textContent = '¡Listo! Ya estás en la lista. 👾';
+      form.reset();
+    }).catch(function(){
+      box.textContent = 'No pudimos guardar tu correo, intenta de nuevo en un momento.';
+    });
+  });
+})();
+</script>
+</body>
+</html>

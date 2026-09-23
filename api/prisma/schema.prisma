@@ -88,6 +88,13 @@ model User {
   ftTransactions        FtTransaction[] // quién disparó cada cobro, para auditoría
   moderationFlags       ModerationFlag[] // incidentes de moderación de IA disparados por este usuario
 
+  // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
+  // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
+  // que "aceptó algo"). Ver api/src/legal/*.page.ts para las constantes de versión.
+  privacyVersionAccepted String?
+  termsVersionAccepted   String?
+  legalAcceptedAt        DateTime?
+
   @@map("users")
 }
 
@@ -266,6 +273,71 @@ model FtTransaction {
 
   @@index([organizationId, createdAt])
   @@map("ft_transactions")
+}
+
+// Paquete de compra única de FT (ej. "300 FT por $179 MXN"), mostrado en la
+// landing pública y (a futuro) en la tienda in-app. Editable desde Superadmin
+// sin deploy (Fase 9); hoy se siembra por migración con los valores que ya
+// estaban hardcodeados en la landing. Los campos `store*`/`stripe*` quedan
+// listos para la fase de pagos (aún no construida) para no migrar de nuevo.
+model FtPackage {
+  id                     String    @id @default(cuid())
+  code                   String    @unique
+  ftAmount               Int
+  priceMxnCents          Int
+  badge                  String?
+  isActive               Boolean   @default(true)
+  sortOrder              Int       @default(0)
+  availableFrom          DateTime?
+  availableUntil         DateTime?
+  stripePriceId          String?
+  storeProductIdIos      String?
+  storeProductIdAndroid  String?
+  createdAt              DateTime  @default(now())
+  updatedAt              DateTime  @updatedAt
+
+  @@map("ft_packages")
+}
+
+// Plan de suscripción (ej. "Coleccionista: 250 FT/mes"). v1 solo vende
+// mensual (decisión de negocio 2026-09-23, ver docs/00-PLAN-MAESTRO.md);
+// `annualEnabled`/`annualPriceMxnCents` ya existen para activar anual después
+// sin volver a migrar.
+model FtPlan {
+  id                    String    @id @default(cuid())
+  code                  String    @unique
+  label                 String
+  ftAmountMonthly       Int
+  monthlyPriceMxnCents  Int
+  annualPriceMxnCents   Int?
+  annualEnabled         Boolean   @default(false)
+  badge                 String?
+  isActive              Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  stripePriceIdMonthly  String?
+  stripePriceIdAnnual   String?
+  storeProductIdIos     String?
+  storeProductIdAndroid String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("ft_plans")
+}
+
+// Lista de espera de la landing pública (frikidex.com). Un correo puede
+// reescribir su registro (ej. si primero usó el form del hero y luego el del
+// modal) — por eso el upsert es por email, no un historial de envíos.
+model Waitlist {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  interest  String? // "¿qué coleccionas?", texto libre opcional
+  source    String   @default("landing")
+  ip        String?
+  consent   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("waitlist")
 }
 
 // Qué se hizo automáticamente al detectar el incidente. AUTO_SUSPENDED solo se

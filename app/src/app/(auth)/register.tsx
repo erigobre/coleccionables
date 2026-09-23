@@ -1,12 +1,12 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
-import { checkUsernameAvailability } from '../../lib/api';
+import { API_BASE_URL, checkUsernameAvailability } from '../../lib/api';
 import { colors } from '../../theme/tokens';
 
 // Solo minúsculas, números y guion bajo: debe coincidir con RegisterDto en el backend.
@@ -22,6 +22,7 @@ export default function RegisterScreen() {
   const [usernameSuggestion, setUsernameSuggestion] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [acceptedLegal, setAcceptedLegal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -62,7 +63,8 @@ export default function RegisterScreen() {
     name.length >= 2 &&
     usernameStatus === 'available' &&
     email.length > 0 &&
-    password.length >= 8;
+    password.length >= 8 &&
+    acceptedLegal;
 
   const onSubmit = async () => {
     setError(null);
@@ -73,6 +75,7 @@ export default function RegisterScreen() {
         username: username.trim().toLowerCase(),
         email: email.trim(),
         password,
+        acceptedLegal,
       });
     } catch (err) {
       setError(authErrorMessage(err));
@@ -154,6 +157,42 @@ export default function RegisterScreen() {
         autoComplete="password-new"
         placeholder="Mínimo 8 caracteres"
       />
+
+      <Pressable
+        onPress={() => setAcceptedLegal((prev) => !prev)}
+        className="mb-4 flex-row items-start"
+        hitSlop={8}
+      >
+        <View
+          className="mr-2 mt-0.5 h-5 w-5 items-center justify-center rounded border"
+          style={{ borderColor: acceptedLegal ? colors.primary : colors.border, backgroundColor: acceptedLegal ? colors.primary : 'transparent' }}
+        >
+          {acceptedLegal ? (
+            <Text className="text-xs font-body-bold" style={{ color: colors.primaryText }}>
+              ✓
+            </Text>
+          ) : null}
+        </View>
+        <Text className="flex-1 text-xs text-textMuted">
+          Acepto la{' '}
+          <Text
+            className="font-body-bold"
+            style={{ color: colors.primary }}
+            onPress={() => Linking.openURL(`${API_BASE_URL}/privacidad`)}
+          >
+            política de privacidad
+          </Text>{' '}
+          y las{' '}
+          <Text
+            className="font-body-bold"
+            style={{ color: colors.primary }}
+            onPress={() => Linking.openURL(`${API_BASE_URL}/terminos`)}
+          >
+            condiciones de uso
+          </Text>
+          .
+        </Text>
+      </Pressable>
 
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 

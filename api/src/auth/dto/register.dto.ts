@@ -1,4 +1,4 @@
-import { IsEmail, IsString, Matches, MinLength } from 'class-validator';
+import { Equals, IsEmail, IsString, Matches, MinLength } from 'class-validator';
 
 export class RegisterDto {
   @IsString()
@@ -18,4 +18,10 @@ export class RegisterDto {
   @IsString()
   @MinLength(8)
   password: string;
+
+  // Checkbox obligatorio de "Acepto la política de privacidad y las
+  // condiciones de uso" — debe venir en `true` explícitamente. La versión
+  // exacta aceptada se guarda en auth.service.ts, no aquí.
+  @Equals(true, { message: 'Debes aceptar la política de privacidad y las condiciones de uso' })
+  acceptedLegal: boolean;
 }

@@ -1,9 +1,13 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // Detrás del proxy de Coolify: sin esto, req.ip da la IP interna del proxy
+  // en vez de la del visitante (necesario para el rate-limit de /waitlist).
+  app.set('trust proxy', 1);
   app.enableCors();
   app.useGlobalPipes(
     new ValidationPipe({
