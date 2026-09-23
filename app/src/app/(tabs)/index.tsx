@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'rea
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
 import { useAuth } from '../../context/auth-context';
+import { useFt } from '../../context/ft-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { fetchItems, type Item } from '../../lib/items';
 import { fetchWishlist } from '../../lib/wishlist';
@@ -39,8 +40,10 @@ function FavoriteCard({ item, onOpen }: { item: Item; onOpen: () => void }) {
 
 export default function HomeScreen() {
   const { user, accessToken } = useAuth();
+  const { costOf } = useFt();
   const router = useRouter();
   const firstName = user?.name?.split(' ')[0] ?? '';
+  const scanCost = costOf('SCAN_HAVE_IT');
 
   const [items, setItems] = useState<Item[] | null>(null);
   const [wishlistCount, setWishlistCount] = useState(0);
@@ -96,7 +99,16 @@ export default function HomeScreen() {
                 className="mt-4 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">
-                  <Text className="font-display text-xl uppercase tracking-wide text-white">¿Ya lo tengo?</Text>
+                  <Text className="font-display text-xl uppercase tracking-wide text-white">
+                    ¿Ya lo tengo?
+                    {scanCost != null ? (
+                      <Text className="text-sm">
+                        {' 🪙'}
+                        {scanCost}
+                        <Text style={{ fontSize: 9 }}>FT</Text>
+                      </Text>
+                    ) : null}
+                  </Text>
                   <Text className="mt-1 text-sm text-white/80">
                     Fotografía algo que viste en una tienda y comprueba si ya está en tu colección.
                   </Text>
@@ -111,7 +123,16 @@ export default function HomeScreen() {
                 className="mt-8 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">
-                  <Text className="font-display text-xl uppercase tracking-wide text-white">¿Ya lo tengo?</Text>
+                  <Text className="font-display text-xl uppercase tracking-wide text-white">
+                    ¿Ya lo tengo?
+                    {scanCost != null ? (
+                      <Text className="text-sm">
+                        {' 🪙'}
+                        {scanCost}
+                        <Text style={{ fontSize: 9 }}>FT</Text>
+                      </Text>
+                    ) : null}
+                  </Text>
                   <Text className="mt-1 text-sm text-white/80">
                     Fotografía algo que viste en una tienda y comprueba si ya está en tu colección.
                   </Text>

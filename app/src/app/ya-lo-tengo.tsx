@@ -283,7 +283,8 @@ export default function YaLoTengoScreen() {
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
           <Button
-            label={costOf('SCAN_HAVE_IT') != null ? `Buscar en mi colección (${costOf('SCAN_HAVE_IT')} FT)` : 'Buscar en mi colección'}
+            label="Buscar en mi colección"
+            ftCost={costOf('SCAN_HAVE_IT')}
             onPress={onSearch}
             loading={busy === 'buscar'}
           />
@@ -330,12 +331,9 @@ export default function YaLoTengoScreen() {
               <Text className="text-sm text-white">Volver</Text>
             </Pressable>
           ) : (
-            <Pressable
-              onPress={() => router.replace('/captura')}
-              className="h-12 items-center justify-center rounded-full bg-background/70 px-4"
-            >
-              <Text className="text-sm text-white">Objeto nuevo</Text>
-            </Pressable>
+            // Espaciador: mantiene centrado el disparador (mismo ancho que el
+            // botón de galería del otro lado).
+            <View className="h-12 w-12" />
           )}
         </View>
         {error ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
