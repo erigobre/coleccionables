@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Animated, {
-  Easing,
-  cancelAnimation,
-  useAnimatedStyle,
-  useSharedValue,
-  withRepeat,
-  withTiming,
-} from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { colors } from '../../theme/tokens';
 
@@ -27,15 +20,12 @@ interface AIProcessingOverlayProps {
   onHidden: () => void;
 }
 
-// Overlay de "consultando IA" (¿Ya lo tengo?/Analizar/Obtener precio): réplica
-// en RN de la transición "pixelWipe" de la landing (api/public/index.html) —
-// fondo con blur+oscurecido y el logo entrando girando (rotateY 0→720°), con
-// textos de estado debajo que van cambiando. Al terminar el proceso se fuerza
-// "¡Proceso finalizado!" y se hace el mismo giro pero invertido, desvaneciendo
-// hacia el centro (scale→0, +360° más de giro, opacity→0).
+// Overlay de "consultando IA" (¿Ya lo tengo?/Analizar/Obtener precio): fondo
+// con blur+oscurecido y el logo estático (fade+scale al entrar/salir, sin giro
+// — el giro con rotateY se veía roto en algunos dispositivos incluso con
+// "perspective"; se deja estático hasta reemplazarlo por un GIF animado).
 export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProcessingOverlayProps) {
   const intro = useSharedValue(0);
-  const spin = useSharedValue(0);
   const outro = useSharedValue(0);
   const textOpacity = useSharedValue(0);
 
@@ -50,8 +40,6 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
     textOpacity.value = 0;
     intro.value = withTiming(1, { duration: 450, easing: Easing.out(Easing.cubic) });
     textOpacity.value = withTiming(1, { duration: 300 });
-    spin.value = 0;
-    spin.value = withRepeat(withTiming(1, { duration: 2600, easing: Easing.linear }), -1, false);
     // Se dispara una sola vez al mostrarse.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible]);
@@ -71,12 +59,11 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
   }, [visible, done, steps.join('|')]);
 
   // Al terminar: se congela el texto final un momento (para que se alcance a
-  // leer) y luego corre el fade-out invertido.
+  // leer) y luego corre el fade-out.
   useEffect(() => {
     if (!done || !visible) return;
     setCurrentText(FINAL_TEXT);
     const timeout = setTimeout(() => {
-      cancelAnimation(spin);
       outro.value = withTiming(1, { duration: 420, easing: Easing.in(Easing.cubic) }, (finished) => {
         if (finished) {
           scheduleOnRN(() => {
@@ -95,14 +82,10 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
   }));
 
   const logoStyle = useAnimatedStyle(() => {
-    const rotate = intro.value * 720 + spin.value * 360 + outro.value * 360;
     const scale = intro.value * (1 - outro.value);
     return {
       opacity: Math.min(1, intro.value * 1.3) * (1 - outro.value),
-      // rotateY es una transformación 3D: sin "perspective" en el mismo array,
-      // RN la renderiza plana y a 90°/270° el layer se ve de canto y se corta
-      // (el "se parte a la mitad" que se veía en pantalla).
-      transform: [{ perspective: 800 }, { scale }, { rotateY: `${rotate}deg` }],
+      transform: [{ scale }],
     };
   });
 
