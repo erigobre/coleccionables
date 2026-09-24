@@ -1,7 +1,5 @@
-import { randomUUID } from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { FtService } from '../ft/ft.service.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
 import type { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 
@@ -9,10 +7,7 @@ const ACTIVE_WINDOW_DAYS = 30;
 
 @Injectable()
 export class AdminService {
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly ftService: FtService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   // Listado de usuarios + búsqueda (plan §5.6, Fase 9).
   findUsers(search?: string) {
@@ -59,18 +54,6 @@ export class AdminService {
         sponsored,
         subscriptionStatus: sponsored ? 'SPONSORED' : 'ACTIVE',
       },
-    });
-  }
-
-  // Otorga FT manualmente (soporte/pruebas): usa el mismo FtService.grant()
-  // que el cron de regalo mensual, con idempotencyKey única por llamada.
-  async grantFt(organizationId: string, amount: number) {
-    await this.assertOrganizationExists(organizationId);
-    return this.ftService.grant({
-      organizationId,
-      source: 'PROMO',
-      amount,
-      idempotencyKey: `admin-grant-${organizationId}-${randomUUID()}`,
     });
   }
 
