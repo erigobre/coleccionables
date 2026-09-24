@@ -99,7 +99,10 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
     const scale = intro.value * (1 - outro.value);
     return {
       opacity: Math.min(1, intro.value * 1.3) * (1 - outro.value),
-      transform: [{ scale }, { rotateY: `${rotate}deg` }],
+      // rotateY es una transformación 3D: sin "perspective" en el mismo array,
+      // RN la renderiza plana y a 90°/270° el layer se ve de canto y se corta
+      // (el "se parte a la mitad" que se veía en pantalla).
+      transform: [{ perspective: 800 }, { scale }, { rotateY: `${rotate}deg` }],
     };
   });
 
