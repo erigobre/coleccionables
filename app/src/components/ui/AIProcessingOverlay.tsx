@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
 import { colors } from '../../theme/tokens';
 
 const LOGO_SIZE = 104;
 const FINAL_TEXT = '¡Proceso finalizado!';
 const STEP_INTERVAL_MS = 1500;
 const HOLD_BEFORE_EXIT_MS = 700;
+const OUTRO_DURATION_MS = 420;
 
 interface AIProcessingOverlayProps {
   visible: boolean;
@@ -59,21 +59,26 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
   }, [visible, done, steps.join('|')]);
 
   // Al terminar: se congela el texto final un momento (para que se alcance a
-  // leer) y luego corre el fade-out.
+  // leer) y luego corre el fade-out. El cierre se dispara con un setTimeout en
+  // JS (no con el callback de withTiming vía scheduleOnRN): ese callback corre
+  // en el runtime de UI de Reanimated disparado por CADisplayLink, y si algo
+  // ahí lanzaba una excepción no atrapada tiraba abajo la app entera (crash
+  // confirmado con el crash log de iOS al revisar precio de mercado).
   useEffect(() => {
     if (!done || !visible) return;
     setCurrentText(FINAL_TEXT);
-    const timeout = setTimeout(() => {
-      outro.value = withTiming(1, { duration: 420, easing: Easing.in(Easing.cubic) }, (finished) => {
-        if (finished) {
-          scheduleOnRN(() => {
-            setMounted(false);
-            onHidden();
-          });
-        }
-      });
+    let exitTimeout: ReturnType<typeof setTimeout> | undefined;
+    const holdTimeout = setTimeout(() => {
+      outro.value = withTiming(1, { duration: OUTRO_DURATION_MS, easing: Easing.in(Easing.cubic) });
+      exitTimeout = setTimeout(() => {
+        setMounted(false);
+        onHidden();
+      }, OUTRO_DURATION_MS);
     }, HOLD_BEFORE_EXIT_MS);
-    return () => clearTimeout(timeout);
+    return () => {
+      clearTimeout(holdTimeout);
+      clearTimeout(exitTimeout);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done, visible]);
 

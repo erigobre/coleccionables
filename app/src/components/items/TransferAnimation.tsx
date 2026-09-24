@@ -9,7 +9,6 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
 import { colors } from '../../theme/tokens';
 
 const TOTAL_MS = 2300;
@@ -30,9 +29,13 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
   const t = useSharedValue(0);
 
   useEffect(() => {
-    t.value = withTiming(TOTAL_MS, { duration: TOTAL_MS, easing: Easing.linear }, (finished) => {
-      if (finished) scheduleOnRN(onDone);
-    });
+    t.value = withTiming(TOTAL_MS, { duration: TOTAL_MS, easing: Easing.linear });
+    // onDone se dispara con un setTimeout en JS, no con el callback de
+    // withTiming (corre en el runtime de UI vía CADisplayLink): un throw ahí
+    // no queda atrapado y tira abajo la app entera (mismo crash confirmado
+    // en AIProcessingOverlay al revisar precio de mercado).
+    const timeout = setTimeout(onDone, TOTAL_MS);
+    return () => clearTimeout(timeout);
     // Se dispara una sola vez al montar.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
