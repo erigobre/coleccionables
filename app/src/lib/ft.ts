@@ -53,3 +53,13 @@ export function fetchFtTransactions(accessToken: string, take?: number) {
   const query = take ? `?take=${take}` : '';
   return apiFetch<FtTransaction[]>(`/ft/transactions${query}`, { accessToken });
 }
+
+// Solo SUPERADMIN puede llamar esto (guard en el backend) — botón de
+// "modo prueba" en el perfil para no depender de scripts SQL manuales.
+export function grantTestFt(accessToken: string, organizationId: string, amount: number) {
+  return apiFetch<{ id: string }>(`/admin/organizations/${organizationId}/grant-ft`, {
+    method: 'POST',
+    accessToken,
+    body: { amount },
+  });
+}

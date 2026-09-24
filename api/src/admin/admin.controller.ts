@@ -6,6 +6,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { AdminService } from './admin.service.js';
 import { CreatePaymentDto } from './dto/create-payment.dto.js';
+import { GrantFtDto } from './dto/grant-ft.dto.js';
 import { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 
 @Controller('admin')
@@ -32,6 +33,11 @@ export class AdminController {
   @Patch('organizations/:id/unsponsor')
   unsponsor(@Param('id') id: string) {
     return this.adminService.setSponsored(id, false);
+  }
+
+  @Post('organizations/:id/grant-ft')
+  grantFt(@Param('id') id: string, @Body() dto: GrantFtDto) {
+    return this.adminService.grantFt(id, dto.amount ?? 50);
   }
 
   @Post('organizations/:id/payments')

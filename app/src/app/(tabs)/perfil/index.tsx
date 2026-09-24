@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
-import { Pressable, Text, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
-import { useAuth } from '../../../context/auth-context';
+import { authErrorMessage, useAuth } from '../../../context/auth-context';
+import { grantTestFt } from '../../../lib/ft';
 
 function MenuRow({
   icon,
@@ -32,7 +34,21 @@ function MenuRow({
 }
 
 export default function PerfilScreen() {
-  const { user, logout } = useAuth();
+  const { user, accessToken, logout } = useAuth();
+  const [grantingFt, setGrantingFt] = useState(false);
+
+  const onGrantTestFt = async () => {
+    if (!accessToken || !user) return;
+    setGrantingFt(true);
+    try {
+      await grantTestFt(accessToken, user.organizationId, 50);
+      Alert.alert('Listo', 'Se agregaron 50 FT de prueba a tu cuenta.');
+    } catch (err) {
+      Alert.alert('Error', authErrorMessage(err));
+    } finally {
+      setGrantingFt(false);
+    }
+  };
 
   return (
     <Screen>
@@ -50,6 +66,17 @@ export default function PerfilScreen() {
         <MenuRow icon="stats-chart-outline" label="Estadísticas" />
         <MenuRow icon="settings-outline" label="Ajustes" />
       </View>
+
+      {/* Solo visible para SUPERADMIN — el backend también lo exige, esto es
+          solo para no mostrar un botón que fallaría a cualquier otro usuario. */}
+      {user?.role === 'SUPERADMIN' ? (
+        <Button
+          label="Agregar 50 FT de prueba"
+          variant="ghost"
+          onPress={onGrantTestFt}
+          loading={grantingFt}
+        />
+      ) : null}
 
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
     </Screen>
