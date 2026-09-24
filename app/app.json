@@ -64,6 +64,12 @@
         "projectId": "55431829-1a16-4348-801c-5cfb60dde329"
       }
     },
-    "owner": "erigobre"
+    "owner": "erigobre",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/55431829-1a16-4348-801c-5cfb60dde329"
+    }
   }
 }

@@ -107,8 +107,8 @@ export default function YaLoTengoScreen() {
     if (!cameraRef.current || !cameraReady) return;
     setError(null);
     try {
-      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8, exif: true });
-      const uri = await normalizeCameraOrientation(picture.uri, picture.exif);
+      const picture = await cameraRef.current.takePictureAsync({ quality: 0.8 });
+      const uri = await normalizeCameraOrientation(picture.uri);
       addPhotos([uri]);
     } catch (err) {
       setError(authErrorMessage(err));
