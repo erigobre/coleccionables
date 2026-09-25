@@ -16,6 +16,13 @@ FROM deps AS build
 COPY admin ./admin
 WORKDIR /repo/admin
 ENV NEXT_TELEMETRY_DISABLED=1
+# El stage "deps" fija NODE_ENV=development para que npm ci instale las
+# devDependencies; si eso se filtra al build, los workers de Turbopack
+# heredan NODE_ENV=development como proceso hijo mientras el resto del build
+# usa producción, mezclando bundles dev/prod de React (dispatcher nulo ->
+# "Cannot read properties of null (reading 'useContext')" al prerenderizar
+# /_global-error). Se corrige explícitamente antes de compilar.
+ENV NODE_ENV=production
 RUN npm run build
 
 # next build --output=standalone anida la salida bajo la ruta relativa al
