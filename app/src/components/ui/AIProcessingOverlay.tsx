@@ -6,7 +6,7 @@ import { colors } from '../../theme/tokens';
 
 const LOGO_SIZE = 104;
 const FINAL_TEXT = '¡Proceso finalizado!';
-const STEP_INTERVAL_MS = 1500;
+const STEP_INTERVAL_MS = 3500;
 const HOLD_BEFORE_EXIT_MS = 700;
 const OUTRO_DURATION_MS = 420;
 

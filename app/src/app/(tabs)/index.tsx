@@ -4,19 +4,32 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
+import { FtCoin } from '../../components/ui/FtCoin';
 import { Screen } from '../../components/ui/Screen';
 import { useAuth } from '../../context/auth-context';
 import { useFt } from '../../context/ft-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { fetchItems, type Item } from '../../lib/items';
-import { fetchWishlist } from '../../lib/wishlist';
 import { colors } from '../../theme/tokens';
 
-function StatCard({ label, value, onPress }: { label: string; value: number; onPress?: () => void }) {
+function StatCard({
+  label,
+  value,
+  onPress,
+  icon,
+}: {
+  label: string;
+  value: number;
+  onPress?: () => void;
+  icon?: boolean;
+}) {
   return (
     <Pressable onPress={onPress} className="flex-1 rounded-lg border border-border bg-surface p-4">
       <Text className="font-display text-2xl text-text">{value}</Text>
-      <Text className="mt-1 text-xs text-textMuted">{label}</Text>
+      <View className="mt-1 flex-row items-center gap-1">
+        <Text className="text-xs text-textMuted">{label}</Text>
+        {icon ? <FtCoin size={11} /> : null}
+      </View>
     </Pressable>
   );
 }
@@ -40,26 +53,23 @@ function FavoriteCard({ item, onOpen }: { item: Item; onOpen: () => void }) {
 }
 
 export default function HomeScreen() {
-  const { user, accessToken } = useAuth();
+  const { accessToken } = useAuth();
   const { costOf, balance } = useFt();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const firstName = user?.name?.split(' ')[0] ?? '';
   const scanCost = costOf('SCAN_HAVE_IT');
 
   const [items, setItems] = useState<Item[] | null>(null);
-  const [wishlistCount, setWishlistCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
       if (!accessToken) return;
       let active = true;
       // El resumen es informativo: si falla algo, se deja lo último que se cargó.
-      Promise.all([fetchItems(accessToken), fetchWishlist(accessToken)])
-        .then(([loadedItems, wishlist]) => {
+      fetchItems(accessToken)
+        .then((loadedItems) => {
           if (!active) return;
           setItems(loadedItems);
-          setWishlistCount(wishlist.length);
         })
         .catch(() => {
           if (active) setItems((prev) => prev ?? []);
@@ -75,8 +85,18 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Screen>
-      <Text className="font-body-bold text-2xl text-text">Hola{firstName ? `, ${firstName}` : ''} 👋</Text>
-      <Text className="mt-1 text-sm text-textMuted">Este es el resumen de tu colección</Text>
+      <View className="flex-row items-center gap-2.5">
+        <Image
+          source={require('../../../assets/icon.png')}
+          style={{ width: 30, height: 30, borderRadius: 7 }}
+        />
+        <View>
+          <Text className="font-display text-lg text-text">
+            FRIKI<Text className="text-primary">DEX</Text>
+          </Text>
+          <Text className="text-[9px] uppercase tracking-widest text-textMuted">La dex de tus coleccionables</Text>
+        </View>
+      </View>
 
       {items === null ? (
         <ActivityIndicator className="mt-12" color={colors.primary} />
@@ -84,14 +104,8 @@ export default function HomeScreen() {
         <>
           <View className="mt-6 flex-row gap-3">
             <StatCard label="Objetos totales" value={items.length} onPress={() => router.push('/(tabs)/objetos')} />
-            <StatCard label="En wishlist" value={wishlistCount} onPress={() => router.push('/(tabs)/wishlist')} />
+            {balance != null ? <StatCard label="Tus FrikiTokens" value={balance} icon /> : null}
           </View>
-
-          {balance != null ? (
-            <View className="mt-3 flex-row gap-3">
-              <StatCard label="Tus FrikiTokens 🪙" value={balance} />
-            </View>
-          ) : null}
 
           {items.length === 0 ? (
             <>
@@ -108,16 +122,18 @@ export default function HomeScreen() {
                 className="mt-4 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">
-                  <Text className="font-display text-xl uppercase tracking-wide text-white">
-                    ¿Ya lo tengo?
+                  <View className="flex-row flex-wrap items-center gap-1.5">
+                    <Text className="font-display text-xl uppercase tracking-wide text-white">¿Ya lo tengo?</Text>
                     {scanCost != null ? (
-                      <Text className="text-sm">
-                        {' 🪙'}
-                        {scanCost}
-                        <Text style={{ fontSize: 9 }}>FT</Text>
-                      </Text>
+                      <View className="flex-row items-center gap-1">
+                        <FtCoin size={12} />
+                        <Text className="text-sm text-white">
+                          {scanCost}
+                          <Text style={{ fontSize: 9 }}>FT</Text>
+                        </Text>
+                      </View>
                     ) : null}
-                  </Text>
+                  </View>
                   <Text className="mt-1 text-sm text-white/80">
                     Fotografía algo que viste en una tienda y comprueba si ya está en tu colección.
                   </Text>
@@ -132,16 +148,18 @@ export default function HomeScreen() {
                 className="mt-8 flex-row items-center rounded-xl bg-secondary p-5 active:bg-secondaryHover"
               >
                 <View className="flex-1 pr-3">
-                  <Text className="font-display text-xl uppercase tracking-wide text-white">
-                    ¿Ya lo tengo?
+                  <View className="flex-row flex-wrap items-center gap-1.5">
+                    <Text className="font-display text-xl uppercase tracking-wide text-white">¿Ya lo tengo?</Text>
                     {scanCost != null ? (
-                      <Text className="text-sm">
-                        {' 🪙'}
-                        {scanCost}
-                        <Text style={{ fontSize: 9 }}>FT</Text>
-                      </Text>
+                      <View className="flex-row items-center gap-1">
+                        <FtCoin size={12} />
+                        <Text className="text-sm text-white">
+                          {scanCost}
+                          <Text style={{ fontSize: 9 }}>FT</Text>
+                        </Text>
+                      </View>
                     ) : null}
-                  </Text>
+                  </View>
                   <Text className="mt-1 text-sm text-white/80">
                     Fotografía algo que viste en una tienda y comprueba si ya está en tu colección.
                   </Text>

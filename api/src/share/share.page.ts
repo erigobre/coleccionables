@@ -46,6 +46,21 @@ const LABELS: Record<string, Record<string, string>> = {
   status: { ACTIVE: 'En colección', PENDING_TRANSFER: 'En proceso de transferencia' },
 };
 
+// Dominio de producción: el mismo que usan canonical/og:url en api/public/index.html.
+const FRIKIDEX_URL = 'https://frikidex.com';
+
+const LOGO_SVG = `<svg viewBox="0 0 120 120" role="img" aria-label="Frikidex"><rect width="120" height="120" rx="28" fill="#6D4AFF"></rect><path d="M22 40 V30 Q22 22 30 22 H40 M80 22 H90 Q98 22 98 30 V40 M98 80 V90 Q98 98 90 98 H80 M40 98 H30 Q22 98 22 90 V80" fill="none" stroke="#C6F432" stroke-width="7" stroke-linecap="round"></path><text x="54" y="84" text-anchor="middle" font-family="Arial Black, sans-serif" font-weight="900" font-size="68" fill="#F5F0E6">F</text><path d="M88 52 L90.6 58.4 L97 61 L90.6 63.6 L88 70 L85.4 63.6 L79 61 L85.4 58.4 Z" fill="#C6F432"></path></svg>`;
+
+// Logo + wordmark + slogan, igual que en la landing (api/public/index.html),
+// como enlace a la web pública. Se usa en la cabecera (grande) y el pie (chico).
+function brandLockup(size: number): string {
+  return `<a class="brand-link" href="${FRIKIDEX_URL}" target="_blank" rel="noopener">
+  <span class="brand-logo" style="width:${size}px;height:${size}px">${LOGO_SVG}</span>
+  <span class="brand-word">FRIKI<b>DEX</b></span>
+  <small class="slogan">La dex de tus coleccionables</small>
+</a>`;
+}
+
 export function esc(value: unknown): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -75,8 +90,16 @@ const STYLES = `
   dl{margin:22px 0 0;display:grid;grid-template-columns:auto 1fr;gap:10px 16px}
   dt{color:#8B84A8;font-size:14px}
   dd{margin:0;font-size:15px}
-  footer{margin-top:30px;padding:0 20px;text-align:center;color:#8B84A8;font-size:13px}
-  footer strong{color:#C6F432;letter-spacing:.04em}
+  header.top{display:flex;justify-content:center;padding-top:22px}
+  .brand-link{display:flex;flex-direction:column;align-items:center;gap:7px;text-decoration:none}
+  .brand-logo{display:block}
+  .brand-logo svg{width:100%;height:100%;display:block}
+  .brand-word{font-weight:800;font-size:19px;letter-spacing:.02em;color:#F4EFE2}
+  .brand-word b{color:#C6F432;font-weight:800}
+  .slogan{font-weight:500;font-size:9px;letter-spacing:.13em;color:#8B84A8;text-transform:uppercase}
+  footer{margin-top:34px;padding:24px 20px 40px;text-align:center;color:#8B84A8;font-size:13px}
+  footer .brand-link{margin-bottom:16px}
+  footer a{color:#8B84A8;text-decoration:underline}
 `;
 
 // La CSP del controlador ya bloquea scripts y recursos externos; el estilo va inline.
@@ -92,9 +115,14 @@ ${head}
 <style>${STYLES}</style>
 </head>
 <body>
+<header class="top">${brandLockup(48)}</header>
 <main>
 ${content}
-<footer>Compartido desde <strong>FRIKIDEX</strong> · el inventario de tu colección</footer>
+<footer>
+${brandLockup(36)}
+<small>Hecho por <a href="https://appgo.mx" target="_blank" rel="noopener">AppGo</a> © 2026</small><br>
+<small><a href="/aviso-de-privacidad">Aviso de privacidad</a> · <a href="/condiciones-de-uso">Condiciones de uso</a></small>
+</footer>
 </main>
 </body>
 </html>`;

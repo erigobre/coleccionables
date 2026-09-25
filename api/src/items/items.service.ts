@@ -432,6 +432,10 @@ export class ItemsService {
     const item = await this.assertOwnedItem(ownerId, id);
     const catalog = await this.ftService.getCatalog();
     const costOf = (key: string) => catalog.find((c) => c.key === key)?.ftCost ?? null;
+    const history = await this.prisma.marketPriceCheck.findMany({
+      where: { itemId: id },
+      orderBy: { createdAt: 'desc' },
+    });
 
     return {
       cached: item.lastMarketPriceResult
@@ -442,6 +446,13 @@ export class ItemsService {
           }
         : null,
       fresh: { ftCost: costOf('MARKET_PRICE_FRESH') },
+      history: history.map((h) => ({
+        id: h.id,
+        market: h.result as unknown as MarketPriceResult,
+        fetchedAt: h.createdAt,
+        fromCache: h.fromCache,
+        ftCost: h.ftCost,
+      })),
     };
   }
 
@@ -456,6 +467,8 @@ export class ItemsService {
     idempotencyKey: string,
   ) {
     const item = await this.assertOwnedItem(ownerId, id);
+    const catalog = await this.ftService.getCatalog();
+    const costOf = (key: string) => catalog.find((c) => c.key === key)?.ftCost ?? null;
 
     if (mode === 'cached') {
       if (!item.lastMarketPriceResult) {
@@ -463,17 +476,27 @@ export class ItemsService {
       }
       return this.ftService.runChargedAction(
         { organizationId, userId: ownerId, service: 'MARKET_PRICE_CACHED', idempotencyKey, metadata: { itemId: id } },
-        async () => ({
-          data: {
-            purchasePrice: item.purchasePrice,
-            currency: item.currency,
-            market: item.lastMarketPriceResult as unknown as MarketPriceResult,
-            fetchedAt: item.lastMarketPriceAt,
-            fromCache: true,
-          },
-          usageEventType: 'MARKET_PRICE_LOOKUP' as const,
-          usageEventMetadata: { itemId: id, fromCache: true },
-        }),
+        async () => {
+          await this.prisma.marketPriceCheck.create({
+            data: {
+              itemId: id,
+              result: item.lastMarketPriceResult as unknown as Prisma.InputJsonValue,
+              fromCache: true,
+              ftCost: costOf('MARKET_PRICE_CACHED'),
+            },
+          });
+          return {
+            data: {
+              purchasePrice: item.purchasePrice,
+              currency: item.currency,
+              market: item.lastMarketPriceResult as unknown as MarketPriceResult,
+              fetchedAt: item.lastMarketPriceAt,
+              fromCache: true,
+            },
+            usageEventType: 'MARKET_PRICE_LOOKUP' as const,
+            usageEventMetadata: { itemId: id, fromCache: true },
+          };
+        },
       );
     }
 
@@ -515,6 +538,14 @@ export class ItemsService {
           data: {
             lastMarketPriceResult: marketPrice as unknown as Prisma.InputJsonValue,
             lastMarketPriceAt: fetchedAt,
+          },
+        });
+        await this.prisma.marketPriceCheck.create({
+          data: {
+            itemId: id,
+            result: marketPrice as unknown as Prisma.InputJsonValue,
+            fromCache: false,
+            ftCost: costOf('MARKET_PRICE_FRESH'),
           },
         });
         return {

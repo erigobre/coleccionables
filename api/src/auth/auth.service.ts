@@ -104,7 +104,7 @@ export class AuthService {
       await tx.location.create({
         data: {
           ownerId: createdUser.id,
-          name: 'Ubicación permanente',
+          name: 'Casa',
           isPermanentDefault: true,
         },
       });

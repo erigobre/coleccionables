@@ -23,6 +23,7 @@ export function ItemFormFields({ values, onChange, showUniqueIdentifier = true }
         value={values.name}
         onChangeText={(text) => onChange('name', text)}
         placeholder="Ej. Batman: The Killing Joke"
+        autoExpand
       />
 
       <ChipSelect

@@ -46,9 +46,9 @@ const STATUS_LABEL: Record<string, string> = {
 function InfoRow({ label, value }: { label: string; value: string | null }) {
   if (!value) return null;
   return (
-    <View className="mb-3 flex-row justify-between border-b border-border pb-3">
+    <View className="mb-3 flex-row justify-between gap-3 border-b border-border pb-3">
       <Text className="text-sm text-textMuted">{label}</Text>
-      <Text className="text-sm text-text">{value}</Text>
+      <Text className="flex-1 text-right text-sm text-text">{value}</Text>
     </View>
   );
 }
@@ -186,7 +186,10 @@ export default function ItemDetailScreen() {
     setNotice(null);
     try {
       const { url } = await shareItem(accessToken, item.id);
-      await Share.share({ message: `${item.name} — mira este objeto de mi colección en Frikidex: ${url}`, url });
+      // En iOS, pasar `url` además de `message` hace que varias apps (Mensajes,
+      // WhatsApp) concatenen ambos y la URL salga duplicada. Basta con incluirla
+      // una sola vez dentro de `message`.
+      await Share.share({ message: `${item.name} — mira este objeto de mi colección en Frikidex: ${url}` });
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -217,6 +220,7 @@ export default function ItemDetailScreen() {
       setMarketPrice(result.market);
       setMarketPriceInfo({ fetchedAt: result.fetchedAt, fromCache: result.fromCache });
       refreshFt();
+      peekMarketPrice(accessToken, item.id).then(setMarketPeek).catch(() => {});
     } catch (err) {
       setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
     } finally {
@@ -446,11 +450,8 @@ export default function ItemDetailScreen() {
 
               <View className="mt-4">
                 <Button
-                  label={
-                    marketPeek?.fresh.ftCost != null
-                      ? `Consultar precio actualizado hoy (${marketPeek.fresh.ftCost} FT)`
-                      : 'Consultar precio actualizado hoy'
-                  }
+                  label="Actualizar precio"
+                  ftCost={marketPeek?.fresh.ftCost}
                   variant="ghost"
                   onPress={() => onLookupMarketPrice('fresh')}
                   loading={loadingMarketPrice === 'fresh'}
@@ -466,11 +467,8 @@ export default function ItemDetailScreen() {
                     Ya tenemos una estimación de precio del {formatMarketDate(marketPeek.cached.fetchedAt)}.
                   </Text>
                   <Button
-                    label={
-                      marketPeek.cached.ftCost != null
-                        ? `Usar ese dato (${marketPeek.cached.ftCost} FT)`
-                        : 'Usar ese dato'
-                    }
+                    label="Usar ese dato"
+                    ftCost={marketPeek.cached.ftCost}
                     variant="secondary"
                     onPress={() => onLookupMarketPrice('cached')}
                     loading={loadingMarketPrice === 'cached'}
@@ -483,11 +481,8 @@ export default function ItemDetailScreen() {
                 </Text>
               )}
               <Button
-                label={
-                  marketPeek.fresh.ftCost != null
-                    ? `Consultar precio de hoy (${marketPeek.fresh.ftCost} FT)`
-                    : 'Consultar precio de hoy'
-                }
+                label="Actualizar precio"
+                ftCost={marketPeek.fresh.ftCost}
                 variant={marketPeek.cached ? 'ghost' : 'secondary'}
                 onPress={() => onLookupMarketPrice('fresh')}
                 loading={loadingMarketPrice === 'fresh'}
@@ -497,6 +492,22 @@ export default function ItemDetailScreen() {
           ) : (
             <ActivityIndicator color={colors.primary} />
           )}
+
+          {marketPeek && marketPeek.history.length > 0 ? (
+            <View className="mt-4 border-t border-border pt-4">
+              <Text className="mb-2 text-sm font-semibold text-text">Historial de consultas</Text>
+              {marketPeek.history.map((entry) => (
+                <View key={entry.id} className="mb-2 flex-row items-center justify-between">
+                  <Text className="text-xs text-textMuted">{formatMarketDate(entry.fetchedAt)}</Text>
+                  <Text className="text-xs text-text">
+                    {entry.market.averagePrice != null
+                      ? `${entry.market.averagePrice} ${entry.market.currency}`
+                      : 'Sin precio disponible'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
         </View>
 
         {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}

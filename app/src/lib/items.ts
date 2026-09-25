@@ -213,9 +213,18 @@ export interface MarketPriceResult {
 // Antes de cobrar: dice si ya hay un precio guardado (y de cuándo), para que
 // la pantalla ofrezca "usar ese dato (menos FT)" vs "consultar uno nuevo (más
 // FT)" — el usuario elige siempre, nunca se decide en silencio.
+export interface MarketPriceHistoryEntry {
+  id: string;
+  market: MarketPriceResult;
+  fetchedAt: string;
+  fromCache: boolean;
+  ftCost: number | null;
+}
+
 export interface MarketPricePeek {
   cached: { market: MarketPriceResult; fetchedAt: string; ftCost: number | null } | null;
   fresh: { ftCost: number | null };
+  history: MarketPriceHistoryEntry[];
 }
 
 export function peekMarketPrice(accessToken: string, id: string) {

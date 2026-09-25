@@ -1,5 +1,6 @@
-import { ActivityIndicator, Pressable, Text } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { colors } from '../../theme/tokens';
+import { FtCoin } from './FtCoin';
 
 interface ButtonProps {
   label: string;
@@ -7,8 +8,8 @@ interface ButtonProps {
   loading?: boolean;
   disabled?: boolean;
   variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
-  // Si se pasa (incluido 0), agrega "🪙<n>FT" al final del label con "FT" en
-  // tamaño reducido, tipo superíndice, para dejar claro que es una moneda.
+  // Si se pasa (incluido 0), agrega la moneda dorada + "<n>FT" (FT en tamaño
+  // reducido, tipo superíndice) al final del label.
   ftCost?: number | null;
 }
 
@@ -55,20 +56,26 @@ export function Button({ label, onPress, loading, disabled, variant = 'primary',
       {loading ? (
         <ActivityIndicator color={isDisabled ? colors.disabledText : SPINNER_COLOR[variant]} />
       ) : (
-        <Text
-          className={`text-center font-display text-[17px] uppercase tracking-wide ${
-            isDisabled ? 'text-disabledText' : TEXT_CLASS[variant]
-          }`}
-        >
-          {label}
+        <View className="flex-row flex-wrap items-center justify-center gap-x-1.5">
+          <Text
+            className={`text-center font-display text-[17px] uppercase tracking-wide ${
+              isDisabled ? 'text-disabledText' : TEXT_CLASS[variant]
+            }`}
+          >
+            {label}
+          </Text>
           {ftCost != null ? (
-            <Text>
-              {' 🪙'}
-              {ftCost}
-              <Text style={{ fontSize: 10 }}>FT</Text>
-            </Text>
+            <View className="flex-row items-center gap-1">
+              <FtCoin size={13} />
+              <Text
+                className={`font-display text-[14px] ${isDisabled ? 'text-disabledText' : TEXT_CLASS[variant]}`}
+              >
+                {ftCost}
+                <Text style={{ fontSize: 10 }}>FT</Text>
+              </Text>
+            </View>
           ) : null}
-        </Text>
+        </View>
       )}
     </Pressable>
   );

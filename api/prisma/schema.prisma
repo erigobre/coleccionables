@@ -585,14 +585,32 @@ model Item {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  photos      ItemPhoto[]
-  collections ItemCollection[]
-  tags        ItemTag[]
-  transfers   Transfer[]
-  shareLink   ShareLink?
+  photos            ItemPhoto[]
+  collections       ItemCollection[]
+  tags              ItemTag[]
+  transfers         Transfer[]
+  shareLink         ShareLink?
+  marketPriceChecks MarketPriceCheck[]
 
   @@index([ownerId, status])
   @@map("items")
+}
+
+// Historial de cada consulta de "precio de mercado" (plan FrikiTokens §5.3.9.10):
+// a diferencia de `Item.lastMarketPriceResult` (solo guarda la más reciente),
+// esta tabla acumula todas las consultas para mostrarlas como historial en la
+// ficha del objeto (fecha + estimación).
+model MarketPriceCheck {
+  id        String   @id @default(cuid())
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  result    Json
+  fromCache Boolean
+  ftCost    Int?
+  createdAt DateTime @default(now())
+
+  @@index([itemId, createdAt])
+  @@map("market_price_checks")
 }
 
 model ItemPhoto {
