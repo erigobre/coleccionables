@@ -31,6 +31,12 @@ RUN npm run build
 FROM base AS runtime
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+# server.js (standalone) hace `process.env.HOSTNAME || '0.0.0.0'`, y Docker
+# siempre define HOSTNAME=<container id> en todo contenedor. Sin esto, Next
+# termina escuchando solo en esa dirección y Traefik no puede conectarse
+# desde otro contenedor (502 Bad Gateway aunque el proceso esté "Ready").
+ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 COPY --from=build /repo/admin/.next/standalone ./
 COPY --from=build /repo/admin/.next/static ./admin/.next/static
 COPY --from=build /repo/admin/public ./admin/public
