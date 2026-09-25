@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
@@ -19,7 +20,10 @@ export function ResolveFlagDialog({ flagId, canReactivate }: { flagId: string; c
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>Resolver</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <ShieldCheck className="size-4" />
+        Resolver
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Resolver incidente de moderación</DialogTitle>

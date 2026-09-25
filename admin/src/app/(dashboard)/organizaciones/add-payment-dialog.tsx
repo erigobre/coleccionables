@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,10 @@ export function AddPaymentDialog({ organizationId, organizationName }: { organiz
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>Agregar pago</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <Plus className="size-4" />
+        Agregar pago
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Nuevo pago · {organizationName}</DialogTitle>

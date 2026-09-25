@@ -1,6 +1,7 @@
 'use client';
 
 import { useActionState, useState } from 'react';
+import { Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -30,7 +31,10 @@ export function EditOrganizationDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={<Button variant="outline" size="sm" />}>Editar</DialogTrigger>
+      <DialogTrigger render={<Button variant="outline" size="sm" />}>
+        <Pencil className="size-4" />
+        Editar
+      </DialogTrigger>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Editar organización</DialogTitle>

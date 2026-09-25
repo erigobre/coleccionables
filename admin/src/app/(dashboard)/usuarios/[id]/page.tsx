@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Ban, ChevronRight, CircleCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,9 +40,13 @@ export default async function UsuarioDetailPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <Link href="/usuarios" className="text-sm text-muted-foreground hover:text-foreground">
-            ← Usuarios
-          </Link>
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <Link href="/usuarios" className="hover:text-foreground">
+              Usuarios
+            </Link>
+            <ChevronRight className="size-3.5" />
+            <span className="text-foreground">{user.name}</span>
+          </div>
           <h1 className="mt-1 text-2xl font-bold text-foreground">{user.name}</h1>
         </div>
         <div className="flex items-center gap-2">
@@ -49,12 +54,14 @@ export default async function UsuarioDetailPage({ params }: { params: Promise<{ 
           {user.status === 'ACTIVE' ? (
             <form action={suspendUserAction.bind(null, user.id)}>
               <Button type="submit" variant="outline" size="sm">
+                <Ban className="size-4" />
                 Suspender
               </Button>
             </form>
           ) : (
             <form action={reactivateUserAction.bind(null, user.id)}>
               <Button type="submit" variant="outline" size="sm">
+                <CircleCheck className="size-4" />
                 Reactivar
               </Button>
             </form>

@@ -1,3 +1,4 @@
+import { HeartHandshake, HeartOff } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -57,12 +58,14 @@ export default async function OrganizacionesPage() {
                 {org.sponsored ? (
                   <form action={unsponsorAction.bind(null, org.id)}>
                     <Button type="submit" variant="outline" size="sm">
+                      <HeartOff className="size-4" />
                       Quitar patrocinio
                     </Button>
                   </form>
                 ) : (
                   <form action={sponsorAction.bind(null, org.id)}>
                     <Button type="submit" variant="outline" size="sm">
+                      <HeartHandshake className="size-4" />
                       Patrocinar
                     </Button>
                   </form>

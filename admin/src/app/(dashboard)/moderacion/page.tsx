@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Clock, ShieldCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { backendFetch } from '@/lib/backend';
@@ -37,14 +38,16 @@ export default async function ModeracionPage({
         <div className="flex gap-2 text-sm">
           <Link
             href="/moderacion?reviewed=false"
-            className={!showingReviewed ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'}
+            className={`flex items-center gap-1.5 ${!showingReviewed ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           >
+            <Clock className="size-4" />
             Pendientes
           </Link>
           <Link
             href="/moderacion?reviewed=true"
-            className={showingReviewed ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'}
+            className={`flex items-center gap-1.5 ${showingReviewed ? 'font-semibold text-primary' : 'text-muted-foreground hover:text-foreground'}`}
           >
+            <ShieldCheck className="size-4" />
             Resueltos
           </Link>
         </div>

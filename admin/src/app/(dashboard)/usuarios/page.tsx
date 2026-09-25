@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Ban, CircleCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,12 +74,14 @@ export default async function UsuariosPage({
                   {user.status === 'ACTIVE' ? (
                     <form action={suspendUserAction.bind(null, user.id)}>
                       <Button type="submit" variant="outline" size="sm">
+                        <Ban className="size-4" />
                         Suspender
                       </Button>
                     </form>
                   ) : (
                     <form action={reactivateUserAction.bind(null, user.id)}>
                       <Button type="submit" variant="outline" size="sm">
+                        <CircleCheck className="size-4" />
                         Reactivar
                       </Button>
                     </form>
