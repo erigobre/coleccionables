@@ -53,11 +53,14 @@ const LOGO_SVG = `<svg viewBox="0 0 120 120" role="img" aria-label="Frikidex"><r
 
 // Logo + wordmark + slogan, igual que en la landing (api/public/index.html),
 // como enlace a la web pública. Se usa en la cabecera (grande) y el pie (chico).
-function brandLockup(size: number): string {
+// En la cabecera el slogan se oculta (showSlogan=false) pero sigue ocupando su
+// espacio (visibility:hidden en vez de display:none) para no mover el logo.
+function brandLockup(size: number, showSlogan = true): string {
+  const sloganStyle = showSlogan ? '' : ' style="visibility:hidden"';
   return `<a class="brand-link" href="${FRIKIDEX_URL}" target="_blank" rel="noopener">
   <span class="brand-logo" style="width:${size}px;height:${size}px">${LOGO_SVG}</span>
   <span class="brand-word">FRIKI<b>DEX</b></span>
-  <small class="slogan">La dex de tus coleccionables</small>
+  <small class="slogan"${sloganStyle}>La dex de tus coleccionables</small>
 </a>`;
 }
 
@@ -115,7 +118,7 @@ ${head}
 <style>${STYLES}</style>
 </head>
 <body>
-<header class="top">${brandLockup(48)}</header>
+<header class="top">${brandLockup(48, false)}</header>
 <main>
 ${content}
 <footer>
