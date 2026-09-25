@@ -1,5 +1,6 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { backendFetch } from '@/lib/backend';
+import { UsageCharts } from './usage-charts';
 
 interface AdminStats {
   totalUsers: number;
@@ -19,8 +20,17 @@ const CARDS: { key: keyof AdminStats; label: string }[] = [
   { key: 'activeUsersLast30Days', label: 'Usuarios activos (30 días)' },
 ];
 
+interface TimeseriesPoint {
+  month: string;
+  newUsers: number;
+  aiScans: number;
+}
+
 export default async function StatsPage() {
-  const stats = await backendFetch<AdminStats>('/admin/stats');
+  const [stats, timeseries] = await Promise.all([
+    backendFetch<AdminStats>('/admin/stats'),
+    backendFetch<TimeseriesPoint[]>('/admin/stats/timeseries'),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -37,6 +47,7 @@ export default async function StatsPage() {
           </Card>
         ))}
       </div>
+      <UsageCharts data={timeseries} />
     </div>
   );
 }

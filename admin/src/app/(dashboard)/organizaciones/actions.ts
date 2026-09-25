@@ -47,3 +47,33 @@ export async function addPaymentAction(
   revalidatePath('/organizaciones');
   return {};
 }
+
+export interface EditOrganizationState {
+  error?: string;
+}
+
+export async function updateOrganizationAction(
+  organizationId: string,
+  _prevState: EditOrganizationState,
+  formData: FormData,
+): Promise<EditOrganizationState> {
+  const name = String(formData.get('name') ?? '').trim();
+  const plan = String(formData.get('plan') ?? '').trim() || undefined;
+  const subscriptionStatus = String(formData.get('subscriptionStatus') ?? '').trim() || undefined;
+
+  if (!name) {
+    return { error: 'El nombre es obligatorio' };
+  }
+
+  try {
+    await backendFetch(`/admin/organizations/${organizationId}`, {
+      method: 'PATCH',
+      body: { name, plan, subscriptionStatus },
+    });
+  } catch {
+    return { error: 'No se pudo actualizar la organización' };
+  }
+
+  revalidatePath('/organizaciones');
+  return {};
+}

@@ -4,6 +4,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { backendFetch } from '@/lib/backend';
 import { sponsorAction, unsponsorAction } from './actions';
 import { AddPaymentDialog } from './add-payment-dialog';
+import { EditOrganizationDialog } from './edit-organization-dialog';
 
 interface Payment {
   id: string;
@@ -66,6 +67,12 @@ export default async function OrganizacionesPage() {
                     </Button>
                   </form>
                 )}
+                <EditOrganizationDialog
+                  organizationId={org.id}
+                  name={org.name}
+                  plan={org.plan}
+                  subscriptionStatus={org.subscriptionStatus}
+                />
                 <AddPaymentDialog organizationId={org.id} organizationName={org.name} />
               </div>
             </div>

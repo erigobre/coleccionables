@@ -377,6 +377,28 @@ model ModerationFlag {
   @@map("moderation_flags")
 }
 
+// Bitácora de acciones hechas desde el panel Superadmin (Fase 9, pedido por
+// el owner 2026-09-25 para poder auditar quién hizo qué). `adminId`/`adminEmail`
+// van sin relación FK, igual que `reviewedById` en ModerationFlag arriba, para
+// que el historial sobreviva aunque esa cuenta admin se borre después.
+// `targetType`/`targetId` quedan como texto libre en vez de una FK polimórfica
+// porque apuntan a distintas tablas (User, Organization, ModerationFlag, etc.)
+// y esto es solo un log de lectura, no necesita integridad referencial.
+model AdminAuditLog {
+  id         String   @id @default(cuid())
+  adminId    String
+  adminEmail String
+  action     String // ej. "user.suspend", "organization.sponsor", "payment.create"
+  targetType String // ej. "User", "Organization"
+  targetId   String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
+}
+
 // ---------------------------------------------------------------------------
 // Ubicaciones (con sub-ubicaciones) y Temporadas
 // ---------------------------------------------------------------------------

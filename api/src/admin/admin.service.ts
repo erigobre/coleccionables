@@ -1,13 +1,43 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import type { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
 import type { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
+import type { UpdateUserDto } from './dto/update-user.dto.js';
+import type { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 
 const ACTIVE_WINDOW_DAYS = 30;
+const TIMESERIES_MAX_MONTHS = 12;
 
 @Injectable()
 export class AdminService {
   constructor(private readonly prisma: PrismaService) {}
+
+  // Bitácora de acciones del panel Superadmin (plan §5.6, pedido 2026-09-25).
+  // Nunca debe tumbar la acción que audita si falla (ej. tabla recién migrada
+  // en un ambiente que no corrió la migración todavía) — se traga el error.
+  private async logAction(
+    admin: { id: string; email: string },
+    action: string,
+    targetType: string,
+    targetId: string,
+    metadata?: Record<string, unknown>,
+  ) {
+    try {
+      await this.prisma.adminAuditLog.create({
+        data: {
+          adminId: admin.id,
+          adminEmail: admin.email,
+          action,
+          targetType,
+          targetId,
+          metadata: metadata as Prisma.InputJsonValue | undefined,
+        },
+      });
+    } catch {
+      // No-op deliberado: el log es de mejor esfuerzo, nunca bloqueante.
+    }
+  }
 
   // Listado de usuarios + búsqueda (plan §5.6, Fase 9).
   findUsers(search?: string) {
@@ -45,21 +75,51 @@ export class AdminService {
     });
   }
 
-  // Activa/desactiva cuenta patrocinada: nunca paga (plan §2).
-  async setSponsored(organizationId: string, sponsored: boolean) {
+  async updateOrganization(
+    admin: { id: string; email: string },
+    organizationId: string,
+    dto: UpdateOrganizationDto,
+  ) {
     await this.assertOrganizationExists(organizationId);
-    return this.prisma.organization.update({
+    const updated = await this.prisma.organization.update({
+      where: { id: organizationId },
+      data: {
+        name: dto.name,
+        plan: dto.plan,
+        subscriptionStatus: dto.subscriptionStatus,
+      },
+    });
+    await this.logAction(admin, 'organization.update', 'Organization', organizationId, { ...dto });
+    return updated;
+  }
+
+  // Todos los pagos de todas las organizaciones, más recientes primero (plan
+  // §5.6: vista global, no solo anidada dentro de cada organización).
+  findPayments() {
+    return this.prisma.payment.findMany({
+      include: { organization: { select: { id: true, name: true } } },
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  // Activa/desactiva cuenta patrocinada: nunca paga (plan §2).
+  async setSponsored(admin: { id: string; email: string }, organizationId: string, sponsored: boolean) {
+    await this.assertOrganizationExists(organizationId);
+    const updated = await this.prisma.organization.update({
       where: { id: organizationId },
       data: {
         sponsored,
         subscriptionStatus: sponsored ? 'SPONSORED' : 'ACTIVE',
       },
     });
+    await this.logAction(admin, sponsored ? 'organization.sponsor' : 'organization.unsponsor', 'Organization', organizationId);
+    return updated;
   }
 
-  async addPayment(organizationId: string, dto: CreatePaymentDto) {
+  async addPayment(admin: { id: string; email: string }, organizationId: string, dto: CreatePaymentDto) {
     await this.assertOrganizationExists(organizationId);
-    return this.prisma.payment.create({
+    const payment = await this.prisma.payment.create({
       data: {
         organizationId,
         amount: dto.amount,
@@ -69,6 +129,8 @@ export class AdminService {
         periodEnd: new Date(dto.periodEnd),
       },
     });
+    await this.logAction(admin, 'payment.create', 'Organization', organizationId, { amount: dto.amount, status: payment.status });
+    return payment;
   }
 
   // KPIs del dashboard (plan §5.6.2): set exacto quedó abierto a definir, se
@@ -104,6 +166,115 @@ export class AdminService {
     };
   }
 
+  // Serie mensual para las gráficas del dashboard (plan §5.6, pedido
+  // 2026-09-25): altas de usuarios y escaneos de IA por mes. Se bucketiza en
+  // JS en vez de con SQL agrupado por mes (MySQL no tiene DATE_TRUNC nativo y
+  // el volumen actual no lo justifica) — trae solo `createdAt`/`type` de la
+  // ventana pedida y agrupa en memoria.
+  async getStatsTimeseries(months?: number) {
+    const monthCount = Math.min(Math.max(months ?? 6, 1), TIMESERIES_MAX_MONTHS);
+    const from = new Date();
+    from.setHours(0, 0, 0, 0);
+    from.setMonth(from.getMonth() - (monthCount - 1), 1);
+
+    const buckets: { key: string; label: string }[] = [];
+    for (let i = 0; i < monthCount; i++) {
+      const d = new Date(from);
+      d.setMonth(d.getMonth() + i);
+      buckets.push({ key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toISOString() });
+    }
+    const bucketKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+
+    const [users, aiScans] = await Promise.all([
+      this.prisma.user.findMany({ where: { createdAt: { gte: from } }, select: { createdAt: true } }),
+      this.prisma.usageEvent.findMany({
+        where: { type: 'AI_SCAN', createdAt: { gte: from } },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const newUsersByMonth = new Map(buckets.map((b) => [b.key, 0]));
+    for (const u of users) {
+      const key = bucketKey(u.createdAt);
+      if (newUsersByMonth.has(key)) newUsersByMonth.set(key, newUsersByMonth.get(key)! + 1);
+    }
+    const aiScansByMonth = new Map(buckets.map((b) => [b.key, 0]));
+    for (const e of aiScans) {
+      const key = bucketKey(e.createdAt);
+      if (aiScansByMonth.has(key)) aiScansByMonth.set(key, aiScansByMonth.get(key)! + 1);
+    }
+
+    return buckets.map((b) => ({
+      month: b.key,
+      newUsers: newUsersByMonth.get(b.key) ?? 0,
+      aiScans: aiScansByMonth.get(b.key) ?? 0,
+    }));
+  }
+
+  // Bitácora del panel: más reciente primero.
+  findAuditLogs() {
+    return this.prisma.adminAuditLog.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 200,
+    });
+  }
+
+  // Detalle de un usuario para soporte/moderación (plan §5.6, pedido
+  // 2026-09-25): perfil + organización + conteos + últimos objetos/eventos.
+  // No reutiliza los endpoints normales de items/collections porque esos
+  // están escopados a req.user (dueño), no a un userId arbitrario.
+  async findUserDetail(id: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        username: true,
+        role: true,
+        status: true,
+        createdAt: true,
+        organization: {
+          select: { id: true, name: true, plan: true, subscriptionStatus: true, sponsored: true },
+        },
+        _count: { select: { items: true, collections: true, seasons: true } },
+      },
+    });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const [recentItems, recentUsageEvents] = await Promise.all([
+      this.prisma.item.findMany({
+        where: { ownerId: id },
+        select: { id: true, name: true, status: true, category: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+      this.prisma.usageEvent.findMany({
+        where: { userId: id },
+        select: { id: true, type: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
+
+    return { ...user, recentItems, recentUsageEvents };
+  }
+
+  async updateUser(admin: { id: string; email: string }, userId: string, dto: UpdateUserDto) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    const updated = await this.prisma.user.update({
+      where: { id: userId },
+      data: { name: dto.name, email: dto.email },
+    });
+    await this.logAction(admin, 'user.update', 'User', userId, { ...dto });
+    return updated;
+  }
+
   // "Reportes" de moderación (plan de bloqueo de contenido no apto, confirmado
   // con el owner 2026-09-22): el reporte vive como cola de revisión interna
   // aquí; un reporte externo (ej. NCMEC para CSAM real) es una decisión legal
@@ -116,7 +287,7 @@ export class AdminService {
     });
   }
 
-  async resolveModerationFlag(id: string, adminId: string, dto: ResolveModerationFlagDto) {
+  async resolveModerationFlag(admin: { id: string; email: string }, id: string, dto: ResolveModerationFlagDto) {
     const flag = await this.prisma.moderationFlag.findUnique({ where: { id } });
     if (!flag) {
       throw new NotFoundException('Incidente de moderación no encontrado');
@@ -124,24 +295,29 @@ export class AdminService {
 
     const updated = await this.prisma.moderationFlag.update({
       where: { id },
-      data: { reviewedAt: new Date(), reviewedById: adminId, resolution: dto.resolution },
+      data: { reviewedAt: new Date(), reviewedById: admin.id, resolution: dto.resolution },
     });
 
     if (dto.reactivateUser && flag.userId) {
       await this.prisma.user.update({ where: { id: flag.userId }, data: { status: 'ACTIVE' } });
     }
 
+    await this.logAction(admin, 'moderationFlag.resolve', 'ModerationFlag', id, {
+      reactivateUser: dto.reactivateUser ?? false,
+    });
     return updated;
   }
 
   // Suspensión/reactivación manual, para cuando el reporte no vino de la IA
   // (ej. otro usuario avisó por fuera de la app).
-  async setUserStatus(userId: string, status: 'ACTIVE' | 'SUSPENDED') {
+  async setUserStatus(admin: { id: string; email: string }, userId: string, status: 'ACTIVE' | 'SUSPENDED') {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       throw new NotFoundException('Usuario no encontrado');
     }
-    return this.prisma.user.update({ where: { id: userId }, data: { status } });
+    const updated = await this.prisma.user.update({ where: { id: userId }, data: { status } });
+    await this.logAction(admin, status === 'SUSPENDED' ? 'user.suspend' : 'user.reactivate', 'User', userId);
+    return updated;
   }
 
   private async assertOrganizationExists(id: string) {

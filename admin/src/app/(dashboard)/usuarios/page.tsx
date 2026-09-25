@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -55,7 +56,11 @@ export default async function UsuariosPage({
           <TableBody>
             {users.map((user) => (
               <TableRow key={user.id}>
-                <TableCell className="font-medium text-foreground">{user.name}</TableCell>
+                <TableCell className="font-medium text-foreground">
+                  <Link href={`/usuarios/${user.id}`} className="hover:underline">
+                    {user.name}
+                  </Link>
+                </TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
                 <TableCell className="text-muted-foreground">{user.organization?.name ?? '—'}</TableCell>
                 <TableCell>

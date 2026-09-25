@@ -6,6 +6,9 @@ const NAV_ITEMS = [
   { href: '/', label: 'Resumen' },
   { href: '/usuarios', label: 'Usuarios' },
   { href: '/organizaciones', label: 'Organizaciones' },
+  { href: '/pagos', label: 'Pagos' },
+  { href: '/moderacion', label: 'Moderación' },
+  { href: '/actividad', label: 'Actividad' },
 ];
 
 // El middleware ya garantiza que solo llega aquí una sesión SUPERADMIN
