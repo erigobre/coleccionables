@@ -19,6 +19,7 @@ import { AdminModule } from './admin/admin.module.js';
 import { FtModule } from './ft/ft.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { WaitlistModule } from './waitlist/waitlist.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { WaitlistModule } from './waitlist/waitlist.module.js';
     FtModule,
     LegalModule,
     WaitlistModule,
+    NotificationsModule,
   ],
 })
 export class AppModule {}

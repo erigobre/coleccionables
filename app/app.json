@@ -54,7 +54,8 @@
         }
       ],
       "expo-font",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-notifications"
     ],
     "extra": {
       "router": {

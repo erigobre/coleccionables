@@ -87,6 +87,7 @@ model User {
   collectionMemberships CollectionMember[]
   ftTransactions        FtTransaction[] // quién disparó cada cobro, para auditoría
   moderationFlags       ModerationFlag[] // incidentes de moderación de IA disparados por este usuario
+  pushTokens            PushToken[]
 
   // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
   // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
@@ -402,17 +403,35 @@ model Location {
 }
 
 model Season {
-  id        String   @id @default(cuid())
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name      String // Halloween, Navidad, Pascua, etc.
-  startDate DateTime
-  endDate   DateTime
-  createdAt DateTime @default(now())
+  id             String    @id @default(cuid())
+  ownerId        String
+  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name           String // Halloween, Navidad, Pascua, etc.
+  startDate      DateTime
+  endDate        DateTime
+  createdAt      DateTime  @default(now())
+  // Evita reenviar el push de "temporada por terminar" más de una vez.
+  reminderSentAt DateTime?
 
   items Item[]
 
   @@map("seasons")
+}
+
+// Token de push de Expo por dispositivo. Un mismo dispositivo puede terminar
+// asociado a otra cuenta (logout + login de otro usuario) — por eso `token`
+// es único y no compuesto con `userId`: al re-registrar se reasigna el dueño.
+model PushToken {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  platform  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@map("push_tokens")
 }
 
 // ---------------------------------------------------------------------------

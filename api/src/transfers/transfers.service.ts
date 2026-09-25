@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import type { InitiateTransferDto } from './dto/initiate-transfer.dto.js';
 
 const TRANSFER_EXPIRY_DAYS = 7; // Decisión confirmada: expira tras 7 días sin respuesta.
@@ -15,9 +16,10 @@ export class TransfersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly collectionsService: CollectionsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
-  async initiate(fromUserId: string, dto: InitiateTransferDto) {
+  async initiate(fromUserId: string, fromUserName: string, dto: InitiateTransferDto) {
     const item = await this.prisma.item.findUnique({ where: { id: dto.itemId } });
     if (!item || item.ownerId !== fromUserId) {
       throw new NotFoundException('Objeto no encontrado');
@@ -48,6 +50,14 @@ export class TransfersService {
         },
       }),
     ]);
+
+    this.notifications
+      .sendPushToUser(toUser.id, {
+        title: 'Nueva transferencia',
+        body: `${fromUserName} te envió "${item.name}". Revisa tus transferencias.`,
+        data: { type: 'transfer', transferId: transfer.id },
+      })
+      .catch(() => {});
 
     return transfer;
   }

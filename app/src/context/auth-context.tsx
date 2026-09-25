@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, loginRequest, registerRequest, setTokenListener, type AuthTokens } from '../lib/api';
 import { clearTokens, decodeJwtPayload, loadTokens, saveTokens } from '../lib/auth-storage';
+import { registerPushToken } from '../lib/push';
 
 export interface AuthUser {
   sub: string;
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const applyTokens = useCallback(async (next: AuthTokens) => {
     await saveTokens(next);
     setTokens(next);
+    void registerPushToken(next.accessToken);
   }, []);
 
   const login = useCallback(

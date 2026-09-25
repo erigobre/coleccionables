@@ -1,7 +1,8 @@
 import { Bungee_400Regular, useFonts as useBungeeFont } from '@expo-google-fonts/bungee';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold, useFonts as useDMSansFont } from '@expo-google-fonts/dm-sans';
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, router } from 'expo-router';
+import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -13,6 +14,33 @@ import { FtProvider } from '../context/ft-context';
 import { colors } from '../theme/tokens';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+
+// Muestra la notificación como alerta también con la app en primer plano
+// (por defecto expo-notifications la silencia si la app está abierta).
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: true,
+    shouldShowList: true,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
+
+// Navega según el tipo de notificación al tocarla (app abierta, en background
+// o cerrada — el listener cubre los tres casos por igual).
+function useNotificationNavigation() {
+  useEffect(() => {
+    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data as { type?: string; seasonId?: string } | undefined;
+      if (data?.type === 'transfer') {
+        router.push('/(tabs)/objetos/transferencias');
+      } else if (data?.type === 'season' && data.seasonId) {
+        router.push(`/(tabs)/perfil/temporadas/${data.seasonId}`);
+      }
+    });
+    return () => sub.remove();
+  }, []);
+}
 
 export default function RootLayout() {
   const [bungeeLoaded] = useBungeeFont({ Bungee_400Regular });
@@ -36,6 +64,8 @@ export default function RootLayout() {
 function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
   const { isLoading, user } = useAuth();
   const ready = fontsLoaded && !isLoading;
+
+  useNotificationNavigation();
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});

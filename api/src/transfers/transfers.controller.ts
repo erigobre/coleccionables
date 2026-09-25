@@ -13,7 +13,7 @@ export class TransfersController {
 
   @Post()
   initiate(@CurrentUser() user: AuthenticatedUser, @Body() dto: InitiateTransferDto) {
-    return this.transfersService.initiate(user.id, dto);
+    return this.transfersService.initiate(user.id, user.name, dto);
   }
 
   @Get('incoming')
