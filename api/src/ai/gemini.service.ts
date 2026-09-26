@@ -81,7 +81,7 @@ Responde a cada uno de estos campos. Es preferible arriesgar una respuesta razon
 - "designer": diseñador o artista, si el producto lo atribuye a alguien en particular.
 - "releaseYear": año de lanzamiento original, como número.
 - "originalSetNumber": número de set/modelo/SKU del fabricante impreso en la caja (no el código de barras EAN/UPC).
-- "purchasePrice": precio de compra promedio actual de este producto (de reventa/segunda mano si es coleccionable, o precio de lista si sigue en venta como nuevo), como número. Usa la moneda que encuentres en la búsqueda.
+- "purchasePrice": precio de compra promedio actual de este producto (de reventa/segunda mano si es coleccionable, o precio de lista si sigue en venta como nuevo), como número EN PESOS MEXICANOS (MXN). Si la fuente que encuentres está en otra moneda (USD, EUR, etc.), conviértela a MXN usando el tipo de cambio aproximado actual antes de responder — nunca devuelvas el número en la moneda original.
 - "collectorSummary": una sola frase en español (máximo 140 caracteres) dirigida al propio coleccionista, con el dato más interesante que encontraste sobre este objeto (rareza, tirada limitada, curiosidad de producción, por qué le importaría a un coleccionista). No repitas simplemente el nombre del objeto.
 - Si la categoría es Cómic o Libro, además intenta: "comicCoverNumber", "comicIssueNumber", "comicWriter", "comicPenciler", "comicInker", "comicColorist", "comicPublisher".
 - "suggestedTags": array de tags cortos en español. SIEMPRE incluye al menos el color principal del objeto, y si reconoces la franquicia/personaje inclúyela también como tag.
