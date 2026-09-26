@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { backendFetch } from '@/lib/backend';
 import { sponsorAction, unsponsorAction } from './actions';
 import { AddPaymentDialog } from './add-payment-dialog';
+import { DeleteOrganizationDialog } from './delete-organization-dialog';
 import { EditOrganizationDialog } from './edit-organization-dialog';
 import { GrantFtDialog } from './grant-ft-dialog';
 
@@ -79,6 +80,7 @@ export default async function OrganizacionesPage() {
                 />
                 <AddPaymentDialog organizationId={org.id} organizationName={org.name} />
                 <GrantFtDialog organizationId={org.id} organizationName={org.name} />
+                <DeleteOrganizationDialog organizationId={org.id} organizationName={org.name} />
               </div>
             </div>
 

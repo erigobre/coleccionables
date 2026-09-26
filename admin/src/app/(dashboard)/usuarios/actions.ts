@@ -15,6 +15,33 @@ export async function reactivateUserAction(userId: string): Promise<void> {
   revalidatePath(`/usuarios/${userId}`);
 }
 
+export interface DeleteUserState {
+  error?: string;
+}
+
+// Borra el usuario y todo lo suyo en cascada (colecciones, objetos, ubicaciones,
+// wishlists, etc.) — pedido 2026-09-26, limpieza de cuentas demo. El backend
+// protege contra borrar una cuenta SUPERADMIN.
+export async function deleteUserAction(
+  userId: string,
+  _prevState: DeleteUserState,
+  formData: FormData,
+): Promise<DeleteUserState> {
+  const confirmEmail = String(formData.get('confirm') ?? '').trim();
+  if (!confirmEmail) {
+    return { error: 'Escribe el correo del usuario para confirmar' };
+  }
+
+  try {
+    await backendFetch(`/admin/users/${userId}`, { method: 'DELETE' });
+  } catch {
+    return { error: 'No se pudo eliminar el usuario' };
+  }
+
+  revalidatePath('/usuarios');
+  return {};
+}
+
 export interface EditUserState {
   error?: string;
 }

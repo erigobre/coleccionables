@@ -79,6 +79,32 @@ export async function grantFtAction(
   return {};
 }
 
+export interface DeleteOrganizationState {
+  error?: string;
+}
+
+// Borra la organización y todo lo suyo en cascada (pedido 2026-09-26, limpieza
+// de cuentas demo). El backend ya protege contra borrar una org con SUPERADMIN.
+export async function deleteOrganizationAction(
+  organizationId: string,
+  _prevState: DeleteOrganizationState,
+  formData: FormData,
+): Promise<DeleteOrganizationState> {
+  const confirmName = String(formData.get('confirm') ?? '').trim();
+  if (!confirmName) {
+    return { error: 'Escribe el nombre de la organización para confirmar' };
+  }
+
+  try {
+    await backendFetch(`/admin/organizations/${organizationId}`, { method: 'DELETE' });
+  } catch {
+    return { error: 'No se pudo eliminar la organización' };
+  }
+
+  revalidatePath('/organizaciones');
+  return {};
+}
+
 export interface EditOrganizationState {
   error?: string;
 }

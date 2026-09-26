@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -147,5 +147,17 @@ export class AdminController {
   @Post('organizations/:id/grant-ft')
   grantFt(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string, @Body() dto: GrantFtDto) {
     return this.adminService.grantFt(admin, id, dto);
+  }
+
+  // Borrado en cascada (organización completa, o un usuario y todo lo suyo) —
+  // pensado para limpiar cuentas demo/prueba (pedido 2026-09-26).
+  @Delete('organizations/:id')
+  deleteOrganization(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
+    return this.adminService.deleteOrganization(admin, id);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
+    return this.adminService.deleteUser(admin, id);
   }
 }

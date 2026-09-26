@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
@@ -431,6 +431,42 @@ export class AdminService {
       reason: dto.reason,
     });
     return transaction;
+  }
+
+  // Borrado en cascada para limpiar cuentas demo/prueba (pedido 2026-09-26).
+  // El propio esquema (onDelete: Cascade en User/Item/Collection/etc., colgados
+  // de Organization/User) hace que un solo `delete` arrastre todo lo que le
+  // pertenece a nivel de base de datos — no hace falta borrar tabla por tabla.
+  async deleteOrganization(admin: { id: string; email: string }, organizationId: string) {
+    const organization = await this.prisma.organization.findUnique({
+      where: { id: organizationId },
+      include: { users: { select: { id: true, role: true } } },
+    });
+    if (!organization) {
+      throw new NotFoundException('Organización no encontrada');
+    }
+    if (organization.users.some((u) => u.role === 'SUPERADMIN')) {
+      throw new BadRequestException('No se puede eliminar una organización con una cuenta SUPERADMIN');
+    }
+
+    await this.prisma.organization.delete({ where: { id: organizationId } });
+    await this.logAction(admin, 'organization.delete', 'Organization', organizationId, {
+      name: organization.name,
+      userCount: organization.users.length,
+    });
+  }
+
+  async deleteUser(admin: { id: string; email: string }, userId: string) {
+    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+    if (user.role === 'SUPERADMIN') {
+      throw new BadRequestException('No se puede eliminar una cuenta SUPERADMIN desde aquí');
+    }
+
+    await this.prisma.user.delete({ where: { id: userId } });
+    await this.logAction(admin, 'user.delete', 'User', userId, { email: user.email, name: user.name });
   }
 
   private async assertFtPackageExists(id: string) {

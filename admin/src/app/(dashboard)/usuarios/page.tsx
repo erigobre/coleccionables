@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { backendFetch } from '@/lib/backend';
 import { reactivateUserAction, suspendUserAction } from './actions';
+import { DeleteUserDialog } from './delete-user-dialog';
 
 interface AdminUser {
   id: string;
@@ -71,21 +72,24 @@ export default async function UsuariosPage({
                   <Badge variant={user.status === 'ACTIVE' ? 'default' : 'destructive'}>{user.status}</Badge>
                 </TableCell>
                 <TableCell className="text-right">
-                  {user.status === 'ACTIVE' ? (
-                    <form action={suspendUserAction.bind(null, user.id)}>
-                      <Button type="submit" variant="outline" size="sm">
-                        <Ban className="size-4" />
-                        Suspender
-                      </Button>
-                    </form>
-                  ) : (
-                    <form action={reactivateUserAction.bind(null, user.id)}>
-                      <Button type="submit" variant="outline" size="sm">
-                        <CircleCheck className="size-4" />
-                        Reactivar
-                      </Button>
-                    </form>
-                  )}
+                  <div className="flex items-center justify-end gap-2">
+                    {user.status === 'ACTIVE' ? (
+                      <form action={suspendUserAction.bind(null, user.id)}>
+                        <Button type="submit" variant="outline" size="sm">
+                          <Ban className="size-4" />
+                          Suspender
+                        </Button>
+                      </form>
+                    ) : (
+                      <form action={reactivateUserAction.bind(null, user.id)}>
+                        <Button type="submit" variant="outline" size="sm">
+                          <CircleCheck className="size-4" />
+                          Reactivar
+                        </Button>
+                      </form>
+                    )}
+                    {user.role !== 'SUPERADMIN' && <DeleteUserDialog userId={user.id} userEmail={user.email} />}
+                  </div>
                 </TableCell>
               </TableRow>
             ))}
