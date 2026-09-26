@@ -176,7 +176,13 @@ export default function NewItemScreen() {
         avatarUrl: draft?.avatarUrl,
       });
       const item = await createItem(accessToken, dto);
-      router.replace(`/(tabs)/objetos/${item.id}`);
+      // `new` vive fuera de los tabs (ver root _layout.tsx), así que un simple
+      // replace hacia una ruta anidada en (tabs) rompe el historial interno de
+      // Objetos y el "atrás" cae fuera de los tabs. dismissTo primero vuelve a
+      // la lista de Objetos tal cual estaba (con su filtro/búsqueda intactos)
+      // y luego se apila el detalle encima, así "atrás" regresa a esa lista.
+      router.dismissTo('/(tabs)/objetos');
+      router.push(`/(tabs)/objetos/${item.id}`);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
