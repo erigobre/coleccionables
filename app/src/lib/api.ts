@@ -108,6 +108,12 @@ function refreshAccessToken(): Promise<string | null> {
   return refreshPromise;
 }
 
+// Sin esto, fetch() en RN no tiene timeout: si el servidor o el proxy se
+// quedan colgados (ej. un lock de BD, un proxy que no cierra la conexión) la
+// pantalla se queda "pasmada" para siempre en vez de mostrar un error
+// (reportado 2026-09-26 con el overlay de "Analizando el objeto..." trabado).
+const REQUEST_TIMEOUT_MS = 60_000;
+
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const { method = 'GET', body, accessToken } = options;
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
@@ -119,7 +125,11 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
       'Idempotency-Key': idempotencyKey,
     };
     if (token) headers.Authorization = `Bearer ${token}`;
-    return fetch(`${API_BASE_URL}${path}`, { method, headers, body: serializedBody });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return fetch(`${API_BASE_URL}${path}`, { method, headers, body: serializedBody, signal: controller.signal }).finally(
+      () => clearTimeout(timeoutId),
+    );
   };
 
   const response = await request(accessToken);
