@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Activity,
   Building2,
+  Coins,
   CreditCard,
   LayoutDashboard,
   ShieldAlert,
@@ -18,6 +19,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/', label: 'Resumen', icon: LayoutDashboard },
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/organizaciones', label: 'Organizaciones', icon: Building2 },
+  { href: '/frikitokens', label: 'FrikiTokens', icon: Coins },
   { href: '/pagos', label: 'Pagos', icon: CreditCard },
   { href: '/moderacion', label: 'Moderación', icon: ShieldAlert },
   { href: '/actividad', label: 'Actividad', icon: Activity },

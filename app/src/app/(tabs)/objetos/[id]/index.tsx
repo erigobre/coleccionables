@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
 import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
-import { insufficientFtMessage, useFt } from '../../../../context/ft-context';
+import { useFt } from '../../../../context/ft-context';
 import { fetchActiveCollections, type Collection } from '../../../../lib/collections';
 import { conservationLabel, packagingLabel, usageLabel } from '../../../../lib/item-enums';
 import {
@@ -29,6 +29,7 @@ import {
 import { findOrCreateTag, type Tag } from '../../../../lib/tags';
 import { TagAutocomplete } from '../../../../components/items/TagAutocomplete';
 import { AIProcessingOverlay } from '../../../../components/ui/AIProcessingOverlay';
+import { NoFtModal } from '../../../../components/ui/NoFtModal';
 import { cancelTransfer, fetchOutgoingTransfers, type OutgoingTransfer } from '../../../../lib/transfers';
 import { useAiProcessing } from '../../../../lib/use-ai-processing';
 import { colors } from '../../../../theme/tokens';
@@ -70,6 +71,7 @@ export default function ItemDetailScreen() {
   const [item, setItem] = useState<Item | null | undefined>(undefined);
   const [collections, setCollections] = useState<Collection[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [noFtVisible, setNoFtVisible] = useState(false);
   const [marketPeek, setMarketPeek] = useState<MarketPricePeek | null>(null);
   const [marketPrice, setMarketPrice] = useState<MarketPriceResult | null>(null);
   const [marketPriceInfo, setMarketPriceInfo] = useState<{ fetchedAt: string; fromCache: boolean } | null>(null);
@@ -222,7 +224,11 @@ export default function ItemDetailScreen() {
       refreshFt();
       peekMarketPrice(accessToken, item.id).then(setMarketPeek).catch(() => {});
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
+      if (err instanceof ApiError && err.status === 402) {
+        setNoFtVisible(true);
+      } else {
+        setError(authErrorMessage(err));
+      }
     } finally {
       setLoadingMarketPrice(null);
     }
@@ -565,6 +571,7 @@ export default function ItemDetailScreen() {
         onHidden={marketPriceProcessing.onHidden}
         steps={MARKET_PRICE_STEPS}
       />
+      <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
     </View>
   );
 }

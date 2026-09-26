@@ -53,3 +53,17 @@ export function fetchFtTransactions(accessToken: string, take?: number) {
   const query = take ? `?take=${take}` : '';
   return apiFetch<FtTransaction[]>(`/ft/transactions${query}`, { accessToken });
 }
+
+export interface FtPackageOption {
+  code: string;
+  ftAmount: number;
+  priceMxnCents: number;
+  badge: string | null;
+}
+
+// Público (sin auth) — mismo endpoint que usa la landing (frikidex.com) para
+// pintar precios, así que el modal de "sin FrikiTokens" siempre muestra los
+// mismos paquetes/precios que el resto del proyecto.
+export function fetchFtPackages() {
+  return apiFetch<{ packages: FtPackageOption[] }>('/ft/packages').then((r) => r.packages);
+}

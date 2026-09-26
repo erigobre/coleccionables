@@ -48,6 +48,37 @@ export async function addPaymentAction(
   return {};
 }
 
+export interface GrantFtState {
+  error?: string;
+}
+
+// Regalo manual de FT sin pago (pedido 2026-09-25): queda registrado en el
+// backend como lote PROMO y en la bitácora de admin como asignación sponsor.
+export async function grantFtAction(
+  organizationId: string,
+  _prevState: GrantFtState,
+  formData: FormData,
+): Promise<GrantFtState> {
+  const amount = Number(formData.get('amount'));
+  const reason = String(formData.get('reason') ?? '').trim() || undefined;
+
+  if (!amount || amount <= 0) {
+    return { error: 'La cantidad de FT debe ser mayor a 0' };
+  }
+
+  try {
+    await backendFetch(`/admin/organizations/${organizationId}/grant-ft`, {
+      method: 'POST',
+      body: { amount, reason },
+    });
+  } catch {
+    return { error: 'No se pudo otorgar el regalo de FT' };
+  }
+
+  revalidatePath('/organizaciones');
+  return {};
+}
+
 export interface EditOrganizationState {
   error?: string;
 }

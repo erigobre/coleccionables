@@ -6,6 +6,7 @@ import { backendFetch } from '@/lib/backend';
 import { sponsorAction, unsponsorAction } from './actions';
 import { AddPaymentDialog } from './add-payment-dialog';
 import { EditOrganizationDialog } from './edit-organization-dialog';
+import { GrantFtDialog } from './grant-ft-dialog';
 
 interface Payment {
   id: string;
@@ -77,6 +78,7 @@ export default async function OrganizacionesPage() {
                   subscriptionStatus={org.subscriptionStatus}
                 />
                 <AddPaymentDialog organizationId={org.id} organizationName={org.name} />
+                <GrantFtDialog organizationId={org.id} organizationName={org.name} />
               </div>
             </div>
 

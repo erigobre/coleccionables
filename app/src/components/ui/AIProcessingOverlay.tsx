@@ -58,6 +58,17 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, done, steps.join('|')]);
 
+  // Si `visible` pasa a false sin que `done` haya llegado a true (p.ej. el
+  // request falló y use-ai-processing oculta el overlay de inmediato), se
+  // desmonta al instante sin esperar la animación de salida normal.
+  useEffect(() => {
+    if (visible || done) return;
+    setMounted(false);
+    intro.value = 0;
+    outro.value = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible, done]);
+
   // Al terminar: se congela el texto final un momento (para que se alcance a
   // leer) y luego corre el fade-out. El cierre se dispara con un setTimeout en
   // JS (no con el callback de withTiming vía scheduleOnRN): ese callback corre

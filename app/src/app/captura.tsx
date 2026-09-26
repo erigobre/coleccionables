@@ -7,6 +7,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
+import { NoFtModal } from '../components/ui/NoFtModal';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import { insufficientFtMessage, useFt } from '../context/ft-context';
 import { ApiError } from '../lib/api';
@@ -40,6 +41,7 @@ export default function CapturaScreen() {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<'analizar' | 'manual' | 'codigo' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [noFtVisible, setNoFtVisible] = useState(false);
   const analyzing = useAiProcessing();
 
   const goToForm = () => router.replace('/new');
@@ -125,7 +127,11 @@ export default function CapturaScreen() {
       });
       goToForm();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
+      if (err instanceof ApiError && err.status === 402) {
+        setNoFtVisible(true);
+      } else {
+        setError(authErrorMessage(err));
+      }
       setBusy(null);
     }
   };
@@ -234,6 +240,7 @@ export default function CapturaScreen() {
           onHidden={analyzing.onHidden}
           steps={ANALYZE_STEPS}
         />
+        <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>
     );
   }

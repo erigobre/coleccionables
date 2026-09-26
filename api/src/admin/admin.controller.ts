@@ -9,6 +9,9 @@ import { CreatePaymentDto } from './dto/create-payment.dto.js';
 import { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
+import { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.dto.js';
+import { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
+import { GrantFtDto } from './dto/grant-ft.dto.js';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -106,5 +109,43 @@ export class AdminController {
   @Patch('users/:id/reactivate')
   reactivateUser(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
     return this.adminService.setUserStatus(admin, id, 'ACTIVE');
+  }
+
+  // Catálogo de paquetes/planes de FT (mismo modelo que /ft/packages y
+  // /ft/plans, editable aquí sin deploy) — pedido 2026-09-25.
+  @Get('ft-packages')
+  findFtPackages() {
+    return this.adminService.findFtPackages();
+  }
+
+  @Post('ft-packages')
+  createFtPackage(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreateFtPackageDto) {
+    return this.adminService.createFtPackage(admin, dto);
+  }
+
+  @Patch('ft-packages/:id')
+  updateFtPackage(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateFtPackageDto) {
+    return this.adminService.updateFtPackage(admin, id, dto);
+  }
+
+  @Get('ft-plans')
+  findFtPlans() {
+    return this.adminService.findFtPlans();
+  }
+
+  @Post('ft-plans')
+  createFtPlan(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreateFtPlanDto) {
+    return this.adminService.createFtPlan(admin, dto);
+  }
+
+  @Patch('ft-plans/:id')
+  updateFtPlan(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateFtPlanDto) {
+    return this.adminService.updateFtPlan(admin, id, dto);
+  }
+
+  // Regalo manual de FT a una organización, sin pago (queda como sponsor).
+  @Post('organizations/:id/grant-ft')
+  grantFt(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string, @Body() dto: GrantFtDto) {
+    return this.adminService.grantFt(admin, id, dto);
   }
 }

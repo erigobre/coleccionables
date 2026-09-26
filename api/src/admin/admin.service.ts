@@ -1,17 +1,25 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { Prisma } from '@prisma/client';
+import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { FtService } from '../ft/ft.service.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
 import type { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
 import type { UpdateOrganizationDto } from './dto/update-organization.dto.js';
+import type { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.dto.js';
+import type { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
+import type { GrantFtDto } from './dto/grant-ft.dto.js';
 
 const ACTIVE_WINDOW_DAYS = 30;
 const TIMESERIES_MAX_MONTHS = 12;
 
 @Injectable()
 export class AdminService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly ftService: FtService,
+  ) {}
 
   // Bitácora de acciones del panel Superadmin (plan §5.6, pedido 2026-09-25).
   // Nunca debe tumbar la acción que audita si falla (ej. tabla recién migrada
@@ -318,6 +326,127 @@ export class AdminService {
     const updated = await this.prisma.user.update({ where: { id: userId }, data: { status } });
     await this.logAction(admin, status === 'SUSPENDED' ? 'user.suspend' : 'user.reactivate', 'User', userId);
     return updated;
+  }
+
+  // Catálogo de paquetes de compra de FT (FtPackage): mismo modelo que
+  // alimenta GET /ft/packages (landing + modal "sin FrikiTokens" de la app).
+  // Se listan todos (activos e inactivos) porque el panel también necesita
+  // poder reactivar uno viejo, a diferencia del endpoint público.
+  findFtPackages() {
+    return this.prisma.ftPackage.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createFtPackage(admin: { id: string; email: string }, dto: CreateFtPackageDto) {
+    const created = await this.prisma.ftPackage.create({
+      data: {
+        code: dto.code,
+        ftAmount: dto.ftAmount,
+        priceMxnCents: dto.priceMxnCents,
+        badge: dto.badge,
+        isActive: dto.isActive ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+        availableFrom: dto.availableFrom ? new Date(dto.availableFrom) : undefined,
+        availableUntil: dto.availableUntil ? new Date(dto.availableUntil) : undefined,
+      },
+    });
+    await this.logAction(admin, 'ftPackage.create', 'FtPackage', created.id, { ...dto });
+    return created;
+  }
+
+  async updateFtPackage(admin: { id: string; email: string }, id: string, dto: UpdateFtPackageDto) {
+    await this.assertFtPackageExists(id);
+    const updated = await this.prisma.ftPackage.update({
+      where: { id },
+      data: {
+        ftAmount: dto.ftAmount,
+        priceMxnCents: dto.priceMxnCents,
+        badge: dto.badge,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
+        availableFrom: dto.availableFrom ? new Date(dto.availableFrom) : undefined,
+        availableUntil: dto.availableUntil ? new Date(dto.availableUntil) : undefined,
+      },
+    });
+    await this.logAction(admin, 'ftPackage.update', 'FtPackage', id, { ...dto });
+    return updated;
+  }
+
+  // Planes de suscripción mensual de FT (FtPlan) — mismo modelo que alimenta
+  // GET /ft/plans.
+  findFtPlans() {
+    return this.prisma.ftPlan.findMany({ orderBy: { sortOrder: 'asc' } });
+  }
+
+  async createFtPlan(admin: { id: string; email: string }, dto: CreateFtPlanDto) {
+    const created = await this.prisma.ftPlan.create({
+      data: {
+        code: dto.code,
+        label: dto.label,
+        ftAmountMonthly: dto.ftAmountMonthly,
+        monthlyPriceMxnCents: dto.monthlyPriceMxnCents,
+        annualPriceMxnCents: dto.annualPriceMxnCents,
+        annualEnabled: dto.annualEnabled ?? false,
+        badge: dto.badge,
+        isActive: dto.isActive ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    await this.logAction(admin, 'ftPlan.create', 'FtPlan', created.id, { ...dto });
+    return created;
+  }
+
+  async updateFtPlan(admin: { id: string; email: string }, id: string, dto: UpdateFtPlanDto) {
+    await this.assertFtPlanExists(id);
+    const updated = await this.prisma.ftPlan.update({
+      where: { id },
+      data: {
+        label: dto.label,
+        ftAmountMonthly: dto.ftAmountMonthly,
+        monthlyPriceMxnCents: dto.monthlyPriceMxnCents,
+        annualPriceMxnCents: dto.annualPriceMxnCents,
+        annualEnabled: dto.annualEnabled,
+        badge: dto.badge,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
+      },
+    });
+    await this.logAction(admin, 'ftPlan.update', 'FtPlan', id, { ...dto });
+    return updated;
+  }
+
+  // Regalo manual de FT a una organización, sin pago real (plan pedido
+  // 2026-09-25): usa el mismo FtService.grant() que ya usa el regalo mensual
+  // automático, con fuente PROMO (ya prevista en el modelo para esto). Queda
+  // trazado en la bitácora de admin como una asignación tipo sponsor.
+  async grantFt(admin: { id: string; email: string }, organizationId: string, dto: GrantFtDto) {
+    await this.assertOrganizationExists(organizationId);
+    const transaction = await this.ftService.grant({
+      organizationId,
+      source: 'PROMO',
+      amount: dto.amount,
+      idempotencyKey: `admin-grant:${organizationId}:${randomUUID()}`,
+    });
+    await this.logAction(admin, 'ft.sponsorGrant', 'Organization', organizationId, {
+      amount: dto.amount,
+      reason: dto.reason,
+    });
+    return transaction;
+  }
+
+  private async assertFtPackageExists(id: string) {
+    const found = await this.prisma.ftPackage.findUnique({ where: { id } });
+    if (!found) {
+      throw new NotFoundException('Paquete de FT no encontrado');
+    }
+    return found;
+  }
+
+  private async assertFtPlanExists(id: string) {
+    const found = await this.prisma.ftPlan.findUnique({ where: { id } });
+    if (!found) {
+      throw new NotFoundException('Plan de FT no encontrado');
+    }
+    return found;
   }
 
   private async assertOrganizationExists(id: string) {

@@ -7,8 +7,9 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
+import { NoFtModal } from '../components/ui/NoFtModal';
 import { authErrorMessage, useAuth } from '../context/auth-context';
-import { insufficientFtMessage, useFt } from '../context/ft-context';
+import { useFt } from '../context/ft-context';
 import { ApiError, resolvePhotoUrl } from '../lib/api';
 import { setItemDraft } from '../lib/item-draft';
 import { itemFormFromExtracted } from '../lib/item-form';
@@ -95,6 +96,7 @@ export default function YaLoTengoScreen() {
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<'buscar' | 'coleccion' | 'wishlist' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [noFtVisible, setNoFtVisible] = useState(false);
   const [result, setResult] = useState<IdentifyResult | null>(null);
   const searching = useAiProcessing();
 
@@ -134,7 +136,11 @@ export default function YaLoTengoScreen() {
       setResult(await searching.run(() => identifyItemPhotos(accessToken, photos)));
       refreshFt();
     } catch (err) {
-      setError(err instanceof ApiError && err.status === 402 ? insufficientFtMessage(err.details) : authErrorMessage(err));
+      if (err instanceof ApiError && err.status === 402) {
+        setNoFtVisible(true);
+      } else {
+        setError(authErrorMessage(err));
+      }
     } finally {
       setBusy(null);
     }
@@ -328,6 +334,7 @@ export default function YaLoTengoScreen() {
           onHidden={searching.onHidden}
           steps={SEARCH_STEPS}
         />
+        <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>
     );
   }
