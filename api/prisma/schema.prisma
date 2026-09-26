@@ -427,7 +427,10 @@ model Location {
   owner    User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name     String
   parentId String?
-  parent   Location?  @relation("LocationTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  // Cascade (antes NoAction): sin esto, borrar un usuario con ubicaciones
+  // anidadas falla con FK constraint en MySQL (pedido 2026-09-26, bug
+  // encontrado al borrar una cuenta demo con sub-ubicaciones).
+  parent   Location?  @relation("LocationTree", fields: [parentId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   children Location[] @relation("LocationTree")
 
   isPermanentDefault Boolean  @default(false) // "Ubicación permanente" default del owner
