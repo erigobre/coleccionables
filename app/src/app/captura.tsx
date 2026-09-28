@@ -7,6 +7,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
+import { PhotoPreview } from '../components/ui/PhotoPreview';
 import { NoFtModal } from '../components/ui/NoFtModal';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import { insufficientFtMessage, useFt } from '../context/ft-context';
@@ -178,25 +179,7 @@ export default function CapturaScreen() {
     return (
       <View className="flex-1 bg-backgroundDeep" style={{ paddingTop: insets.top + 56 }}>
         <View className="flex-1 px-5">
-          <Image
-            source={{ uri: photos[photos.length - 1] }}
-            style={{ flex: 1, borderRadius: 16 }}
-            resizeMode="contain"
-          />
-          <ScrollView horizontal className="mt-3 max-h-20 flex-grow-0" showsHorizontalScrollIndicator={false}>
-            {photos.map((uri, index) => (
-              <View key={uri} className="mr-2 pt-1">
-                <Image source={{ uri }} style={{ width: 64, height: 64, borderRadius: 10 }} />
-                <Pressable
-                  onPress={() => setPhotos((prev) => prev.filter((_, i) => i !== index))}
-                  disabled={busy !== null}
-                  className="absolute -right-1 top-0 h-5 w-5 items-center justify-center rounded-full bg-danger"
-                >
-                  <Ionicons name="close" size={13} color={colors.primaryText} />
-                </Pressable>
-              </View>
-            ))}
-          </ScrollView>
+          <PhotoPreview photos={photos} setPhotos={setPhotos} disabled={busy !== null} />
           <Text className="mt-3 text-center text-sm text-textMuted">
             ¿Se ve bien iluminada y nítida? Si no, quítala y toma otra.
           </Text>

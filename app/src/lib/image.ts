@@ -26,6 +26,12 @@ export function compressPhotos(uris: string[]): Promise<CompressedPhoto[]> {
   return Promise.all(uris.map(compressPhoto));
 }
 
+// Gira la foto 90° en sentido horario (para corregirla desde el preview).
+export async function rotatePhoto(uri: string): Promise<string> {
+  const result = await manipulateAsync(uri, [{ rotate: 90 }], { format: SaveFormat.JPEG });
+  return result.uri;
+}
+
 // manipulateAsync ya decodifica el JPEG respetando el tag EXIF Orientation y
 // vuelve a codificar los píxeles ya derechos (por eso pasar por acá sin
 // ninguna transformación alcanza para "hornear" la orientación correcta).
