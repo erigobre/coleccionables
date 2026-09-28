@@ -555,8 +555,8 @@ export default function ItemDetailScreen() {
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
             <Button label="Compartir enlace" variant="ghost" onPress={onShare} loading={sharing} />
             <Button
-              label={item.saleStatus ? 'Administrar venta' : 'Objeto en venta'}
-              variant="secondary"
+              label={item.saleStatus ? 'Administrar venta' : 'Colocar en venta'}
+              variant="sale"
               onPress={() => setSaleVisible(true)}
             />
             <Pressable onPress={onUnshare} className="items-center py-2">
@@ -577,10 +577,10 @@ export default function ItemDetailScreen() {
             <Pressable
               onPress={() => setSaleVisible(true)}
               accessibilityLabel="Venta del objeto"
-              className="absolute h-14 w-14 items-center justify-center rounded-full bg-surfaceElevated shadow-lg"
+              className="absolute h-14 w-14 items-center justify-center rounded-full bg-sale shadow-lg"
               style={{ right: 20, bottom: insets.bottom + 232 }}
             >
-              <Ionicons name="cash-outline" size={26} color={colors.primary} />
+              <Ionicons name="cash-outline" size={26} color={colors.primaryText} />
             </Pressable>
           ) : null}
           <Pressable

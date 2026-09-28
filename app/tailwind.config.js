@@ -24,6 +24,8 @@ module.exports = {
         primaryText: '#16122B',
         secondary: '#6D4AFF',
         secondaryHover: '#4B2FD6',
+        sale: '#2DD4BF',
+        saleHover: '#5EEAD4',
         danger: '#FF6B57',
         dangerText: '#16122B',
         disabledBg: '#2E2752',

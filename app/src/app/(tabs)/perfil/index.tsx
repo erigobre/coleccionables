@@ -40,7 +40,19 @@ export default function PerfilScreen() {
         <View className="mb-3 h-20 w-20 items-center justify-center rounded-full bg-surfaceElevated">
           <Ionicons name="person" size={36} color={colors.secondary} />
         </View>
-        <Text className="font-body-bold text-lg text-text">{user?.username || user?.name}</Text>
+        {user?.username ? (
+          <View className="flex-row items-center">
+            <Text
+              className="mr-0.5 font-display text-2xl text-primary"
+              style={{ textShadowColor: 'rgba(198, 244, 50, 0.55)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 6 }}
+            >
+              @
+            </Text>
+            <Text className="font-body-bold text-lg uppercase text-text">{user.username}</Text>
+          </View>
+        ) : (
+          <Text className="font-body-bold text-lg text-text">{user?.name}</Text>
+        )}
         <Text className="text-sm text-textMuted">{user?.email}</Text>
       </View>
 

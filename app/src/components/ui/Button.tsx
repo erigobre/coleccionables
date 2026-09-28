@@ -7,7 +7,7 @@ interface ButtonProps {
   onPress: () => void;
   loading?: boolean;
   disabled?: boolean;
-  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'destructive' | 'sale';
   // Si se pasa (incluido 0), agrega la moneda dorada + "<n>FT" (FT en tamaño
   // reducido, tipo superíndice) al final del label.
   ftCost?: number | null;
@@ -18,6 +18,7 @@ const HEIGHT_CLASS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary: 'h-[52px]',
   secondary: 'h-[52px]',
   destructive: 'h-[52px]',
+  sale: 'h-[52px]',
   ghost: 'h-12',
 };
 
@@ -25,6 +26,7 @@ const VARIANT_CLASS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary: 'bg-primary active:bg-primaryHover',
   secondary: 'bg-secondary active:bg-secondaryHover',
   destructive: 'bg-danger',
+  sale: 'bg-sale active:bg-saleHover',
   ghost: 'border-2 border-primary bg-transparent active:bg-surfaceElevated',
 };
 
@@ -32,6 +34,7 @@ const TEXT_CLASS: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary: 'text-primaryText',
   secondary: 'text-white',
   destructive: 'text-primaryText',
+  sale: 'text-primaryText',
   ghost: 'text-primary',
 };
 
@@ -39,6 +42,7 @@ const SPINNER_COLOR: Record<NonNullable<ButtonProps['variant']>, string> = {
   primary: colors.primaryText,
   secondary: colors.white,
   destructive: colors.primaryText,
+  sale: colors.primaryText,
   ghost: colors.primary,
 };
 

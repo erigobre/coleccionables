@@ -27,6 +27,11 @@ export const colors = {
   secondary: '#6D4AFF', // Violeta Frikidex — marca, íconos, botones secundarios
   secondaryHover: '#4B2FD6',
 
+  // Turquesa — solo para la función "Objeto en venta" (botón y botón flotante $): fuera de la
+  // paleta principal, pero armoniza con Noche, violeta y lima.
+  sale: '#2DD4BF',
+  saleHover: '#5EEAD4',
+
   danger: '#FF6B57', // Coral — SOLO uso funcional: "¡Ya lo tienes!", duplicados, errores, destructivo
   dangerText: '#16122B',
 

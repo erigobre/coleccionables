@@ -147,19 +147,22 @@ export function SaleModal({
           <Ionicons name="pricetag" size={36} color={colors.primary} />
         </View>
         <Text className="text-center font-display text-lg uppercase text-primary">¡Objeto en venta!</Text>
-        <Text className="mb-4 mt-2 text-center text-sm text-textSecondary">
+        <Text className="mb-5 mt-2 text-center text-sm text-textSecondary">
           Tu objeto quedó marcado como &ldquo;en venta&rdquo; por {formatSalePrice({ salePrice: String(price ?? 0), currency: item.currency })}.
           Ya aparece en tu colección &ldquo;En Venta&rdquo;.
         </Text>
         {suggestMarketPrice ? (
-          <>
-            <Text className="mb-4 text-center text-sm text-textSecondary">
-              No has consultado su precio de mercado en los últimos 7 días. ¿Quieres verlo ahora para asegurarte de
-              ponerle un buen precio?
+          <View className="border-t border-border pt-5">
+            <Text className="text-center font-display text-lg uppercase text-primary">Sugerencia</Text>
+            <Text className="mt-2 text-center text-sm text-textSecondary">
+              No has consultado su precio de mercado en los últimos 7 días.
+            </Text>
+            <Text className="mb-4 mt-2 text-center text-sm font-bold text-text">
+              ¿Quieres verlo ahora para asegurarte de ponerle un buen precio?
             </Text>
             <View className="gap-3">
               <Button
-                label="Consultar precio de mercado"
+                label="Sí"
                 ftCost={marketPriceFtCost}
                 onPress={() => {
                   onClose();
@@ -168,7 +171,7 @@ export function SaleModal({
               />
               <Button label="Ahora no" variant="ghost" onPress={onClose} />
             </View>
-          </>
+          </View>
         ) : (
           <Button label="Listo" onPress={onClose} />
         )}
