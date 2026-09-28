@@ -155,7 +155,7 @@ export function SaleModal({
           <View className="border-t border-border pt-5">
             <Text className="text-center font-display text-lg uppercase text-primary">Sugerencia</Text>
             <Text className="mt-2 text-center text-sm text-textSecondary">
-              No has consultado su precio de mercado en los últimos 7 días.
+              No has consultado su precio actual de mercado.
             </Text>
             <Text className="mb-4 mt-2 text-center text-sm font-bold text-text">
               ¿Quieres verlo ahora para asegurarte de ponerle un buen precio?
