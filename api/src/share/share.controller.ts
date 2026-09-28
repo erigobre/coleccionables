@@ -33,7 +33,47 @@ export class ItemShareController {
   }
 }
 
-// Página pública, sin autenticación.
+// Enlace de una colección completa: solo su dueño lo crea, consulta o revoca.
+@Controller('collections/:id/share')
+@UseGuards(JwtAuthGuard)
+export class CollectionShareController {
+  constructor(private readonly shareService: ShareService) {}
+
+  @Get()
+  async status(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Req() req: Request) {
+    const { token } = await this.shareService.getCollectionLink(user.id, id);
+    return { shared: token !== null, url: token ? `${publicBaseUrl(req)}/c/${token}` : null };
+  }
+
+  @Post()
+  async share(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Req() req: Request) {
+    const { token } = await this.shareService.getOrCreateForCollection(user.id, id);
+    return { token, url: `${publicBaseUrl(req)}/c/${token}` };
+  }
+
+  @Delete()
+  @HttpCode(204)
+  async revoke(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    await this.shareService.revokeForCollection(user.id, id);
+  }
+}
+
+// Sin scripts ni recursos externos; las fotos salen del mismo origen.
+function sendHtml(res: Response, status: number, html: string) {
+  res
+    .status(status)
+    .set({
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy':
+        "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Cache-Control': 'no-store',
+    })
+    .send(html);
+}
+
+// Páginas públicas, sin autenticación.
 @Controller('s')
 export class PublicShareController {
   constructor(private readonly shareService: ShareService) {}
@@ -41,17 +81,28 @@ export class PublicShareController {
   @Get(':token')
   async view(@Param('token') token: string, @Req() req: Request, @Res() res: Response) {
     const { status, html } = await this.shareService.renderPublicPage(token, publicBaseUrl(req));
-    res
-      .status(status)
-      .set({
-        'Content-Type': 'text/html; charset=utf-8',
-        // Sin scripts ni recursos externos; las fotos salen del mismo origen.
-        'Content-Security-Policy':
-          "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
-        'X-Content-Type-Options': 'nosniff',
-        'Referrer-Policy': 'no-referrer',
-        'Cache-Control': 'no-store',
-      })
-      .send(html);
+    sendHtml(res, status, html);
+  }
+}
+
+@Controller('c')
+export class PublicCollectionShareController {
+  constructor(private readonly shareService: ShareService) {}
+
+  @Get(':token')
+  async grid(@Param('token') token: string, @Req() req: Request, @Res() res: Response) {
+    const { status, html } = await this.shareService.renderCollectionPage(token, publicBaseUrl(req));
+    sendHtml(res, status, html);
+  }
+
+  @Get(':token/:itemId')
+  async item(
+    @Param('token') token: string,
+    @Param('itemId') itemId: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const { status, html } = await this.shareService.renderCollectionItemPage(token, itemId, publicBaseUrl(req));
+    sendHtml(res, status, html);
   }
 }

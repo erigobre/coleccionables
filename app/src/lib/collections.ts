@@ -65,3 +65,44 @@ export function deleteCollection(accessToken: string, id: string, migrateToColle
     accessToken,
   });
 }
+
+export function fetchCollection(accessToken: string, id: string) {
+  return apiFetch<CollectionWithoutCount>(`/collections/${id}`, { accessToken });
+}
+
+// Reubica todos los objetos de la colección (mismos pasos que el cambio de ubicación
+// de un objeto: destino → indefinido/temporal → temporada). Los objetos en
+// transferencia se saltan y se reportan aparte.
+export function moveCollectionLocation(
+  accessToken: string,
+  id: string,
+  dto: { locationId: string; assignment: 'INDEFINIDO' | 'TEMPORAL'; seasonId?: string },
+) {
+  return apiFetch<{ updated: number; skippedInTransfer: number }>(`/collections/${id}/location`, {
+    method: 'PATCH',
+    body: dto,
+    accessToken,
+  });
+}
+
+// Regresa a su ubicación permanente todos los objetos de la colección que estén fuera de ella.
+export function returnCollectionToPermanentLocation(accessToken: string, id: string) {
+  return apiFetch<{ returned: number }>(`/collections/${id}/return-to-permanent-location`, {
+    method: 'PATCH',
+    accessToken,
+  });
+}
+
+// Enlace público con cuadrícula de la colección. Es idempotente: compartir dos
+// veces devuelve la misma URL.
+export function shareCollection(accessToken: string, id: string) {
+  return apiFetch<{ token: string; url: string }>(`/collections/${id}/share`, { method: 'POST', accessToken });
+}
+
+export function unshareCollection(accessToken: string, id: string) {
+  return apiFetch<void>(`/collections/${id}/share`, { method: 'DELETE', accessToken });
+}
+
+export function fetchCollectionShare(accessToken: string, id: string) {
+  return apiFetch<{ shared: boolean; url: string | null }>(`/collections/${id}/share`, { accessToken });
+}

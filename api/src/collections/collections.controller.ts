@@ -6,11 +6,16 @@ import { CollectionsService } from './collections.service.js';
 import { CreateCollectionDto } from './dto/create-collection.dto.js';
 import { UpdateCollectionDto } from './dto/update-collection.dto.js';
 import { RemoveCollectionDto } from './dto/remove-collection.dto.js';
+import { MoveCollectionDto } from './dto/move-collection.dto.js';
+import { CollectionLocationService } from './collection-location.service.js';
 
 @Controller('collections')
 @UseGuards(JwtAuthGuard)
 export class CollectionsController {
-  constructor(private readonly collectionsService: CollectionsService) {}
+  constructor(
+    private readonly collectionsService: CollectionsService,
+    private readonly locationService: CollectionLocationService,
+  ) {}
 
   @Post()
   create(@CurrentUser() user: AuthenticatedUser, @Body() dto: CreateCollectionDto) {
@@ -49,6 +54,21 @@ export class CollectionsController {
   @Patch(':id/activate')
   activate(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.collectionsService.setSuspended(user.id, id, false);
+  }
+
+  // Reubica todos los objetos de la colección (indefinido o temporal por temporada).
+  @Patch(':id/location')
+  moveAll(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: MoveCollectionDto,
+  ) {
+    return this.locationService.moveAll(user.id, id, dto);
+  }
+
+  @Patch(':id/return-to-permanent-location')
+  returnAll(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.locationService.returnAll(user.id, id);
   }
 
   @Delete(':id')

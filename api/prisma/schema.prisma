@@ -500,6 +500,7 @@ model Collection {
 
   members   CollectionMember[]
   itemLinks ItemCollection[]
+  shareLink CollectionShareLink?
 
   @@map("collections")
 }
@@ -728,6 +729,17 @@ model ShareLink {
   createdAt DateTime @default(now())
 
   @@map("share_links")
+}
+
+// Enlace público de una colección completa: cuadrícula de objetos, sin la app instalada.
+model CollectionShareLink {
+  id           String     @id @default(cuid())
+  collectionId String     @unique
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  token        String     @unique @default(cuid())
+  createdAt    DateTime   @default(now())
+
+  @@map("collection_share_links")
 }
 
 // ---------------------------------------------------------------------------

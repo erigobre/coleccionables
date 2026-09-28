@@ -93,6 +93,16 @@ export interface Item {
   currentSeason: ItemSeasonRef | null;
 }
 
+// Un objeto está "fuera de su lugar" si su ubicación actual no es la permanente o
+// está ligado a una temporada. Mismo criterio que el backend (regreso en bloque de una colección).
+export function isAwayFromPermanent(item: Item): boolean {
+  return (
+    item.status === 'ACTIVE' &&
+    item.permanentLocationId !== null &&
+    (item.currentLocationId !== item.permanentLocationId || item.locationAssignment === 'TEMPORAL')
+  );
+}
+
 export interface CreateItemDto {
   name: string;
   category: ItemCategory;

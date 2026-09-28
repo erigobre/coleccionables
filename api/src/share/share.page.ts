@@ -82,6 +82,21 @@ function safePhotos(urls: string[]): string[] {
   return urls.filter((u) => /^\/uploads\/[\w.-]+$/.test(u));
 }
 
+export interface SharedCollectionTile {
+  id: string;
+  name: string;
+  photoUrl: string | null;
+  saleStatus: 'FOR_SALE' | 'RESERVED' | 'SOLD' | null;
+  salePrice: number | null;
+  currency: string;
+}
+
+export interface SharedCollectionView {
+  name: string;
+  ownerUsername: string | null;
+  tiles: SharedCollectionTile[];
+}
+
 const STYLES = `
   :root{color-scheme:dark}
   *{box-sizing:border-box}
@@ -108,13 +123,27 @@ const STYLES = `
   .brand-word{font-weight:800;font-size:19px;letter-spacing:.02em;color:#F4EFE2}
   .brand-word b{color:#C6F432;font-weight:800}
   .slogan{font-weight:500;font-size:9px;letter-spacing:.13em;color:#8B84A8;text-transform:uppercase}
+  main.wide{max-width:640px}
+  .col-head{padding:22px 20px 16px;text-align:center}
+  .col-head h1{font-size:24px}
+  .col-head p{margin:0;color:#8B84A8;font-size:14px}
+  .col-head p b{color:#C6F432;font-weight:700}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:2px}
+  .tile{position:relative;display:block;aspect-ratio:1/1;background:#0F0C20;overflow:hidden}
+  .tile img{width:100%;height:100%;object-fit:cover;display:block}
+  .tile .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8B84A8;font-size:34px}
+  .tile .tag{position:absolute;left:0;right:0;bottom:0;padding:3px 6px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;display:flex;justify-content:space-between;gap:6px}
+  .tile .tag-FOR_SALE{background:#C6F432;color:#16122B}
+  .tile .tag-RESERVED{background:#F5A524;color:#16122B}
+  .tile .tag-SOLD{background:#3B3560;color:#F4EFE2}
+  .back{display:inline-block;margin:16px 20px 0;color:#C6F432;font-size:14px;font-weight:700;text-decoration:none}
   footer{margin-top:34px;padding:24px 20px 40px;text-align:center;color:#8B84A8;font-size:13px}
   footer .brand-link{margin-bottom:16px}
   footer a{color:#8B84A8;text-decoration:underline}
 `;
 
 // La CSP del controlador ya bloquea scripts y recursos externos; el estilo va inline.
-function layout(title: string, head: string, content: string): string {
+function layout(title: string, head: string, content: string, wide = false): string {
   return `<!doctype html>
 <html lang="es">
 <head>
@@ -127,7 +156,7 @@ ${head}
 </head>
 <body>
 <header class="top">${brandLockup(48, false)}</header>
-<main>
+<main${wide ? ' class="wide"' : ''}>
 ${content}
 <footer>
 ${brandLockup(36)}
@@ -139,7 +168,12 @@ ${brandLockup(36)}
 </html>`;
 }
 
-export function renderSharedItemPage(item: SharedItemView, pageUrl: string, baseUrl: string): string {
+export function renderSharedItemPage(
+  item: SharedItemView,
+  pageUrl: string,
+  baseUrl: string,
+  backLink?: { url: string; label: string },
+): string {
   const photos = safePhotos(item.photoUrls);
 
   const rows: [string, string | null][] = [
@@ -183,7 +217,9 @@ export function renderSharedItemPage(item: SharedItemView, pageUrl: string, base
       }</div>`
     : '';
 
-  const content = `${saleBanner}${gallery}
+  const back = backLink ? `<a class="back" href="${esc(backLink.url)}">${esc(backLink.label)}</a>` : '';
+
+  const content = `${back}${saleBanner}${gallery}
 <div class="body">
 <h1>${esc(item.name)}</h1>
 <span class="badge">${esc(LABELS.status[item.status] ?? '')}</span>
@@ -195,13 +231,66 @@ ${details}
   return layout(`${item.name} · Frikidex`, head, content);
 }
 
-export function renderNotAvailablePage(): string {
+const SALE_TAG_LABELS = { FOR_SALE: 'En venta', RESERVED: 'Apartado', SOLD: 'Vendido' } as const;
+
+// Cuadrícula tipo Instagram: 3 columnas de fotos cuadradas; cada una abre el objeto
+// dentro del mismo enlace de la colección (`basePath/<id>`).
+export function renderSharedCollectionPage(
+  collection: SharedCollectionView,
+  pageUrl: string,
+  baseUrl: string,
+  basePath: string,
+): string {
+  const tiles = collection.tiles
+    .map((tile) => {
+      const photo = tile.photoUrl && safePhotos([tile.photoUrl])[0];
+      const image = photo
+        ? `<img src="${esc(photo)}" alt="${esc(tile.name)}" loading="lazy">`
+        : `<span class="ph">📦</span>`;
+      const tag = tile.saleStatus
+        ? `<span class="tag tag-${tile.saleStatus}"><span>${SALE_TAG_LABELS[tile.saleStatus]}</span>${
+            tile.salePrice !== null
+              ? `<span>$${esc(tile.salePrice.toLocaleString('es-MX', { maximumFractionDigits: 2 }))}</span>`
+              : ''
+          }</span>`
+        : '';
+      return `<a class="tile" href="${esc(`${basePath}/${tile.id}`)}" title="${esc(tile.name)}">${image}${tag}</a>`;
+    })
+    .join('');
+
+  const count = collection.tiles.length;
+  const owner = collection.ownerUsername ? `por <b>@${esc(collection.ownerUsername)}</b> · ` : '';
+  const firstPhoto = collection.tiles.map((t) => t.photoUrl).find((u): u is string => !!u && safePhotos([u]).length > 0);
+  const head = [
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:title" content="${esc(collection.name)}">`,
+    `<meta property="og:description" content="${esc(`${count === 1 ? '1 objeto' : `${count} objetos`} en Frikidex`)}">`,
+    `<meta property="og:url" content="${esc(pageUrl)}">`,
+    firstPhoto ? `<meta property="og:image" content="${esc(baseUrl + firstPhoto)}">` : '',
+  ].join('\n');
+
+  const content = `<div class="col-head">
+<h1>${esc(collection.name)}</h1>
+<p>${owner}${count === 1 ? '1 objeto' : `${count} objetos`}</p>
+</div>
+${count ? `<div class="grid">
+${tiles}
+</div>` : `<p style="text-align:center;color:#8B84A8;padding:40px 20px">Esta colección todavía no tiene objetos.</p>`}`;
+
+  return layout(`${collection.name} · Frikidex`, head, content, true);
+}
+
+export function renderNotAvailablePage(kind: 'item' | 'collection' = 'item'): string {
   return layout(
     'Enlace no disponible · Frikidex',
     '',
     `<div class="body" style="padding-top:80px;text-align:center">
 <h1>Este enlace ya no está disponible</h1>
-<p style="color:#8B84A8">El dueño dejó de compartir este objeto o ya no forma parte de su colección.</p>
+<p style="color:#8B84A8">${
+      kind === 'collection'
+        ? 'El dueño dejó de compartir esta colección o ya no está disponible.'
+        : 'El dueño dejó de compartir este objeto o ya no forma parte de su colección.'
+    }</p>
 </div>`,
   );
 }

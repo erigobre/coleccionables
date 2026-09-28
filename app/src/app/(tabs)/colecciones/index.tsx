@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Screen } from '../../../components/ui/Screen';
@@ -10,9 +10,9 @@ import { collectionIconName } from '../../../lib/collection-icons';
 import { fetchActiveCollections, type Collection } from '../../../lib/collections';
 import { colors } from '../../../theme/tokens';
 
-function CollectionCard({ collection }: { collection: Collection }) {
+function CollectionCard({ collection, onOpen }: { collection: Collection; onOpen: () => void }) {
   return (
-    <View className="mb-4 w-[48%] rounded-xl bg-surface p-4">
+    <Pressable onPress={onOpen} className="mb-4 w-[48%] rounded-xl bg-surface p-4 active:opacity-80">
       <View className="mb-3 h-12 w-12 items-center justify-center rounded-full bg-secondary">
         <Ionicons name={collectionIconName(collection.icon)} size={22} color={colors.white} />
       </View>
@@ -22,7 +22,7 @@ function CollectionCard({ collection }: { collection: Collection }) {
       <Text className="mt-1 text-xs text-textMuted">
         {collection.itemCount === 1 ? '1 objeto' : `${collection.itemCount} objetos`}
       </Text>
-    </View>
+    </Pressable>
   );
 }
 
@@ -81,7 +81,11 @@ export default function ColeccionesScreen() {
       ) : (
         <View className="mb-6 flex-row flex-wrap justify-between">
           {collections.map((collection) => (
-            <CollectionCard key={collection.id} collection={collection} />
+            <CollectionCard
+              key={collection.id}
+              collection={collection}
+              onOpen={() => router.push(`/(tabs)/colecciones/${collection.id}`)}
+            />
           ))}
         </View>
       )}
