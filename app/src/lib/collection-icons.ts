@@ -26,8 +26,11 @@ export const COLLECTION_ICON_CHOICES: IconName[] = [
   'camera-outline',
 ];
 
+// Íconos que solo usan las colecciones del sistema (no se pueden elegir a mano).
+const SYSTEM_ICONS: IconName[] = ['pricetag-outline'];
+
 export function collectionIconName(icon: string | null): IconName {
-  if (icon && (COLLECTION_ICON_CHOICES as string[]).includes(icon)) {
+  if (icon && ([...COLLECTION_ICON_CHOICES, ...SYSTEM_ICONS] as string[]).includes(icon)) {
     return icon as IconName;
   }
   return DEFAULT_COLLECTION_ICON;

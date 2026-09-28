@@ -36,7 +36,7 @@ export class ShareService {
     await this.prisma.shareLink.deleteMany({ where: { itemId } });
   }
 
-  // Perfil simplificado (plan §5.3.4): nada de precio, notas, ubicación, lugar de
+  // Perfil simplificado (plan §5.3.4): nada de precio de compra, notas, ubicación, lugar de
   // compra ni datos del dueño.
   async renderPublicPage(token: string, baseUrl: string): Promise<{ status: number; html: string }> {
     const link = await this.prisma.shareLink.findUnique({
@@ -56,6 +56,9 @@ export class ShareService {
             scale: true,
             designer: true,
             releaseYear: true,
+            saleStatus: true,
+            salePrice: true,
+            currency: true,
             photos: { orderBy: { order: 'asc' }, select: { url: true } },
           },
         },
@@ -66,7 +69,13 @@ export class ShareService {
       return { status: 404, html: renderNotAvailablePage() };
     }
 
-    const view: SharedItemView = { ...link.item, photoUrls: link.item.photos.map((p) => p.url) };
+    // Precio de venta: solo con "en venta" o "apartado"; vendido nunca lo muestra.
+    const showPrice = link.item.saleStatus !== 'SOLD' && link.item.salePrice !== null;
+    const view: SharedItemView = {
+      ...link.item,
+      salePrice: showPrice ? Number(link.item.salePrice) : null,
+      photoUrls: link.item.photos.map((p) => p.url),
+    };
     return { status: 200, html: renderSharedItemPage(view, `${baseUrl}/s/${link.token}`, baseUrl) };
   }
 }

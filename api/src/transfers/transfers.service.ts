@@ -71,7 +71,7 @@ export class TransfersService {
       include: { photos: true },
     });
 
-    return this.prisma.$transaction(async (tx) => {
+    const newItem = await this.prisma.$transaction(async (tx) => {
       await tx.transfer.update({
         where: { id: transfer.id },
         data: { status: 'ACCEPTED', respondedAt: new Date() },
@@ -116,6 +116,10 @@ export class TransfersService {
 
       return newItem;
     });
+
+    // El original ya no es del vendedor: sale de su colección automática "En Venta".
+    await this.collectionsService.removeFromSaleCollection(originalItem.ownerId, originalItem.id);
+    return newItem;
   }
 
   async reject(toUserId: string, transferId: string) {

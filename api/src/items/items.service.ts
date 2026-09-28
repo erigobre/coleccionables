@@ -9,6 +9,7 @@ import { FtService } from '../ft/ft.service.js';
 import type { ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
 import type { CreateItemDto } from './dto/create-item.dto.js';
 import type { UpdateItemDto } from './dto/update-item.dto.js';
+import type { SetSaleDto } from './dto/set-sale.dto.js';
 import { ChangeLocationDto, LocationChangeDestination, LocationChangeAssignment } from './dto/change-location.dto.js';
 import type { MatchItemDto } from './dto/match-item.dto.js';
 import {
@@ -149,6 +150,39 @@ export class ItemsService {
       throw new BadRequestException('No se puede eliminar un objeto vendido o en transferencia');
     }
     await this.prisma.item.delete({ where: { id } });
+    await this.collectionsService.refreshSaleCollectionStatus(ownerId);
+  }
+
+  // "Objeto en venta": pone/actualiza el precio, o cambia entre en venta, apartado
+  // y vendido. Mientras esté en venta o apartado pertenece a la colección
+  // automática "En Venta"; al marcarlo vendido sale de ella (falta transferirlo).
+  async setSale(ownerId: string, id: string, dto: SetSaleDto) {
+    const item = await this.assertEditableItem(ownerId, id);
+
+    if (dto.status !== 'SOLD' && dto.price === undefined && item.salePrice === null) {
+      throw new BadRequestException('Indica el precio al que quieres vender este objeto');
+    }
+
+    const updated = await this.prisma.item.update({
+      where: { id },
+      data: { saleStatus: dto.status, salePrice: dto.price },
+      include: ITEM_INCLUDE,
+    });
+
+    if (dto.status === 'SOLD') {
+      await this.collectionsService.removeFromSaleCollection(ownerId, id);
+    } else {
+      await this.collectionsService.addToSaleCollection(ownerId, id);
+    }
+    return this.prisma.item.findUniqueOrThrow({ where: { id: updated.id }, include: ITEM_INCLUDE });
+  }
+
+  // Saca el objeto del sistema de ventas (precio incluido).
+  async clearSale(ownerId: string, id: string) {
+    await this.assertEditableItem(ownerId, id);
+    await this.prisma.item.update({ where: { id }, data: { saleStatus: null, salePrice: null } });
+    await this.collectionsService.removeFromSaleCollection(ownerId, id);
+    return this.prisma.item.findUniqueOrThrow({ where: { id }, include: ITEM_INCLUDE });
   }
 
   async toggleFavorite(ownerId: string, id: string) {
@@ -202,6 +236,7 @@ export class ItemsService {
 
   async removeFromCollection(ownerId: string, id: string, collectionId: string) {
     await this.assertEditableItem(ownerId, id);
+    await this.collectionsService.assertCanRemoveItems(ownerId, collectionId);
     await this.prisma.itemCollection.deleteMany({ where: { itemId: id, collectionId } });
   }
 

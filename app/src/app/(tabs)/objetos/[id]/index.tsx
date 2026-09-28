@@ -27,6 +27,7 @@ import {
   type MarketPriceResult,
 } from '../../../../lib/items';
 import { findOrCreateTag, type Tag } from '../../../../lib/tags';
+import { formatSalePrice, SaleModal } from '../../../../components/items/SaleModal';
 import { TagAutocomplete } from '../../../../components/items/TagAutocomplete';
 import { AIProcessingOverlay } from '../../../../components/ui/AIProcessingOverlay';
 import { NoFtModal } from '../../../../components/ui/NoFtModal';
@@ -77,6 +78,7 @@ export default function ItemDetailScreen() {
   const [marketPriceInfo, setMarketPriceInfo] = useState<{ fetchedAt: string; fromCache: boolean } | null>(null);
   const [loadingMarketPrice, setLoadingMarketPrice] = useState<'cached' | 'fresh' | null>(null);
   const [applyingNotes, setApplyingNotes] = useState(false);
+  const [saleVisible, setSaleVisible] = useState(false);
   const marketPriceProcessing = useAiProcessing();
 
   const load = useCallback(async () => {
@@ -109,6 +111,11 @@ export default function ItemDetailScreen() {
   );
 
   const editable = item?.status === 'ACTIVE';
+
+  // Sugerir consultar el precio de mercado solo si no se ha hecho en los últimos 7 días.
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const suggestMarketPrice =
+    !item?.lastMarketPriceAt || Date.now() - new Date(item.lastMarketPriceAt).getTime() > SEVEN_DAYS_MS;
 
   const onToggleFavorite = async () => {
     if (!accessToken || !item) return;
@@ -350,6 +357,18 @@ export default function ItemDetailScreen() {
             <Text className="text-xs text-dangerText">{statusLabel}</Text>
           </View>
         ) : null}
+        {item.saleStatus ? (
+          <Pressable
+            onPress={() => editable && setSaleVisible(true)}
+            className="mt-2 flex-row items-center gap-1.5 self-start rounded-full bg-secondary px-3 py-1"
+          >
+            <Ionicons name="pricetag" size={12} color={colors.white} />
+            <Text className="text-xs font-medium uppercase text-white">
+              {item.saleStatus === 'FOR_SALE' ? 'En venta' : item.saleStatus === 'RESERVED' ? 'Apartado' : 'Vendido'}
+              {item.saleStatus !== 'SOLD' && formatSalePrice(item) ? ` · ${formatSalePrice(item)}` : ''}
+            </Text>
+          </Pressable>
+        ) : null}
 
         <View className="my-5 rounded-lg border border-border bg-surface p-4">
           {item.locationAssignment === 'TEMPORAL' ? (
@@ -383,7 +402,7 @@ export default function ItemDetailScreen() {
               <Pressable
                 key={collection.id}
                 onPress={() => onToggleCollection(collection.id)}
-                disabled={!editable}
+                disabled={!editable || collection.isSystem}
                 className={`rounded-full border px-3 py-2 ${isLinked ? 'border-primary bg-surfaceElevated' : 'border-border bg-surfaceElevated'}`}
               >
                 <Text className={`text-sm ${isLinked ? 'text-primary' : 'text-textMuted'}`}>{collection.name}</Text>
@@ -535,6 +554,11 @@ export default function ItemDetailScreen() {
           <View className="gap-3">
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
             <Button label="Compartir enlace" variant="ghost" onPress={onShare} loading={sharing} />
+            <Button
+              label={item.saleStatus ? 'Administrar venta' : 'Objeto en venta'}
+              variant="secondary"
+              onPress={() => setSaleVisible(true)}
+            />
             <Pressable onPress={onUnshare} className="items-center py-2">
               <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
             </Pressable>
@@ -549,6 +573,16 @@ export default function ItemDetailScreen() {
 
       {editable ? (
         <>
+          {item.saleStatus ? (
+            <Pressable
+              onPress={() => setSaleVisible(true)}
+              accessibilityLabel="Venta del objeto"
+              className="absolute h-14 w-14 items-center justify-center rounded-full bg-surfaceElevated shadow-lg"
+              style={{ right: 20, bottom: insets.bottom + 232 }}
+            >
+              <Ionicons name="cash-outline" size={26} color={colors.primary} />
+            </Pressable>
+          ) : null}
           <Pressable
             onPress={() => router.push(`/(tabs)/objetos/${item.id}/vender`)}
             className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
@@ -572,6 +606,21 @@ export default function ItemDetailScreen() {
         steps={MARKET_PRICE_STEPS}
       />
       <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
+      {accessToken ? (
+        <SaleModal
+          visible={saleVisible}
+          item={item}
+          accessToken={accessToken}
+          suggestMarketPrice={suggestMarketPrice}
+          marketPriceFtCost={marketPeek?.fresh.ftCost}
+          onClose={() => setSaleVisible(false)}
+          onChanged={load}
+          // El modal se está cerrando: en iOS navegar/mostrar otra capa justo
+          // en ese momento se ignora, así que se espera a que termine.
+          onLookupMarketPrice={() => setTimeout(() => onLookupMarketPrice('fresh'), 400)}
+          onTransfer={() => setTimeout(() => router.push(`/(tabs)/objetos/${item.id}/vender`), 400)}
+        />
+      ) : null}
     </View>
   );
 }

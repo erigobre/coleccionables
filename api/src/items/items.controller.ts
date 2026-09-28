@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import { IdempotencyKey } from '../common/decorators/idempotency-key.decorator.js';
@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../auth/auth.types.js';
 import { ItemsService } from './items.service.js';
 import { CreateItemDto } from './dto/create-item.dto.js';
 import { UpdateItemDto } from './dto/update-item.dto.js';
+import { SetSaleDto } from './dto/set-sale.dto.js';
 import { ChangeLocationDto } from './dto/change-location.dto.js';
 import { MatchItemDto } from './dto/match-item.dto.js';
 import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
@@ -102,6 +103,16 @@ export class ItemsController {
   @Delete(':id')
   remove(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.itemsService.remove(user.id, id);
+  }
+
+  @Put(':id/sale')
+  setSale(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string, @Body() dto: SetSaleDto) {
+    return this.itemsService.setSale(user.id, id, dto);
+  }
+
+  @Delete(':id/sale')
+  clearSale(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.itemsService.clearSale(user.id, id);
   }
 
   @Patch(':id/favorite')

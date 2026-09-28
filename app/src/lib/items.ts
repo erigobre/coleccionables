@@ -40,6 +40,8 @@ export interface ItemCollectionRef {
   collection: Collection;
 }
 
+export type SaleStatus = 'FOR_SALE' | 'RESERVED' | 'SOLD';
+
 export interface Item {
   id: string;
   ownerId: string;
@@ -78,6 +80,9 @@ export interface Item {
   currentSeasonId: string | null;
   returnedFromSeason: boolean;
   avatarUrl: string | null;
+  saleStatus: SaleStatus | null;
+  salePrice: string | null;
+  lastMarketPriceAt: string | null;
   createdAt: string;
   updatedAt: string;
   photos: ItemPhoto[];
@@ -316,6 +321,17 @@ export function addItemPhotos(accessToken: string, id: string, urls: string[]) {
 
 export function removeItemPhoto(accessToken: string, id: string, photoId: string) {
   return apiFetch<void>(`/items/${id}/photos/${photoId}`, { method: 'DELETE', accessToken });
+}
+
+// "Objeto en venta": pone o actualiza el precio y/o cambia el estado
+// (en venta / apartado / vendido). El backend administra la colección "En Venta".
+export function setItemSale(accessToken: string, id: string, dto: { status: SaleStatus; price?: number }) {
+  return apiFetch<Item>(`/items/${id}/sale`, { method: 'PUT', body: dto, accessToken });
+}
+
+// Saca el objeto del sistema de ventas.
+export function clearItemSale(accessToken: string, id: string) {
+  return apiFetch<Item>(`/items/${id}/sale`, { method: 'DELETE', accessToken });
 }
 
 // Enlace público (página web simple, sin la app). Es idempotente: compartir dos

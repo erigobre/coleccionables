@@ -15,6 +15,9 @@ export interface SharedItemView {
   scale: string | null;
   designer: string | null;
   releaseYear: number | null;
+  saleStatus: 'FOR_SALE' | 'RESERVED' | 'SOLD' | null;
+  salePrice: number | null; // ya viene en null cuando está vendido
+  currency: string;
   photoUrls: string[];
 }
 
@@ -87,6 +90,11 @@ const STYLES = `
   .gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;background:#0F0C20}
   .gallery img{flex:0 0 100%;width:100%;aspect-ratio:1/1;object-fit:contain;scroll-snap-align:center}
   .empty{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;background:#0F0C20;color:#8B84A8;font-size:56px}
+  .sale{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 20px;font-weight:800;font-size:14px;letter-spacing:.06em;text-transform:uppercase}
+  .sale .price{font-size:18px;letter-spacing:0}
+  .sale-FOR_SALE{background:#C6F432;color:#16122B}
+  .sale-RESERVED{background:#F5A524;color:#16122B}
+  .sale-SOLD{background:#3B3560;color:#F4EFE2}
   .body{padding:22px 20px}
   h1{margin:0 0 6px;font-size:26px;line-height:1.2}
   .badge{display:inline-block;padding:3px 10px;border-radius:999px;background:#C6F432;color:#16122B;font-size:12px;font-weight:700}
@@ -166,7 +174,16 @@ export function renderSharedItemPage(item: SharedItemView, pageUrl: string, base
     photos[0] ? `<meta property="og:image" content="${esc(baseUrl + photos[0])}">` : '',
   ].join('\n');
 
-  const content = `${gallery}
+  const SALE_LABELS = { FOR_SALE: 'En venta', RESERVED: 'Apartado', SOLD: 'Vendido' } as const;
+  const saleBanner = item.saleStatus
+    ? `<div class="sale sale-${item.saleStatus}"><span>${SALE_LABELS[item.saleStatus]}</span>${
+        item.salePrice !== null
+          ? `<span class="price">$${esc(item.salePrice.toLocaleString('es-MX', { maximumFractionDigits: 2 }))} ${esc(item.currency)}</span>`
+          : ''
+      }</div>`
+    : '';
+
+  const content = `${saleBanner}${gallery}
 <div class="body">
 <h1>${esc(item.name)}</h1>
 <span class="badge">${esc(LABELS.status[item.status] ?? '')}</span>

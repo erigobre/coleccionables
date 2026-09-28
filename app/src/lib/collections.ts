@@ -7,6 +7,7 @@ export interface Collection {
   icon: string | null;
   status: 'ACTIVE' | 'SUSPENDED';
   isDefault: boolean;
+  isSystem: boolean; // "En Venta": la administra el sistema
   itemCount: number;
   createdAt: string;
   updatedAt: string;

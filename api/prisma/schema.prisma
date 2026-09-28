@@ -494,6 +494,7 @@ model Collection {
   icon      String? // nombre de ícono o url de imagen
   status    CollectionStatus @default(ACTIVE)
   isDefault Boolean          @default(false) // Libros, Comics, Juguetes, ArtToys, Esculturas, Pinturas, Estatuas
+  isSystem  Boolean          @default(false) // "En Venta": la administra el sistema, el usuario no la edita, borra ni le agrega objetos a mano
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
@@ -572,6 +573,13 @@ enum ItemStatus {
   LOST
 }
 
+// Estado comercial del objeto (independiente de ItemStatus): solo aplica si el dueño lo puso en venta.
+enum SaleStatus {
+  FOR_SALE
+  RESERVED // apartado
+  SOLD // vendido (falta transferirlo al nuevo dueño)
+}
+
 // Estado del cambio de ubicación actual (independiente de ItemStatus).
 enum LocationAssignmentType {
   INDEFINIDO
@@ -620,6 +628,11 @@ model Item {
   comicPublisher   String?
 
   status ItemStatus @default(ACTIVE)
+
+  // Venta: saleStatus null = no está en venta. salePrice se muestra en el enlace público
+  // salvo cuando saleStatus = SOLD.
+  saleStatus SaleStatus?
+  salePrice  Decimal?   @db.Decimal(10, 2)
 
   currentLocationId   String?
   currentLocation     Location?              @relation("ItemCurrentLocation", fields: [currentLocationId], references: [id], onDelete: SetNull)
