@@ -11,6 +11,13 @@ interface NoFtModalProps {
   onClose: () => void;
 }
 
+// Solo se muestran 2 columnas: el paquete más barato y el más caro del catálogo.
+function featuredPackages(packages: FtPackageOption[]): FtPackageOption[] {
+  if (packages.length <= 2) return packages;
+  const sorted = [...packages].sort((a, b) => a.priceMxnCents - b.priceMxnCents);
+  return [sorted[0], sorted[sorted.length - 1]];
+}
+
 // Se dispara cuando una acción que cobra FT tira 402 (INSUFFICIENT_FT): en vez
 // de solo un texto de error, se ofrece de una vez comprar más. Los paquetes
 // salen de /ft/packages — el mismo catálogo (misma BD) que alimenta la landing
@@ -51,7 +58,7 @@ export function NoFtModal({ visible, onClose }: NoFtModalProps) {
             <ActivityIndicator className="mt-6" color={colors.primary} />
           ) : (
             <View className="mt-5 flex-row gap-3">
-              {packages.map((pkg) => (
+              {featuredPackages(packages).map((pkg) => (
                 <View
                   key={pkg.code}
                   className="flex-1 items-center rounded-xl border border-border bg-surfaceElevated px-3 py-4"
@@ -61,12 +68,7 @@ export function NoFtModal({ visible, onClose }: NoFtModalProps) {
                     <Text className="font-display text-xl text-primary">{pkg.ftAmount.toLocaleString('es-MX')}</Text>
                   </View>
                   <Text className="mt-0.5 text-[11px] uppercase tracking-wide text-textMuted">FrikiTokens</Text>
-                  {pkg.badge ? (
-                    <View className="mt-2 rounded-full bg-secondary px-2 py-0.5">
-                      <Text className="text-[10px] font-medium uppercase text-white">{pkg.badge}</Text>
-                    </View>
-                  ) : null}
-                  <View className="mt-3 w-full">
+                  <View className="mt-4 w-full">
                     <Button
                       label={`$${(pkg.priceMxnCents / 100).toLocaleString('es-MX')}`}
                       onPress={() => onBuy(pkg)}
