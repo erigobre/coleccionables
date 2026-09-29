@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, loginRequest, registerRequest, setTokenListener, type AuthTokens } from '../lib/api';
 import { clearTokens, decodeJwtPayload, loadTokens, saveTokens } from '../lib/auth-storage';
-import { registerPushToken } from '../lib/push';
+import { registerPushToken, unregisterCurrentPushToken } from '../lib/push';
 
 export interface AuthUser {
   sub: string;
@@ -39,7 +39,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadTokens()
-      .then(setTokens)
+      .then((saved) => {
+        setTokens(saved);
+        // Sesión ya guardada: el token de push puede haber cambiado o no haberse
+        // registrado nunca (el permiso se pide la primera vez que se llega aquí).
+        if (saved) void registerPushToken(saved.accessToken);
+      })
       .finally(() => setIsLoading(false));
   }, []);
 
@@ -75,9 +80,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(async () => {
+    // Antes de borrar la sesión: hace falta el access token para quitar el push token.
+    if (tokens) await unregisterCurrentPushToken(tokens.accessToken);
     await clearTokens();
     setTokens(null);
-  }, []);
+  }, [tokens]);
 
   const value = useMemo<AuthContextValue>(
     () => ({

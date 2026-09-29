@@ -301,7 +301,7 @@ export default function ItemDetailScreen() {
 
   return (
     <View className="flex-1">
-    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: insets.bottom + 240 }}>
+    <ScrollView className="flex-1 bg-background" contentContainerStyle={{ paddingBottom: insets.bottom + 310 }}>
       <View className="relative w-full bg-surface" style={{ aspectRatio: 4 / 5 }}>
         {item.photos.length > 0 ? (
           <ScrollView
@@ -553,7 +553,6 @@ export default function ItemDetailScreen() {
         {editable ? (
           <View className="gap-3">
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
-            <Button label="Compartir enlace" variant="ghost" onPress={onShare} loading={sharing} />
             <Button
               label={item.saleStatus ? 'Administrar venta' : 'Colocar en venta'}
               variant="sale"
@@ -573,6 +572,19 @@ export default function ItemDetailScreen() {
 
       {editable ? (
         <>
+          <Pressable
+            onPress={onShare}
+            disabled={sharing}
+            accessibilityLabel="Compartir objeto"
+            className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
+            style={{ right: 20, bottom: insets.bottom + (item.saleStatus ? 300 : 232) }}
+          >
+            {sharing ? (
+              <ActivityIndicator color={colors.white} />
+            ) : (
+              <Ionicons name="share-social" size={24} color={colors.white} />
+            )}
+          </Pressable>
           {item.saleStatus ? (
             <Pressable
               onPress={() => setSaleVisible(true)}

@@ -182,7 +182,15 @@ export default function NewItemScreen() {
       // la lista de Objetos tal cual estaba (con su filtro/búsqueda intactos)
       // y luego se apila el detalle encima, así "atrás" regresa a esa lista.
       router.dismissTo('/(tabs)/objetos');
-      router.push(`/(tabs)/objetos/${item.id}`);
+      // Si se llegó aquí desde Home (tab Objetos nunca montado en la sesión, ej.
+      // botón "+" de Home), el push de abajo puede ejecutarse antes de que el
+      // dismissTo anterior termine de confirmar el cambio de tab, y el detalle
+      // queda apilado sobre Home en vez de sobre Objetos — "atrás" caía en Home
+      // (bug reportado por un usuario 2026-09-29). Esperar un frame a que el
+      // estado de navegación se asiente evita la condición de carrera.
+      requestAnimationFrame(() => {
+        router.push(`/(tabs)/objetos/${item.id}`);
+      });
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {

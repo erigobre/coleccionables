@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../../lib/api';
@@ -12,7 +13,7 @@ import {
   unshareCollection,
   type Collection,
 } from '../../../../lib/collections';
-import { fetchItems, isAwayFromPermanent, type Item } from '../../../../lib/items';
+import { fetchItems, type Item } from '../../../../lib/items';
 import { colors } from '../../../../theme/tokens';
 
 const GRID_GAP = 3;
@@ -24,6 +25,22 @@ const STATUS_TAG: Record<string, string> = {
   DONATED: 'Donado',
   LOST: 'Perdido',
 };
+
+// El botón "Regresar ubicación" solo aplica cuando toda la colección quedó en una
+// ubicación temporal: todos sus objetos activos comparten ubicación actual y
+// temporada, y están marcados como TEMPORAL.
+function isWholeCollectionTemporary(items: Item[]): boolean {
+  const active = items.filter((item) => item.status === 'ACTIVE');
+  if (active.length === 0) return false;
+  const [first] = active;
+  return active.every(
+    (item) =>
+      item.locationAssignment === 'TEMPORAL' &&
+      item.currentSeasonId !== null &&
+      item.currentSeasonId === first.currentSeasonId &&
+      item.currentLocationId === first.currentLocationId,
+  );
+}
 
 function ItemTile({ item, size, onOpen }: { item: Item; size: number; onOpen: () => void }) {
   const photo = item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined;
@@ -59,6 +76,7 @@ export default function CollectionDetailScreen() {
   const { accessToken } = useAuth();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const [collection, setCollection] = useState<Omit<Collection, 'itemCount'> | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
@@ -142,12 +160,13 @@ export default function CollectionDetailScreen() {
   }
 
   const tileSize = Math.floor((width - SIDE_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
-  const awayCount = items.filter(isAwayFromPermanent).length;
+  const showReturn = isWholeCollectionTemporary(items);
 
   return (
+    <View className="flex-1 bg-background">
     <ScrollView
       className="flex-1 bg-background"
-      contentContainerStyle={{ paddingTop: 8, paddingBottom: 120, paddingHorizontal: SIDE_PADDING }}
+      contentContainerStyle={{ paddingTop: 8, paddingBottom: 240, paddingHorizontal: SIDE_PADDING }}
     >
       <Stack.Screen options={{ title: collection.name }} />
 
@@ -173,25 +192,52 @@ export default function CollectionDetailScreen() {
       )}
 
       <View className="gap-3">
-        <Button label="Compartir colección" onPress={onShare} loading={sharing} disabled={items.length === 0} />
-        {shared ? <Button label="Dejar de compartir" variant="ghost" onPress={onUnshare} /> : null}
         <Button
           label="Reubicar colección"
           variant="secondary"
           onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/ubicacion`)}
           disabled={items.length === 0}
         />
-        <Button
-          label={
-            awayCount > 0
-              ? `Regresar colección a su ubicación permanente (${awayCount})`
-              : 'Regresar colección a su ubicación permanente'
-          }
-          variant="ghost"
-          onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/regresar`)}
-          disabled={items.length === 0}
-        />
+        {showReturn ? (
+          <Button
+            label="Regresar ubicación"
+            variant="ghost"
+            onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/regresar`)}
+          />
+        ) : null}
+        {shared ? (
+          <Pressable onPress={onUnshare} className="items-center py-2">
+            <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
+          </Pressable>
+        ) : null}
       </View>
     </ScrollView>
+
+      {items.length > 0 ? (
+        <Pressable
+          onPress={onShare}
+          disabled={sharing}
+          accessibilityLabel="Compartir colección"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
+          style={{ right: 20, bottom: insets.bottom + (collection.isSystem ? 96 : 164) }}
+        >
+          {sharing ? (
+            <ActivityIndicator color={colors.white} />
+          ) : (
+            <Ionicons name="share-social" size={24} color={colors.white} />
+          )}
+        </Pressable>
+      ) : null}
+      {!collection.isSystem ? (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/edit`)}
+          accessibilityLabel="Editar colección"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-primary shadow-lg"
+          style={{ right: 20, bottom: insets.bottom + 96 }}
+        >
+          <Ionicons name="pencil" size={22} color={colors.primaryText} />
+        </Pressable>
+      ) : null}
+    </View>
   );
 }

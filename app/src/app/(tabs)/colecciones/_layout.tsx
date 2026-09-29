@@ -15,6 +15,7 @@ export default function ColeccionesStackLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="manage" options={{ title: 'Gestionar colecciones' }} />
       <Stack.Screen name="[id]/index" options={{ title: 'Colección' }} />
+      <Stack.Screen name="[id]/edit" options={{ title: 'Editar colección' }} />
       <Stack.Screen name="[id]/ubicacion" options={{ title: 'Reubicar colección', presentation: 'modal' }} />
       <Stack.Screen name="[id]/regresar" options={{ title: 'Ubicación permanente' }} />
     </Stack>

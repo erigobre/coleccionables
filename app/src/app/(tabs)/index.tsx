@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { FtCoin } from '../../components/ui/FtCoin';
 import { Screen } from '../../components/ui/Screen';
-import { useAuth } from '../../context/auth-context';
+import { authErrorMessage, useAuth } from '../../context/auth-context';
 import { useFt } from '../../context/ft-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { fetchItems, type Item } from '../../lib/items';
@@ -60,25 +60,28 @@ export default function HomeScreen() {
   const scanCost = costOf('SCAN_HAVE_IT');
 
   const [items, setItems] = useState<Item[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (!accessToken) return;
-      let active = true;
-      // El resumen es informativo: si falla algo, se deja lo último que se cargó.
-      fetchItems(accessToken)
-        .then((loadedItems) => {
-          if (!active) return;
-          setItems(loadedItems);
-        })
-        .catch(() => {
-          if (active) setItems((prev) => prev ?? []);
-        });
-      return () => {
-        active = false;
-      };
-    }, [accessToken]),
-  );
+  const load = useCallback(() => {
+    if (!accessToken) return;
+    let active = true;
+    // Si falla, no se pisa lo último que se cargó con un "0 objetos" falso —
+    // se avisa con un error y un botón para reintentar.
+    fetchItems(accessToken)
+      .then((loadedItems) => {
+        if (!active) return;
+        setItems(loadedItems);
+        setError(null);
+      })
+      .catch((err) => {
+        if (active) setError(authErrorMessage(err));
+      });
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+
+  useFocusEffect(useCallback(load, [load]));
 
   const favorites = items?.filter((item) => item.isFavorite) ?? [];
 
@@ -98,8 +101,17 @@ export default function HomeScreen() {
         </View>
       </View>
 
+      {error && items !== null ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
+
       {items === null ? (
-        <ActivityIndicator className="mt-12" color={colors.primary} />
+        error ? (
+          <View className="mt-12 items-center gap-4">
+            <Text className="text-center text-sm text-danger">{error}</Text>
+            <Button label="Reintentar" onPress={load} />
+          </View>
+        ) : (
+          <ActivityIndicator className="mt-12" color={colors.primary} />
+        )
       ) : (
         <>
           <View className="mt-6 flex-row gap-3">

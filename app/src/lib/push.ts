@@ -32,6 +32,20 @@ export async function registerPushToken(accessToken: string): Promise<void> {
   }
 }
 
+// Al cerrar sesión: quita el token de este dispositivo de la cuenta que sale, para que
+// no le sigan llegando avisos de esa cuenta al teléfono.
+export async function unregisterCurrentPushToken(accessToken: string): Promise<void> {
+  try {
+    if (!Device.isDevice) return;
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') return;
+    const { data: token } = await Notifications.getExpoPushTokenAsync({ projectId: PROJECT_ID });
+    await unregisterPushToken(accessToken, token);
+  } catch {
+    // Silencioso: el logout no debe bloquearse por esto.
+  }
+}
+
 export async function unregisterPushToken(accessToken: string, token: string): Promise<void> {
   try {
     await apiFetch(`/notifications/push-tokens/${encodeURIComponent(token)}`, {
