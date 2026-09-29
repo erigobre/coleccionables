@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
@@ -14,6 +14,11 @@ export class TransfersController {
   @Post()
   initiate(@CurrentUser() user: AuthenticatedUser, @Body() dto: InitiateTransferDto) {
     return this.transfersService.initiate(user.id, user.name, dto);
+  }
+
+  @Get('validate-recipient')
+  validateRecipient(@Query('email') email: string) {
+    return this.transfersService.validateRecipient(email ?? '');
   }
 
   @Get('incoming')

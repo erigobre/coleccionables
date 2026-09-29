@@ -9,6 +9,7 @@ import {
   Coins,
   CreditCard,
   LayoutDashboard,
+  Settings,
   ShieldAlert,
   Users,
   type LucideIcon,
@@ -23,6 +24,7 @@ const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/pagos', label: 'Pagos', icon: CreditCard },
   { href: '/moderacion', label: 'Moderación', icon: ShieldAlert },
   { href: '/actividad', label: 'Actividad', icon: Activity },
+  { href: '/ajustes', label: 'Ajustes', icon: Settings },
 ];
 
 export function Sidebar() {

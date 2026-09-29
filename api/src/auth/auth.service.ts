@@ -4,6 +4,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
 import { FtService } from '../ft/ft.service.js';
+import { ReferralsService } from '../referrals/referrals.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import { isUsernameProfane } from './profanity/username-filter.js';
 import { PRIVACY_POLICY_VERSION } from '../legal/privacy-policy.page.js';
 import { TERMS_OF_USE_VERSION } from '../legal/terms-of-use.page.js';
@@ -12,7 +14,7 @@ import type { LoginDto } from './dto/login.dto.js';
 import type { JwtPayload } from './auth.types.js';
 
 const SALT_ROUNDS = 10;
-const MONTHLY_FREE_FT_FALLBACK = 20;
+const SIGNUP_FREE_FT_FALLBACK = 20;
 const FREE_FT_LOT_DAYS = 30;
 
 export interface Tokens {
@@ -28,6 +30,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly ftService: FtService,
+    private readonly referralsService: ReferralsService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   // Chequeo en vivo desde el registro (plan: bloquear el alta hasta que el
@@ -120,27 +124,75 @@ export class AuthService {
       return createdUser;
     });
 
+    // Si alguien le transfirió un objeto a este correo antes de que existiera
+    // la cuenta (ver TransfersService.initiate), se liga esa invitación ahora:
+    // el invitado recibe el bono de referido (en vez del bono normal) y se le
+    // avisa por push de la transferencia que quedó esperando.
+    let linkedInvite: { fromUserId: string } | null = null;
+    try {
+      const pendingInvite = await this.prisma.transfer.findFirst({
+        where: { toEmail: user.email, toUserId: null, status: 'PENDING' },
+        orderBy: { createdAt: 'asc' },
+      });
+
+      if (pendingInvite) {
+        const fromUser = await this.prisma.user.findUniqueOrThrow({
+          where: { id: pendingInvite.fromUserId },
+        });
+        await this.prisma.transfer.updateMany({
+          where: { toEmail: user.email, toUserId: null, status: 'PENDING' },
+          data: { toUserId: user.id },
+        });
+        linkedInvite = { fromUserId: fromUser.id };
+
+        this.notifications
+          .sendPushToUser(fromUser.id, {
+            title: 'Nueva transferencia',
+            body: `Tu invitación fue aceptada. Revisa tus transferencias.`,
+            data: { type: 'transfer', transferId: pendingInvite.id },
+          })
+          .catch(() => {});
+
+        await this.prisma.user.update({
+          where: { id: user.id },
+          data: { referredById: fromUser.id, referredAt: new Date(), referralSource: 'TRANSFER_INVITE' },
+        });
+
+        await this.referralsService.grantReferralBonuses({
+          inviteeId: user.id,
+          inviteeOrganizationId: user.organizationId,
+          inviterId: fromUser.id,
+          inviterOrganizationId: fromUser.organizationId,
+        });
+      }
+    } catch (error) {
+      this.logger.warn(`No se pudo ligar la invitación de transferencia para ${user.email}`, error as Error);
+    }
+
     // Regalo inicial de FrikiTokens (fuera de la transacción de arriba: si
     // fallara, la cuenta ya quedó creada y el cron diario de regalo mensual
-    // la recoge de todos modos porque `ftFreeGrantAt` sigue en null).
-    try {
-      const amount = await this.ftService.getConfigValue('MONTHLY_FREE_FT', MONTHLY_FREE_FT_FALLBACK);
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + FREE_FT_LOT_DAYS);
-      await this.prisma.organization.update({
-        where: { id: user.organizationId },
-        data: { ftFreeGrantAt: new Date() },
-      });
-      await this.ftService.grant({
-        organizationId: user.organizationId,
-        userId: user.id,
-        source: 'MONTHLY_FREE',
-        amount,
-        expiresAt,
-        idempotencyKey: `signup-free:${user.organizationId}`,
-      });
-    } catch (error) {
-      this.logger.warn(`No se pudo dar el regalo inicial de FT a ${user.organizationId}`, error as Error);
+    // la recoge de todos modos porque `ftFreeGrantAt` sigue en null). Si ya
+    // se otorgó el bono de referido arriba, se salta este (no se duplican).
+    if (!linkedInvite) {
+      try {
+        const amount = await this.ftService.getConfigValue('SIGNUP_FREE_FT', SIGNUP_FREE_FT_FALLBACK);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + FREE_FT_LOT_DAYS);
+        await this.prisma.organization.update({
+          where: { id: user.organizationId },
+          data: { ftFreeGrantAt: new Date() },
+        });
+        await this.ftService.grant({
+          organizationId: user.organizationId,
+          userId: user.id,
+          source: 'MONTHLY_FREE',
+          amount,
+          expiresAt,
+          idempotencyKey: `signup-free:${user.organizationId}`,
+        });
+      } catch (error) {
+        this.logger.warn(`No se pudo dar el regalo inicial de FT a ${user.organizationId}`, error as Error);
+      }
     }
 
     return this.issueTokens({

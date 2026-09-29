@@ -7,6 +7,8 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { EmailService } from '../email/email.service.js';
+import { validateEmailDomain } from '../common/email-validation.js';
 import type { InitiateTransferDto } from './dto/initiate-transfer.dto.js';
 
 const TRANSFER_EXPIRY_DAYS = 7; // Decisión confirmada: expira tras 7 días sin respuesta.
@@ -17,7 +19,20 @@ export class TransfersService {
     private readonly prisma: PrismaService,
     private readonly collectionsService: CollectionsService,
     private readonly notifications: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
+
+  // Usado por la app con debounce mientras se escribe el correo en la pantalla
+  // de transferencia, para avisar de typos de TLD y si se le enviará una
+  // invitación en vez de una transferencia directa.
+  async validateRecipient(email: string) {
+    const { structureValid, tldValid, suggestion } = validateEmailDomain(email);
+    if (!structureValid || !tldValid) {
+      return { structureValid, tldValid, suggestion, hasAccount: false };
+    }
+    const toUser = await this.prisma.user.findUnique({ where: { email } });
+    return { structureValid, tldValid, suggestion, hasAccount: !!toUser };
+  }
 
   async initiate(fromUserId: string, fromUserName: string, dto: InitiateTransferDto) {
     const item = await this.prisma.item.findUnique({ where: { id: dto.itemId } });
@@ -28,11 +43,17 @@ export class TransfersService {
       throw new BadRequestException('Solo se pueden transferir objetos activos');
     }
 
-    const toUser = await this.prisma.user.findUnique({ where: { email: dto.toUserEmail } });
-    if (!toUser) {
-      throw new NotFoundException('No existe un usuario con ese correo');
+    const { structureValid, tldValid, suggestion } = validateEmailDomain(dto.toUserEmail);
+    if (!structureValid || !tldValid) {
+      throw new BadRequestException({
+        message: 'Ese correo no parece válido',
+        code: 'INVALID_EMAIL_DOMAIN',
+        suggestion,
+      });
     }
-    if (toUser.id === fromUserId) {
+
+    const toUser = await this.prisma.user.findUnique({ where: { email: dto.toUserEmail } });
+    if (toUser?.id === fromUserId) {
       throw new BadRequestException('No puedes transferirte un objeto a ti mismo');
     }
 
@@ -45,21 +66,28 @@ export class TransfersService {
         data: {
           itemId: item.id,
           fromUserId,
-          toUserId: toUser.id,
+          toUserId: toUser?.id ?? null,
+          toEmail: dto.toUserEmail,
           expiresAt,
         },
       }),
     ]);
 
-    this.notifications
-      .sendPushToUser(toUser.id, {
-        title: 'Nueva transferencia',
-        body: `${fromUserName} te envió "${item.name}". Revisa tus transferencias.`,
-        data: { type: 'transfer', transferId: transfer.id },
-      })
-      .catch(() => {});
+    if (toUser) {
+      this.notifications
+        .sendPushToUser(toUser.id, {
+          title: 'Nueva transferencia',
+          body: `${fromUserName} te envió "${item.name}". Revisa tus transferencias.`,
+          data: { type: 'transfer', transferId: transfer.id },
+        })
+        .catch(() => {});
+    } else {
+      this.emailService
+        .sendTransferInviteEmail({ toEmail: dto.toUserEmail, fromUserName, itemName: item.name })
+        .catch(() => {});
+    }
 
-    return transfer;
+    return { ...transfer, hasAccount: !!toUser };
   }
 
   async accept(toUserId: string, transferId: string, targetCollectionId: string) {

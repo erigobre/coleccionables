@@ -96,7 +96,25 @@ model User {
   termsVersionAccepted   String?
   legalAcceptedAt        DateTime?
 
+  // Programa de invitaciones: código propio para compartir, y quién invitó a
+  // este usuario (por código de amigo o porque le transfirieron un objeto sin
+  // tener cuenta todavía) — un usuario solo puede ser invitado una vez.
+  // referralCode es nullable (mismo criterio que username arriba): se genera
+  // perezosamente la primera vez que se necesita, así se evita un backfill
+  // no-nulo masivo sobre las filas existentes al migrar.
+  referralCode   String?         @unique
+  referredById   String?
+  referredBy     User?           @relation("Referrals", fields: [referredById], references: [id], onDelete: SetNull)
+  referredUsers  User[]          @relation("Referrals")
+  referredAt     DateTime?
+  referralSource ReferralSource?
+
   @@map("users")
+}
+
+enum ReferralSource {
+  FRIEND_CODE // canjeó el código de otro usuario desde su perfil
+  TRANSFER_INVITE // se registró con el correo al que alguien le transfirió un objeto
 }
 
 // Preparado desde v1 para no migrar esquema en v1.1, pero sin UI/lógica de
@@ -221,6 +239,7 @@ enum FtLotSource {
   PURCHASE     // Compra real (IAP / Stripe) — fase futura
   PROMO        // Regalo manual del superadmin
   REFUND       // Devolución de un cobro que se retuvo (HELD) pero falló
+  REFERRAL     // Bono del programa de invitaciones (invitado o invitador)
 }
 
 // El saldo se guarda por "lotes", no como un solo número: así cada lote puede
@@ -754,18 +773,25 @@ enum TransferStatus {
 }
 
 model Transfer {
-  id          String         @id @default(cuid())
-  itemId      String
-  item        Item           @relation(fields: [itemId], references: [id], onDelete: Cascade)
-  fromUserId  String
-  fromUser    User           @relation("TransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUserId    String
-  toUser      User           @relation("TransferReceiver", fields: [toUserId], references: [id], onDelete: Cascade)
+  id         String @id @default(cuid())
+  itemId     String
+  item       Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  fromUserId String
+  fromUser   User   @relation("TransferSender", fields: [fromUserId], references: [id], onDelete: Cascade)
+
+  // toUserId es null mientras el destinatario no tiene cuenta todavía —
+  // toEmail siempre se guarda (exista cuenta o no) y se usa para hacer match
+  // cuando esa persona se registre (ver AuthService.register).
+  toUserId String?
+  toUser   User?   @relation("TransferReceiver", fields: [toUserId], references: [id], onDelete: Cascade)
+  toEmail  String
+
   status      TransferStatus @default(PENDING)
   expiresAt   DateTime // createdAt + 7 días (decisión confirmada en el plan)
   respondedAt DateTime?
   createdAt   DateTime       @default(now())
 
+  @@index([toEmail, toUserId, status])
   @@map("transfers")
 }
 

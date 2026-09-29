@@ -21,6 +21,7 @@ import { LegalModule } from './legal/legal.module.js';
 import { WaitlistModule } from './waitlist/waitlist.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { SupportModule } from './support/support.module.js';
+import { ReferralsModule } from './referrals/referrals.module.js';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { SupportModule } from './support/support.module.js';
     WaitlistModule,
     NotificationsModule,
     SupportModule,
+    ReferralsModule,
   ],
 })
 export class AppModule {}

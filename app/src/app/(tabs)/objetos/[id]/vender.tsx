@@ -1,16 +1,18 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { TextField } from '../../../../components/ui/TextField';
 import { TransferAnimation } from '../../../../components/items/TransferAnimation';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../../lib/api';
 import { fetchItem, type Item } from '../../../../lib/items';
-import { initiateTransfer } from '../../../../lib/transfers';
+import { initiateTransfer, validateRecipientEmail } from '../../../../lib/transfers';
 import { colors } from '../../../../theme/tokens';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type RecipientStatus = 'idle' | 'checking' | 'valid' | 'invalid';
 
 export default function SellItemScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -19,6 +21,9 @@ export default function SellItemScreen() {
 
   const [item, setItem] = useState<Item | null>(null);
   const [email, setEmail] = useState('');
+  const [recipientStatus, setRecipientStatus] = useState<RecipientStatus>('idle');
+  const [suggestion, setSuggestion] = useState<string | null>(null);
+  const [hasAccount, setHasAccount] = useState(true);
   const [sending, setSending] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,22 +36,68 @@ export default function SellItemScreen() {
   }, [accessToken, id]);
 
   const trimmedEmail = email.trim().toLowerCase();
-  const emailValid = EMAIL_PATTERN.test(trimmedEmail);
+
+  // Valida estructura + TLD real y si ya existe cuenta, con debounce (mismo
+  // patrón que la disponibilidad de @usuario en register.tsx) — así se
+  // detectan typos de dominio (".con" en vez de ".com") y se avisa si se
+  // enviará una invitación en vez de una transferencia directa.
+  useEffect(() => {
+    setSuggestion(null);
+    if (!accessToken || !EMAIL_PATTERN.test(trimmedEmail)) {
+      setRecipientStatus('idle');
+      return;
+    }
+    let cancelled = false;
+    setRecipientStatus('checking');
+    const timer = setTimeout(() => {
+      validateRecipientEmail(accessToken, trimmedEmail)
+        .then((result) => {
+          if (cancelled) return;
+          setRecipientStatus(result.tldValid ? 'valid' : 'invalid');
+          setSuggestion(result.suggestion);
+          setHasAccount(result.hasAccount);
+        })
+        .catch(() => {
+          if (!cancelled) setRecipientStatus('idle');
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [accessToken, trimmedEmail]);
+
+  const useSuggestion = () => {
+    if (!suggestion) return;
+    setEmail(suggestion);
+    setSuggestion(null);
+  };
+
+  const emailValid = recipientStatus === 'valid';
 
   const onSend = async () => {
     if (!accessToken || !id || !emailValid) return;
     setSending(true);
     setError(null);
     try {
-      await initiateTransfer(accessToken, id, trimmedEmail);
-      setSent(true);
+      const result = await initiateTransfer(accessToken, id, trimmedEmail);
+      if (result.hasAccount) {
+        setSent(true);
+      } else {
+        Alert.alert(
+          'Invitación enviada',
+          `Le mandamos un correo a ${trimmedEmail} para que se registre y acepte la transferencia. Tienes 7 días.`,
+          [{ text: 'Entendido', onPress: () => router.back() }],
+        );
+      }
     } catch (err) {
       setError(authErrorMessage(err));
       setSending(false);
     }
   };
 
-  // La animación solo corre cuando el backend ya aceptó el envío.
+  // La animación solo corre cuando el backend ya aceptó el envío a alguien
+  // que ya tiene cuenta (el caso sin cuenta usa el Alert de arriba).
   if (sent && item) {
     return (
       <>
@@ -87,9 +138,25 @@ export default function SellItemScreen() {
         keyboardType="email-address"
         autoComplete="email"
         placeholder="correo@ejemplo.com"
-        error={email.length > 0 && !emailValid ? 'Escribe un correo válido' : undefined}
+        error={recipientStatus === 'invalid' && !suggestion ? 'Ese correo no parece válido' : undefined}
       />
-      <Text className="-mt-2 mb-6 text-xs text-textMuted">Debe tener una cuenta en Frikidex.</Text>
+
+      {recipientStatus === 'checking' ? (
+        <View className="-mt-2 mb-6 flex-row items-center">
+          <ActivityIndicator size="small" color={colors.textMuted} />
+        </View>
+      ) : recipientStatus === 'invalid' && suggestion ? (
+        <Text className="-mt-2 mb-6 text-xs text-danger" onPress={useSuggestion}>
+          ¿Quisiste decir <Text className="font-body-bold">{suggestion}</Text>? Toca para usarlo.
+        </Text>
+      ) : recipientStatus === 'valid' && !hasAccount ? (
+        <Text className="-mt-2 mb-6 text-xs text-textMuted">
+          Esa persona todavía no tiene cuenta en Frikidex: le enviaremos un correo de invitación para que se
+          registre y acepte la transferencia.
+        </Text>
+      ) : (
+        <View className="mb-6" />
+      )}
 
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 

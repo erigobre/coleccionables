@@ -18,6 +18,7 @@ export default function PerfilStackLayout() {
       <Stack.Screen name="ubicaciones/escanear" options={{ title: 'Escanear QR' }} />
       <Stack.Screen name="temporadas/index" options={{ title: 'Temporadas' }} />
       <Stack.Screen name="temporadas/[id]" options={{ title: 'Temporada' }} />
+      <Stack.Screen name="invitar" options={{ title: 'Invitar amigos' }} />
     </Stack>
   );
 }

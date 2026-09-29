@@ -25,7 +25,24 @@ export interface OutgoingTransfer extends TransferBase {
 }
 
 export function initiateTransfer(accessToken: string, itemId: string, toUserEmail: string) {
-  return apiFetch<{ id: string }>('/transfers', { method: 'POST', body: { itemId, toUserEmail }, accessToken });
+  return apiFetch<{ id: string; hasAccount: boolean }>('/transfers', {
+    method: 'POST',
+    body: { itemId, toUserEmail },
+    accessToken,
+  });
+}
+
+export interface ValidateRecipientResult {
+  structureValid: boolean;
+  tldValid: boolean;
+  suggestion: string | null;
+  hasAccount: boolean;
+}
+
+export function validateRecipientEmail(accessToken: string, email: string) {
+  return apiFetch<ValidateRecipientResult>(`/transfers/validate-recipient?email=${encodeURIComponent(email)}`, {
+    accessToken,
+  });
 }
 
 export function fetchIncomingTransfers(accessToken: string) {

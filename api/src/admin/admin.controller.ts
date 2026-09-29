@@ -12,6 +12,7 @@ import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.dto.js';
 import { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
 import { GrantFtDto } from './dto/grant-ft.dto.js';
+import { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -159,5 +160,22 @@ export class AdminController {
   @Delete('users/:id')
   deleteUser(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
     return this.adminService.deleteUser(admin, id);
+  }
+
+  // Regalos de FT configurables (bono de registro, regalo mensual, bonos de
+  // invitación y su tope, e interruptor del programa de invitaciones) —
+  // programa de invitaciones, pedido 2026-09-28.
+  @Get('ft-config')
+  findFtConfig() {
+    return this.adminService.findFtConfig();
+  }
+
+  @Patch('ft-config/:key')
+  updateFtConfig(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('key') key: string,
+    @Body() dto: UpdateFtConfigDto,
+  ) {
+    return this.adminService.updateFtConfig(admin, key, dto);
   }
 }

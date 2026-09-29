@@ -10,9 +10,22 @@ import type { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import type { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.dto.js';
 import type { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
 import type { GrantFtDto } from './dto/grant-ft.dto.js';
+import type { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
 
 const ACTIVE_WINDOW_DAYS = 30;
 const TIMESERIES_MAX_MONTHS = 12;
+
+// Catálogo fijo de "Regalos de FT" editables desde Superadmin (§6 del plan de
+// invitaciones). No hay UI para crear claves nuevas a mano: si se necesita
+// otra, se agrega aquí y en el fallback que ya lee el código que la consume.
+const FT_CONFIG_CATALOG: { key: string; label: string; fallback: number }[] = [
+  { key: 'SIGNUP_FREE_FT', label: 'Bono de bienvenida al registrarte', fallback: 20 },
+  { key: 'MONTHLY_FREE_FT', label: 'Regalo mensual recurrente (plan gratuito)', fallback: 20 },
+  { key: 'REFERRAL_INVITEE_FT', label: 'Bono al invitado (referido)', fallback: 50 },
+  { key: 'REFERRAL_INVITER_FT', label: 'Bono a quien invita (referido)', fallback: 30 },
+  { key: 'REFERRAL_MONTHLY_LIMIT', label: 'Tope de invitaciones exitosas por mes', fallback: 3 },
+  { key: 'REFERRAL_FEATURE_ENABLED', label: 'Programa de invitaciones activo (1 = sí, 0 = no)', fallback: 1 },
+];
 
 @Injectable()
 export class AdminService {
@@ -431,6 +444,31 @@ export class AdminService {
       reason: dto.reason,
     });
     return transaction;
+  }
+
+  async findFtConfig() {
+    const rows = await this.prisma.ftConfig.findMany({
+      where: { key: { in: FT_CONFIG_CATALOG.map((entry) => entry.key) } },
+    });
+    const byKey = new Map(rows.map((row) => [row.key, row.value]));
+    return FT_CONFIG_CATALOG.map((entry) => ({
+      key: entry.key,
+      label: entry.label,
+      value: byKey.get(entry.key) ?? entry.fallback,
+    }));
+  }
+
+  async updateFtConfig(admin: { id: string; email: string }, key: string, dto: UpdateFtConfigDto) {
+    if (!FT_CONFIG_CATALOG.some((entry) => entry.key === key)) {
+      throw new NotFoundException('Esa clave de configuración no existe');
+    }
+    const updated = await this.prisma.ftConfig.upsert({
+      where: { key },
+      create: { key, value: dto.value },
+      update: { value: dto.value },
+    });
+    await this.logAction(admin, 'ftConfig.update', 'FtConfig', key, { value: dto.value });
+    return updated;
   }
 
   // Borrado en cascada para limpiar cuentas demo/prueba (pedido 2026-09-26).
