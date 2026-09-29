@@ -32,6 +32,11 @@ export const colors = {
   sale: '#2DD4BF',
   saleHover: '#5EEAD4',
 
+  // Rosa — solo para el botón "+" de carga manual en Wishlist: fuera de la
+  // paleta principal, pero armoniza con Noche, violeta y lima (mismo patrón que `sale`).
+  wishlist: '#FF4FA3',
+  wishlistHover: '#FF7FBE',
+
   danger: '#FF6B57', // Coral — SOLO uso funcional: "¡Ya lo tienes!", duplicados, errores, destructivo
   dangerText: '#16122B',
 

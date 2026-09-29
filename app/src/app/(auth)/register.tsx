@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { Link } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
 import { Button } from '../../components/ui/Button';
 import { Screen } from '../../components/ui/Screen';
@@ -32,31 +32,37 @@ export default function RegisterScreen() {
     setUsernameSuggestion(null);
   };
 
-  const onUsernameBlur = async () => {
+  // Antes el chequeo solo se disparaba en onBlur: si el usuario editaba el campo
+  // después de haberlo llenado todo, "Crear cuenta" se deshabilitaba (correcto,
+  // hay que re-validar) pero solo se volvía a habilitar al enfocar OTRO input —
+  // tocar fuera (o un botón deshabilitado) no dispara blur de forma confiable.
+  // Con un debounce por cambio de texto ya no hace falta salir del campo.
+  useEffect(() => {
     if (!USERNAME_REGEX.test(username)) return;
+    let cancelled = false;
     setUsernameStatus('checking');
-    try {
-      const result = await checkUsernameAvailability(username);
-      setUsernameStatus(result.blocked ? 'blocked' : result.available ? 'available' : 'taken');
-      setUsernameSuggestion(result.suggestion);
-    } catch {
-      // Si falla el chequeo se deja "idle": el usuario puede reintentar tocando fuera de nuevo.
-      setUsernameStatus('idle');
-    }
-  };
+    const timer = setTimeout(() => {
+      checkUsernameAvailability(username)
+        .then((result) => {
+          if (cancelled) return;
+          setUsernameStatus(result.blocked ? 'blocked' : result.available ? 'available' : 'taken');
+          setUsernameSuggestion(result.suggestion);
+        })
+        .catch(() => {
+          if (!cancelled) setUsernameStatus('idle');
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [username]);
 
-  const useSuggestion = async () => {
+  // El efecto de arriba reacciona al cambio de `username` y hace su propio chequeo.
+  const useSuggestion = () => {
     if (!usernameSuggestion) return;
-    const suggested = usernameSuggestion;
-    setUsername(suggested);
-    setUsernameStatus('checking');
-    try {
-      const result = await checkUsernameAvailability(suggested);
-      setUsernameStatus(result.blocked ? 'blocked' : result.available ? 'available' : 'taken');
-      setUsernameSuggestion(result.suggestion);
-    } catch {
-      setUsernameStatus('idle');
-    }
+    setUsername(usernameSuggestion);
+    setUsernameSuggestion(null);
   };
 
   const canSubmit =
@@ -112,7 +118,6 @@ export default function RegisterScreen() {
             className="ml-3 h-full flex-1 text-base text-text"
             value={username}
             onChangeText={onUsernameChange}
-            onBlur={onUsernameBlur}
             placeholder="tu_usuario"
             placeholderTextColor="#A79FC4"
             autoCapitalize="none"
