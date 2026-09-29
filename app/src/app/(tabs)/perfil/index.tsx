@@ -35,13 +35,13 @@ function MenuRow({
 
 export default function PerfilScreen() {
   const { user, logout, accessToken } = useAuth();
-  const [inviteFeatureEnabled, setInviteFeatureEnabled] = useState(false);
+  const [canInvite, setCanInvite] = useState(false);
 
   useEffect(() => {
     if (!accessToken) return;
     fetchMyReferralInfo(accessToken)
-      .then((info) => setInviteFeatureEnabled(info.featureEnabled))
-      .catch(() => setInviteFeatureEnabled(false));
+      .then((info) => setCanInvite(info.canInvite))
+      .catch(() => setCanInvite(false));
   }, [accessToken]);
 
   return (
@@ -69,7 +69,7 @@ export default function PerfilScreen() {
       <View className="mb-8 rounded-lg border border-border bg-surface px-4">
         <MenuRow icon="location-outline" label="Ubicaciones" href="/(tabs)/perfil/ubicaciones" />
         <MenuRow icon="calendar-outline" label="Temporadas" href="/(tabs)/perfil/temporadas" />
-        {inviteFeatureEnabled ? (
+        {canInvite ? (
           <MenuRow icon="people-outline" label="Invitar amigos" href="/(tabs)/perfil/invitar" />
         ) : null}
         <MenuRow icon="stats-chart-outline" label="Estadísticas" />

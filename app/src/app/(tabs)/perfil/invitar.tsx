@@ -45,7 +45,10 @@ export default function InvitarAmigosScreen() {
       const result = await redeemReferralCode(accessToken, redeemCode.trim());
       setRedeemCode('');
       await load();
-      Alert.alert('¡Listo!', `Canjeaste el código de ${result.inviterName}. Ya recibiste tu bono de bienvenida.`);
+      Alert.alert(
+        '¡Listo!',
+        `Canjeaste el código de ${result.inviterName}. Agrega tu primer objeto a tu colección para recibir tu bono de bienvenida.`,
+      );
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -69,11 +72,13 @@ export default function InvitarAmigosScreen() {
     );
   }
 
-  if (!info.featureEnabled) {
+  if (!info.canInvite) {
     return (
       <View className="flex-1 items-center justify-center bg-background px-8">
         <Text className="text-center text-sm text-textMuted">
-          El programa de invitaciones no está disponible por ahora.
+          {info.featureEnabled
+            ? 'Ya no puedes seguir invitando amigos con este código.'
+            : 'El programa de invitaciones no está disponible por ahora.'}
         </Text>
       </View>
     );
@@ -93,8 +98,11 @@ export default function InvitarAmigosScreen() {
 
       <Button label="Compartir mi código" onPress={onShare} />
 
-      <Text className="mb-6 mt-4 text-center text-xs text-textMuted">
+      <Text className="mt-4 text-center text-xs text-textMuted">
         {info.successfulThisMonth} de {info.limit} invitaciones exitosas este mes
+      </Text>
+      <Text className="mb-6 text-center text-xs text-textMuted">
+        {info.successfulLifetime} de {info.lifetimeLimit} en total
       </Text>
 
       {!info.alreadyReferred ? (

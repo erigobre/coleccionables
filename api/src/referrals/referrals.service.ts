@@ -1,4 +1,4 @@
-import { BadRequestException, ConflictException, Injectable } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FtService } from '../ft/ft.service.js';
 
@@ -10,6 +10,7 @@ const REFERRAL_WINDOW_DAYS = 30; // ventana de "este mes" para el tope de invita
 const INVITEE_FT_FALLBACK = 50;
 const INVITER_FT_FALLBACK = 30;
 const MONTHLY_LIMIT_FALLBACK = 3;
+const LIFETIME_LIMIT_FALLBACK = 20;
 
 function generateCandidateCode(): string {
   let code = '';
@@ -21,6 +22,8 @@ function generateCandidateCode(): string {
 
 @Injectable()
 export class ReferralsService {
+  private readonly logger = new Logger(ReferralsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly ftService: FtService,
@@ -51,26 +54,65 @@ export class ReferralsService {
   }
 
   async getMyReferralInfo(userId: string) {
-    const [user, code, featureEnabled, limit] = await Promise.all([
+    const [user, code, featureEnabled, limit, lifetimeLimit] = await Promise.all([
       this.prisma.user.findUniqueOrThrow({ where: { id: userId } }),
       this.ensureReferralCode(userId),
       this.isFeatureEnabled(),
       this.ftService.getConfigValue('REFERRAL_MONTHLY_LIMIT', MONTHLY_LIMIT_FALLBACK),
+      this.ftService.getConfigValue('REFERRAL_LIFETIME_LIMIT', LIFETIME_LIMIT_FALLBACK),
     ]);
 
     const windowStart = new Date();
     windowStart.setDate(windowStart.getDate() - REFERRAL_WINDOW_DAYS);
-    const successfulThisMonth = await this.prisma.user.count({
-      where: { referredById: userId, referredAt: { gte: windowStart } },
-    });
+    const [successfulThisMonth, successfulLifetime] = await Promise.all([
+      this.prisma.user.count({ where: { referredById: userId, referredAt: { gte: windowStart } } }),
+      this.prisma.user.count({ where: { referredById: userId } }),
+    ]);
+
+    // Suspendido (ver maybeFlagSuspiciousInviter) o al tope de por vida: se
+    // trata igual — se oculta "Invitar amigos" en la app.
+    const canInvite = featureEnabled && !user.referralSuspended && successfulLifetime < lifetimeLimit;
 
     return {
       code,
       featureEnabled,
       limit,
+      lifetimeLimit,
       successfulThisMonth,
+      successfulLifetime,
+      canInvite,
       alreadyReferred: user.referredById !== null,
     };
+  }
+
+  // Antifraude: si este mes ya se agotó todo el tope de invitaciones del
+  // inviter Y todas esas invitaciones se registraron desde la misma IP, es la
+  // firma de una granja de cuentas canjeando el mismo código una y otra vez —
+  // se marca sospechoso de forma permanente (deja de cobrar bono de inviter y
+  // se oculta la función, igual que si hubiera llegado al tope de por vida).
+  // No revierte bonos ya pagados.
+  async maybeFlagSuspiciousInviter(inviterId: string) {
+    try {
+      const inviter = await this.prisma.user.findUnique({ where: { id: inviterId } });
+      if (!inviter || inviter.referralSuspended) return;
+
+      const monthlyLimit = await this.ftService.getConfigValue('REFERRAL_MONTHLY_LIMIT', MONTHLY_LIMIT_FALLBACK);
+      const windowStart = new Date();
+      windowStart.setDate(windowStart.getDate() - REFERRAL_WINDOW_DAYS);
+      const thisMonthInvitees = await this.prisma.user.findMany({
+        where: { referredById: inviterId, referredAt: { gte: windowStart } },
+        select: { registrationIp: true },
+      });
+      if (thisMonthInvitees.length < monthlyLimit) return;
+
+      const ips = new Set(thisMonthInvitees.map((invitee) => invitee.registrationIp));
+      const allSameKnownIp = ips.size === 1 && thisMonthInvitees[0].registrationIp !== null;
+      if (allSameKnownIp) {
+        await this.prisma.user.update({ where: { id: inviterId }, data: { referralSuspended: true } });
+      }
+    } catch (error) {
+      this.logger.warn(`No se pudo evaluar antifraude de referidos para ${inviterId}`, error as Error);
+    }
   }
 
   async redeemCode(userId: string, rawCode: string) {
@@ -94,20 +136,22 @@ export class ReferralsService {
       data: { referredById: inviter.id, referredAt: new Date(), referralSource: 'FRIEND_CODE' },
     });
 
-    await this.grantReferralBonuses({
-      inviteeId: userId,
-      inviteeOrganizationId: user.organizationId,
-      inviterId: inviter.id,
-      inviterOrganizationId: inviter.organizationId,
-    });
+    // El bono ya no se otorga aquí: se exige que el invitado muestre
+    // actividad mínima primero (ver ReferralBonusCronService), para que
+    // registrarse y canjear un código no sea, por sí solo, suficiente para
+    // cobrarlo.
+    await this.maybeFlagSuspiciousInviter(inviter.id);
 
     return { inviterName: inviter.name };
   }
 
-  // Punto único de otorgamiento de bonos, reusado tanto por `redeemCode` como
-  // por el backfill de invitación-por-transferencia en AuthService.register.
-  // Si el feature está apagado no otorga el bono especial (el invitado ya
-  // recibió el bono normal de registro por otro camino).
+  // Punto único de otorgamiento de bonos: lo llama solo ReferralBonusCronService,
+  // una vez que el invitado ya mostró actividad mínima. Si el feature está
+  // apagado no otorga el bono especial (el invitado ya recibió el bono normal
+  // de registro por otro camino). El bono del inviter además respeta el tope
+  // mensual, el tope de por vida y la bandera de suspensión por antifraude
+  // (ver maybeFlagSuspiciousInviter) — el del invitado no depende de nada de
+  // eso, porque es un bono de un solo uso por cuenta.
   async grantReferralBonuses(params: {
     inviteeId: string;
     inviteeOrganizationId: string;
@@ -117,10 +161,12 @@ export class ReferralsService {
     const { inviteeId, inviteeOrganizationId, inviterId, inviterOrganizationId } = params;
     if (!(await this.isFeatureEnabled())) return;
 
-    const [inviteeFt, inviterFt, limit] = await Promise.all([
+    const [inviter, inviteeFt, inviterFt, monthlyLimit, lifetimeLimit] = await Promise.all([
+      this.prisma.user.findUniqueOrThrow({ where: { id: inviterId } }),
       this.ftService.getConfigValue('REFERRAL_INVITEE_FT', INVITEE_FT_FALLBACK),
       this.ftService.getConfigValue('REFERRAL_INVITER_FT', INVITER_FT_FALLBACK),
       this.ftService.getConfigValue('REFERRAL_MONTHLY_LIMIT', MONTHLY_LIMIT_FALLBACK),
+      this.ftService.getConfigValue('REFERRAL_LIFETIME_LIMIT', LIFETIME_LIMIT_FALLBACK),
     ]);
 
     const expiresAt = new Date();
@@ -137,11 +183,13 @@ export class ReferralsService {
 
     const windowStart = new Date();
     windowStart.setDate(windowStart.getDate() - REFERRAL_WINDOW_DAYS);
-    const successfulThisMonth = await this.prisma.user.count({
-      where: { referredById: inviterId, referredAt: { gte: windowStart } },
-    });
+    const [successfulThisMonth, successfulLifetime] = await Promise.all([
+      this.prisma.user.count({ where: { referredById: inviterId, referredAt: { gte: windowStart } } }),
+      this.prisma.user.count({ where: { referredById: inviterId } }),
+    ]);
 
-    if (successfulThisMonth <= limit) {
+    const inviterEligible = !inviter.referralSuspended && successfulThisMonth <= monthlyLimit && successfulLifetime <= lifetimeLimit;
+    if (inviterEligible) {
       await this.ftService.grant({
         organizationId: inviterOrganizationId,
         userId: inviterId,

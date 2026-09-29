@@ -109,6 +109,18 @@ model User {
   referredAt     DateTime?
   referralSource ReferralSource?
 
+  // Antifraude del programa de invitaciones (pedido 2026-09-28): IP capturada
+  // al registrarse (para detectar granjas de cuentas que canjean el mismo
+  // código desde una sola IP), bandera permanente de "sospechoso" que se
+  // trata igual que haber llegado al tope de por vida (deja de recibir bono
+  // de inviter y se oculta "Invitar amigos"), y si ya se pagó el bono de
+  // referido de ESTE usuario como invitado (se exige actividad mínima antes
+  // de pagarlo — ver ReferralBonusCronService — así que ya no se paga al
+  // instante de canjear el código).
+  registrationIp    String?
+  referralSuspended Boolean @default(false)
+  referralBonusPaid Boolean @default(false)
+
   @@map("users")
 }
 

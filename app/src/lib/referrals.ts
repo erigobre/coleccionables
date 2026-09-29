@@ -4,7 +4,10 @@ export interface ReferralInfo {
   code: string;
   featureEnabled: boolean;
   limit: number;
+  lifetimeLimit: number;
   successfulThisMonth: number;
+  successfulLifetime: number;
+  canInvite: boolean;
   alreadyReferred: boolean;
 }
 

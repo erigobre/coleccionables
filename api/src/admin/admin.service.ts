@@ -24,6 +24,7 @@ const FT_CONFIG_CATALOG: { key: string; label: string; fallback: number }[] = [
   { key: 'REFERRAL_INVITEE_FT', label: 'Bono al invitado (referido)', fallback: 50 },
   { key: 'REFERRAL_INVITER_FT', label: 'Bono a quien invita (referido)', fallback: 30 },
   { key: 'REFERRAL_MONTHLY_LIMIT', label: 'Tope de invitaciones exitosas por mes', fallback: 3 },
+  { key: 'REFERRAL_LIFETIME_LIMIT', label: 'Tope de invitaciones exitosas de por vida', fallback: 20 },
   { key: 'REFERRAL_FEATURE_ENABLED', label: 'Programa de invitaciones activo (1 = sí, 0 = no)', fallback: 1 },
 ];
 
