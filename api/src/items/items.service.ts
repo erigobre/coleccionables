@@ -27,6 +27,9 @@ const ITEM_INCLUDE = {
   currentLocation: true,
   permanentLocation: true,
   currentSeason: true,
+  // Solo se llena cuando status = PENDING_MODERATION; expone el estado de la
+  // aclaración al dueño del objeto (ver ItemsService.submitModerationAppeal).
+  moderationFlag: { select: { id: true, userAppeal: true, userAppealAt: true } },
 };
 
 const MAX_SIMILAR_RESULTS = 10;
@@ -55,7 +58,20 @@ export class ItemsService {
       await this.assertOwnedTags(ownerId, dto.tagIds);
     }
 
-    const { locationId, collectionIds, tagIds, photoUrls, avatarUrl, ...fields } = dto;
+    // Si analyzePhotos detectó una posible persona real, la foto viene con un
+    // ModerationFlag (action ITEM_HELD) esperando a que este objeto se ligue a
+    // él. Se valida que sea del mismo dueño y que nadie más lo haya usado ya
+    // (evita que un moderationFlagId ajeno o reciclado oculte un objeto).
+    let heldByModeration = false;
+    if (dto.moderationFlagId) {
+      const flag = await this.prisma.moderationFlag.findUnique({ where: { id: dto.moderationFlagId } });
+      if (!flag || flag.userId !== ownerId || flag.action !== 'ITEM_HELD' || flag.itemId) {
+        throw new BadRequestException('moderationFlagId inválido');
+      }
+      heldByModeration = true;
+    }
+
+    const { locationId, collectionIds, tagIds, photoUrls, avatarUrl, moderationFlagId, ...fields } = dto;
 
     // El avatar 1:1 se usa para el re-ranking visual de "¿Ya lo tengo?" (y a
     // futuro como miniatura de UI). Si vino de analyzePhotos (recorte preciso
@@ -65,10 +81,11 @@ export class ItemsService {
     const resolvedAvatarUrl =
       avatarUrl ?? (photoUrls?.length ? await this.buildFallbackAvatar(photoUrls[0]) : undefined);
 
-    return this.prisma.item.create({
+    const item = await this.prisma.item.create({
       data: {
         ownerId,
         ...fields,
+        status: heldByModeration ? 'PENDING_MODERATION' : undefined,
         avatarUrl: resolvedAvatarUrl ?? null,
         acquisitionDate: dto.acquisitionDate ? new Date(dto.acquisitionDate) : undefined,
         currentLocationId: locationId ?? null,
@@ -83,6 +100,15 @@ export class ItemsService {
       },
       include: ITEM_INCLUDE,
     });
+
+    if (heldByModeration) {
+      await this.prisma.moderationFlag.update({
+        where: { id: dto.moderationFlagId },
+        data: { itemId: item.id },
+      });
+    }
+
+    return item;
   }
 
   private async buildFallbackAvatar(photoUrl: string): Promise<string | undefined> {
@@ -91,12 +117,14 @@ export class ItemsService {
     return this.storageService.saveAvatar(image);
   }
 
-  // Vista principal de Objetos: los vendidos desaparecen (plan §5.3.9.4).
+  // Vista principal de Objetos: los vendidos desaparecen (plan §5.3.9.4) y los
+  // retenidos en moderación tampoco se listan (solo viven en Moderación hasta
+  // que un superadmin los revise, ver ItemsService.create).
   findAll(ownerId: string, filters: { collectionId?: string; favoritesOnly?: boolean } = {}) {
     return this.prisma.item.findMany({
       where: {
         ownerId,
-        status: { not: 'SOLD' },
+        status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
         isFavorite: filters.favoritesOnly ? true : undefined,
         collections: filters.collectionId ? { some: { collectionId: filters.collectionId } } : undefined,
       },
@@ -130,6 +158,24 @@ export class ItemsService {
   }
 
   async findOne(ownerId: string, id: string) {
+    return this.assertOwnedItem(ownerId, id);
+  }
+
+  // El dueño puede pedir una aclaración una sola vez mientras el objeto está
+  // retenido (status PENDING_MODERATION); el superadmin la ve en Moderación
+  // al resolver el ModerationFlag (action ITEM_HELD) ligado.
+  async submitModerationAppeal(ownerId: string, id: string, message: string) {
+    const item = await this.assertOwnedItem(ownerId, id);
+    if (item.status !== 'PENDING_MODERATION' || !item.moderationFlag) {
+      throw new BadRequestException('Este objeto no está en revisión');
+    }
+    if (item.moderationFlag.userAppeal) {
+      throw new BadRequestException('Ya enviaste una aclaración para este objeto');
+    }
+    await this.prisma.moderationFlag.update({
+      where: { id: item.moderationFlag.id },
+      data: { userAppeal: message, userAppealAt: new Date() },
+    });
     return this.assertOwnedItem(ownerId, id);
   }
 
@@ -323,7 +369,7 @@ export class ItemsService {
   async findSimilar(ownerId: string, id: string) {
     const item = await this.assertOwnedItem(ownerId, id);
     const candidates = await this.prisma.item.findMany({
-      where: { ownerId, status: { not: 'SOLD' }, id: { not: id } },
+      where: { ownerId, status: { notIn: ['SOLD', 'PENDING_MODERATION'] }, id: { not: id } },
       include: { tags: { include: { tag: true } } },
     });
 
@@ -347,7 +393,7 @@ export class ItemsService {
       currentLocation: { select: { id: true, name: true } },
     };
     const [activeCandidates, soldCandidates] = await Promise.all([
-      this.prisma.item.findMany({ where: { ownerId, status: { not: 'SOLD' } }, include }),
+      this.prisma.item.findMany({ where: { ownerId, status: { notIn: ['SOLD', 'PENDING_MODERATION'] } }, include }),
       this.prisma.item.findMany({ where: { ownerId, status: 'SOLD' }, include }),
     ]);
 
@@ -375,7 +421,22 @@ export class ItemsService {
       { organizationId, userId: ownerId, service: 'SCAN_HAVE_IT', idempotencyKey },
       async () => {
         const { result: extracted, usage, moderation, boundingBox } = await this.geminiService.analyzePhotos(files);
-        await this.handleModerationSignal(organizationId, ownerId, 'identify', moderation);
+        await this.blockIfUnsafe(organizationId, ownerId, 'identify', moderation);
+        // "identify" nunca sube ni guarda la foto (a diferencia de analyzePhotos),
+        // así que no hay objeto que retener: solo se marca para revisión, sin
+        // ITEM_HELD ni photoUrls (ver flagAfterUpload).
+        if (moderation?.containsIdentifiablePerson === true || moderation?.isLikelyCollectible === false) {
+          await this.prisma.moderationFlag.create({
+            data: {
+              organizationId,
+              userId: ownerId,
+              context: 'identify',
+              category: moderation.containsIdentifiablePerson ? 'possible_person' : 'not_collectible',
+              detail: moderation.moderationNote,
+              action: 'FLAGGED_FOR_REVIEW',
+            },
+          });
+        }
         const matchResult = await this.match(ownerId, {
           name: extracted.name,
           brand: extracted.brand,
@@ -609,15 +670,25 @@ export class ItemsService {
       { organizationId, userId: ownerId, service: 'CREATE_WITH_AI', idempotencyKey },
       async () => {
         // Ojo: NO se sube la foto en paralelo con el análisis (a diferencia de
-        // antes) — si la moderación la rechaza, no debe quedar guardada.
+        // antes) — si Google la rechaza por seguridad, no debe quedar guardada.
         const { result: extracted, usage, moderation, boundingBox } = await this.geminiService.analyzePhotos(files);
-        await this.handleModerationSignal(organizationId, ownerId, 'analyzePhotos', moderation);
+        await this.blockIfUnsafe(organizationId, ownerId, 'analyzePhotos', moderation);
         const [photoUrls, avatarUrl] = await Promise.all([
           Promise.all(files.map((file) => this.storageService.saveCompressedImage(file))),
           this.storageService.saveAvatar(files[0], boundingBox),
         ]);
+        // Con las fotos ya subidas, "persona real"/"no parece coleccionable" se
+        // marcan para moderación (ver flagAfterUpload) SIN bloquear el análisis:
+        // el objeto se sigue creando, solo queda retenido si corresponde.
+        const moderationFlagId = await this.flagAfterUpload(
+          organizationId,
+          ownerId,
+          'analyzePhotos',
+          moderation,
+          photoUrls,
+        );
         return {
-          data: { extracted, photoUrls, avatarUrl },
+          data: { extracted, photoUrls, avatarUrl, moderationFlagId },
           realCostUsd: GeminiService.estimateCostUsd(usage),
           usageEventType: 'AI_SCAN' as const,
         };
@@ -626,55 +697,90 @@ export class ItemsService {
   }
 
   // Moderación de contenido de las fotos subidas (plan confirmado con el owner
-  // 2026-09-22, a raíz de la pregunta "¿qué pasa si suben una foto que no es
-  // un objeto coleccionable / contenido sexual no autorizado?").
-  // - blockedByGoogleSafety (filtro propio de Gemini, auditado por Google):
-  //   la señal más confiable → se registra el incidente Y se suspende la
-  //   cuenta de inmediato. `runChargedAction` libera el cobro de FT al
-  //   propagarse esta excepción, así que nunca se cobra por un intento así.
-  // - isLikelyCollectible/containsIdentifiablePerson (chequeo propio, pedido
-  //   al mismo modelo): menos confiable — una figura/muñeco con rostro humano
-  //   puede disparar un falso positivo — así que solo queda marcado para
-  //   revisión de un superadmin (admin.service.ts), sin bloquear al usuario.
-  private async handleModerationSignal(
+  // 2026-09-22, extendido 2026-09-29 con el retenido automático de objetos
+  // con persona real detectada — ver flagAfterUpload).
+  // blockedByGoogleSafety (filtro propio de Gemini, auditado por Google): la
+  // señal más confiable → se registra el incidente Y se suspende la cuenta de
+  // inmediato, sin siquiera subir la foto. `runChargedAction` libera el cobro
+  // de FT al propagarse esta excepción, así que nunca se cobra por un intento así.
+  private async blockIfUnsafe(
     organizationId: string,
     userId: string,
     context: string,
     moderation: ModerationSignal | undefined,
   ) {
-    if (!moderation) return;
+    if (!moderation?.blockedByGoogleSafety) return;
 
-    if (moderation.blockedByGoogleSafety) {
-      await this.prisma.$transaction([
-        this.prisma.moderationFlag.create({
-          data: {
-            organizationId,
-            userId,
-            context,
-            category: moderation.blockedCategories.join(', ') || 'safety_block',
-            detail: moderation.moderationNote,
-            action: 'AUTO_SUSPENDED',
-          },
-        }),
-        this.prisma.user.update({ where: { id: userId }, data: { status: 'SUSPENDED' } }),
-      ]);
-      throw new ForbiddenException(
-        'Esta foto fue bloqueada por nuestro filtro de contenido y tu cuenta fue suspendida. Si crees que es un error, contacta a soporte.',
-      );
+    await this.prisma.$transaction([
+      this.prisma.moderationFlag.create({
+        data: {
+          organizationId,
+          userId,
+          context,
+          category: moderation.blockedCategories.join(', ') || 'safety_block',
+          detail: moderation.moderationNote,
+          action: 'AUTO_SUSPENDED',
+        },
+      }),
+      this.prisma.user.update({ where: { id: userId }, data: { status: 'SUSPENDED' } }),
+    ]);
+    throw new ForbiddenException(
+      'Esta foto fue bloqueada por nuestro filtro de contenido y tu cuenta fue suspendida. Si crees que es un error, contacta a soporte.',
+    );
+  }
+
+  // isLikelyCollectible/containsIdentifiablePerson (chequeo propio, pedido al
+  // mismo modelo): menos confiable que el filtro de Google — una
+  // figura/muñeco con rostro humano puede disparar un falso positivo — así
+  // que nunca suspende sola a nadie. Diferencia entre las dos categorías
+  // (decisión 2026-09-29, a raíz de "no quiero que la app sea usada para
+  // malas prácticas"):
+  // - containsIdentifiablePerson: retiene el objeto (ITEM_HELD) — no aparece
+  //   en Objetos hasta que un superadmin lo revise (ver ItemsService.create).
+  //   No se distingue "es un niño" con una señal aparte de la IA (estimar
+  //   edad por foto es poco confiable); el criterio queda en manos del
+  //   moderador humano al ver la foto en el panel.
+  // - isLikelyCollectible === false (y no hay persona): solo queda marcado
+  //   para revisión, el objeto se guarda normal — igual que antes.
+  private async flagAfterUpload(
+    organizationId: string,
+    userId: string,
+    context: string,
+    moderation: ModerationSignal | undefined,
+    photoUrls: string[],
+  ): Promise<string | null> {
+    if (!moderation) return null;
+
+    if (moderation.containsIdentifiablePerson === true) {
+      const flag = await this.prisma.moderationFlag.create({
+        data: {
+          organizationId,
+          userId,
+          context,
+          category: 'possible_person',
+          detail: moderation.moderationNote,
+          action: 'ITEM_HELD',
+          photoUrls,
+        },
+      });
+      return flag.id;
     }
 
-    if (moderation.isLikelyCollectible === false || moderation.containsIdentifiablePerson === true) {
+    if (moderation.isLikelyCollectible === false) {
       await this.prisma.moderationFlag.create({
         data: {
           organizationId,
           userId,
           context,
-          category: moderation.containsIdentifiablePerson ? 'possible_person' : 'not_collectible',
+          category: 'not_collectible',
           detail: moderation.moderationNote,
           action: 'FLAGGED_FOR_REVIEW',
+          photoUrls,
         },
       });
     }
+
+    return null;
   }
 
   private assertHasPhotos(files: ImageInput[] | undefined) {

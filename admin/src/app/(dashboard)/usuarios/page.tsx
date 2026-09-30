@@ -61,7 +61,14 @@ export default async function UsuariosPage({
               <TableRow key={user.id}>
                 <TableCell className="font-medium text-foreground">
                   <Link href={`/usuarios/${user.id}`} className="hover:underline">
-                    {user.username ? `@${user.username}` : user.name}
+                    {user.username ? (
+                      <>
+                        <span className="text-primary">@</span>
+                        {user.username}
+                      </>
+                    ) : (
+                      user.name
+                    )}
                   </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>

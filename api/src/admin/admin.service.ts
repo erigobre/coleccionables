@@ -3,6 +3,8 @@ import type { Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FtService } from '../ft/ft.service.js';
+import { StorageService } from '../storage/storage.service.js';
+import { NotificationsService } from '../notifications/notifications.service.js';
 import type { CreatePaymentDto } from './dto/create-payment.dto.js';
 import type { ResolveModerationFlagDto } from './dto/resolve-moderation-flag.dto.js';
 import type { UpdateUserDto } from './dto/update-user.dto.js';
@@ -33,6 +35,8 @@ export class AdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly ftService: FtService,
+    private readonly storageService: StorageService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   // Bitácora de acciones del panel Superadmin (plan §5.6, pedido 2026-09-25).
@@ -303,18 +307,57 @@ export class AdminService {
   // con el owner 2026-09-22): el reporte vive como cola de revisión interna
   // aquí; un reporte externo (ej. NCMEC para CSAM real) es una decisión legal
   // que le corresponde al owner tomar caso por caso, no algo que se automatiza.
-  findModerationFlags(reviewed?: boolean) {
+  findModerationFlags(reviewed?: boolean, category?: string) {
     return this.prisma.moderationFlag.findMany({
-      where: reviewed === undefined ? undefined : { reviewedAt: reviewed ? { not: null } : null },
-      include: { user: { select: { id: true, name: true, email: true, username: true, status: true } } },
+      where: {
+        reviewedAt: reviewed === undefined ? undefined : reviewed ? { not: null } : null,
+        category: category ? category : undefined,
+      },
+      include: {
+        user: { select: { id: true, name: true, email: true, username: true, status: true } },
+        item: { select: { id: true, name: true, status: true, category: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
 
   async resolveModerationFlag(admin: { id: string; email: string }, id: string, dto: ResolveModerationFlagDto) {
-    const flag = await this.prisma.moderationFlag.findUnique({ where: { id } });
+    const flag = await this.prisma.moderationFlag.findUnique({ where: { id }, include: { item: { include: { photos: true } } } });
     if (!flag) {
       throw new NotFoundException('Incidente de moderación no encontrado');
+    }
+
+    if (flag.action === 'ITEM_HELD' && flag.item) {
+      if (dto.approveItem === undefined) {
+        throw new BadRequestException('Indica si el objeto retenido se aprueba o se rechaza (approveItem)');
+      }
+      if (dto.approveItem) {
+        await this.prisma.item.update({ where: { id: flag.item.id }, data: { status: 'ACTIVE' } });
+        if (flag.userId) {
+          this.notificationsService
+            .sendPushToUser(flag.userId, {
+              title: 'Tu objeto ya está disponible',
+              body: `Revisamos "${flag.item.name}" y ya lo puedes ver en tus Objetos.`,
+            })
+            .catch(() => {});
+        }
+      } else {
+        await Promise.all(flag.item.photos.map((photo) => this.storageService.deleteImage(photo.url)));
+        if (flag.item.avatarUrl) {
+          await this.storageService.deleteImage(flag.item.avatarUrl);
+        }
+        await this.prisma.item.delete({ where: { id: flag.item.id } });
+        if (flag.userId) {
+          this.notificationsService
+            .sendPushToUser(flag.userId, {
+              title: 'Tu objeto no pudo agregarse',
+              body:
+                dto.resolution ||
+                'Revisamos tu foto y no cumple nuestras reglas de contenido. Puedes volver a intentarlo con una foto donde solo se vea el objeto.',
+            })
+            .catch(() => {});
+        }
+      }
     }
 
     const updated = await this.prisma.moderationFlag.update({
@@ -328,6 +371,7 @@ export class AdminService {
 
     await this.logAction(admin, 'moderationFlag.resolve', 'ModerationFlag', id, {
       reactivateUser: dto.reactivateUser ?? false,
+      approveItem: dto.approveItem,
     });
     return updated;
   }

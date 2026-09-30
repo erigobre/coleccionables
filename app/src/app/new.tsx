@@ -174,6 +174,7 @@ export default function NewItemScreen() {
         tagIds: allTagIds.length ? allTagIds : undefined,
         photoUrls: photoUrls.length ? photoUrls : undefined,
         avatarUrl: draft?.avatarUrl,
+        moderationFlagId: draft?.moderationFlagId,
       });
       const item = await createItem(accessToken, dto);
       // `new` vive fuera de los tabs (ver root _layout.tsx), así que un simple

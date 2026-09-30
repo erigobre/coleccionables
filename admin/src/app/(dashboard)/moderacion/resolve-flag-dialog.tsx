@@ -9,8 +9,17 @@ import { resolveFlagAction, type ResolveFlagState } from './actions';
 
 const initialState: ResolveFlagState = {};
 
-export function ResolveFlagDialog({ flagId, canReactivate }: { flagId: string; canReactivate: boolean }) {
+export function ResolveFlagDialog({
+  flagId,
+  canReactivate,
+  isHeldItem,
+}: {
+  flagId: string;
+  canReactivate: boolean;
+  isHeldItem: boolean;
+}) {
   const [open, setOpen] = useState(false);
+  const [approveItem, setApproveItem] = useState<'true' | 'false'>('true');
   const action = resolveFlagAction.bind(null, flagId);
   const [state, formAction, pending] = useActionState(async (prev: ResolveFlagState, formData: FormData) => {
     const result = await action(prev, formData);
@@ -29,6 +38,33 @@ export function ResolveFlagDialog({ flagId, canReactivate }: { flagId: string; c
           <DialogTitle>Resolver incidente de moderación</DialogTitle>
         </DialogHeader>
         <form action={formAction} className="space-y-4">
+          {isHeldItem && (
+            <div className="space-y-2">
+              <Label>Objeto retenido</Label>
+              <div className="flex gap-4 text-sm text-foreground">
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="approveItem"
+                    value="true"
+                    checked={approveItem === 'true'}
+                    onChange={() => setApproveItem('true')}
+                  />
+                  Aprobar (era un falso positivo)
+                </label>
+                <label className="flex items-center gap-2">
+                  <input
+                    type="radio"
+                    name="approveItem"
+                    value="false"
+                    checked={approveItem === 'false'}
+                    onChange={() => setApproveItem('false')}
+                  />
+                  Rechazar (borrar objeto y fotos)
+                </label>
+              </div>
+            </div>
+          )}
           <div className="space-y-2">
             <Label htmlFor="resolution">Nota de resolución</Label>
             <textarea
@@ -36,7 +72,11 @@ export function ResolveFlagDialog({ flagId, canReactivate }: { flagId: string; c
               name="resolution"
               rows={3}
               className="w-full rounded-lg border border-border bg-background px-2.5 py-2 text-sm text-foreground"
-              placeholder="Qué se decidió y por qué"
+              placeholder={
+                isHeldItem && approveItem === 'false'
+                  ? 'Se muestra al usuario como motivo del rechazo (opcional)'
+                  : 'Qué se decidió y por qué'
+              }
             />
           </div>
           {canReactivate && (

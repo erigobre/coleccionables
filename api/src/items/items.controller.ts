@@ -12,6 +12,7 @@ import { MatchItemDto } from './dto/match-item.dto.js';
 import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
 import { LookupMarketPriceDto } from './dto/lookup-market-price.dto.js';
 import { AnalyzePhotosDto } from './dto/analyze-photos.dto.js';
+import { ModerationAppealDto } from './dto/moderation-appeal.dto.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -113,6 +114,17 @@ export class ItemsController {
   @Delete(':id/sale')
   clearSale(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
     return this.itemsService.clearSale(user.id, id);
+  }
+
+  // El dueño pide una aclaración mientras el objeto está retenido en
+  // moderación (status PENDING_MODERATION); solo se puede una vez.
+  @Patch(':id/moderation-appeal')
+  submitModerationAppeal(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ModerationAppealDto,
+  ) {
+    return this.itemsService.submitModerationAppeal(user.id, id, dto.message);
   }
 
   @Patch(':id/favorite')

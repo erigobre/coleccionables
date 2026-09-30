@@ -38,6 +38,20 @@ function formatDate(value: string) {
   return new Date(value).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+// El nombre se genera como "Monedero de {username}" (auth.service.ts, sin
+// arroba en el texto guardado); aquí solo se resalta esa parte en la UI para
+// unificar la visualización con Usuarios, que sí muestra "@usuario" en verde.
+function renderOrgName(name: string) {
+  const match = name.match(/^Monedero de (.+)$/);
+  if (!match) return name;
+  return (
+    <>
+      Monedero de <span className="text-primary">@</span>
+      {match[1]}
+    </>
+  );
+}
+
 export default async function OrganizacionesPage() {
   const organizations = await backendFetch<AdminOrganization[]>('/admin/organizations');
 
@@ -50,7 +64,7 @@ export default async function OrganizacionesPage() {
           <div key={org.id} className="rounded-xl border border-border p-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-lg font-semibold text-foreground">{org.name}</h2>
+                <h2 className="text-lg font-semibold text-foreground">{renderOrgName(org.name)}</h2>
                 <p className="text-sm text-muted-foreground">
                   {org._count.users} usuario(s) · Plan: {org.plan ?? '—'}
                 </p>

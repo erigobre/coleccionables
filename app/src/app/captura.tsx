@@ -3,7 +3,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIProcessingOverlay } from '../components/ui/AIProcessingOverlay';
 import { Button } from '../components/ui/Button';
@@ -116,17 +116,30 @@ export default function CapturaScreen() {
     setBusy('analizar');
     setError(null);
     try {
-      const { extracted, photoUrls, avatarUrl } = await analyzing.run(() => analyzeItemPhotos(accessToken, photos));
+      const { extracted, photoUrls, avatarUrl, moderationFlagId } = await analyzing.run(() =>
+        analyzeItemPhotos(accessToken, photos),
+      );
       refreshFt();
       setItemDraft({
         values: itemFormFromExtracted(extracted),
         photoUrls,
         avatarUrl,
         suggestedTags: extracted.suggestedTags ?? [],
-        notice: 'Revisa lo que detectó la IA y corrige lo que haga falta.',
+        notice: moderationFlagId
+          ? 'Este objeto quedará pendiente de revisión (ver aviso).'
+          : 'Revisa lo que detectó la IA y corrige lo que haga falta.',
         source: 'ai',
+        moderationFlagId: moderationFlagId ?? undefined,
       });
-      goToForm();
+      if (moderationFlagId) {
+        Alert.alert(
+          'Al parecer hay una persona real en tu fotografía',
+          'Para proteger a las personas —sobre todo a menores— que puedan aparecer sin querer en una foto, tu objeto quedará pendiente de revisión antes de aparecer en tu colección. Te recomendamos fotografiar el objeto solo, sobre un fondo limpio, para una mejor apreciación. Si crees que es un error, podrás pedir una aclaración desde el detalle del objeto.',
+          [{ text: 'Entendido', onPress: goToForm }],
+        );
+      } else {
+        goToForm();
+      }
     } catch (err) {
       if (err instanceof ApiError && err.status === 402) {
         setNoFtVisible(true);

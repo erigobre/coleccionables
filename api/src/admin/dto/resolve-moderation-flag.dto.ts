@@ -13,4 +13,11 @@ export class ResolveModerationFlagDto {
   @IsOptional()
   @IsBoolean()
   reactivateUser?: boolean;
+
+  // Solo aplica a flags con action = ITEM_HELD (objeto retenido): true lo
+  // libera (status ACTIVE), false lo rechaza y lo borra junto con sus fotos.
+  // Obligatorio para resolver ese tipo de flag (ver AdminService.resolveModerationFlag).
+  @IsOptional()
+  @IsBoolean()
+  approveItem?: boolean;
 }

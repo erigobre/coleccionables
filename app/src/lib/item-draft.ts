@@ -18,6 +18,9 @@ export interface ItemDraft {
   // identificador único (SKU) — solo tiene sentido pedirlo si se llegó por
   // escaneo de código de barras.
   source?: ItemDraftSource;
+  // Si analyzeItemPhotos detectó una posible persona real: el objeto se debe
+  // crear retenido (ver CreateItemDto.moderationFlagId).
+  moderationFlagId?: string;
 }
 
 let current: ItemDraft | null = null;

@@ -8,7 +8,7 @@ import type {
   UsageState,
 } from './item-enums';
 
-export type ItemStatus = 'ACTIVE' | 'PENDING_TRANSFER' | 'SOLD' | 'DONATED' | 'LOST';
+export type ItemStatus = 'ACTIVE' | 'PENDING_TRANSFER' | 'SOLD' | 'DONATED' | 'LOST' | 'PENDING_MODERATION';
 export type LocationAssignment = 'INDEFINIDO' | 'TEMPORAL';
 
 export interface ItemPhoto {
@@ -91,6 +91,8 @@ export interface Item {
   currentLocation: ItemLocationRef | null;
   permanentLocation: ItemLocationRef | null;
   currentSeason: ItemSeasonRef | null;
+  // Solo viene cuando status = PENDING_MODERATION (ver ItemsService.submitModerationAppeal).
+  moderationFlag: { id: string; userAppeal: string | null; userAppealAt: string | null } | null;
 }
 
 // Un objeto está "fuera de su lugar" si su ubicación actual no es la permanente o
@@ -135,6 +137,9 @@ export interface CreateItemDto {
   tagIds?: string[];
   photoUrls?: string[];
   avatarUrl?: string;
+  // Si analyzeItemPhotos detectó una posible persona real, liga el objeto al
+  // ModerationFlag que lo retiene (ver AnalyzeItemResult).
+  moderationFlagId?: string;
 }
 
 // El backend gestiona ubicación/colecciones/tags/fotos con endpoints propios de
@@ -167,6 +172,16 @@ export function createItem(accessToken: string, dto: CreateItemDto) {
 
 export function updateItem(accessToken: string, id: string, dto: UpdateItemDto) {
   return apiFetch<Item>(`/items/${id}`, { method: 'PATCH', body: dto, accessToken });
+}
+
+// El dueño pide una aclaración mientras el objeto está retenido en moderación
+// (status PENDING_MODERATION); solo se puede una vez por objeto.
+export function submitModerationAppeal(accessToken: string, id: string, message: string) {
+  return apiFetch<Item>(`/items/${id}/moderation-appeal`, {
+    method: 'PATCH',
+    body: { message },
+    accessToken,
+  });
 }
 
 export function deleteItem(accessToken: string, id: string) {
@@ -288,6 +303,9 @@ export interface AnalyzeItemResult {
   extracted: ExtractedItemData;
   photoUrls: string[];
   avatarUrl?: string;
+  // Si la IA detectó una posible persona real, el objeto debe crearse retenido
+  // (moderationFlagId en CreateItemDto) en vez de guardarse normal.
+  moderationFlagId?: string | null;
 }
 
 // Las fotos de cámara se redimensionan/comprimen en el cliente antes de subir

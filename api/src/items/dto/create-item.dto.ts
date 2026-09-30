@@ -144,4 +144,11 @@ export class CreateItemDto {
   @IsOptional()
   @IsString()
   avatarUrl?: string;
+
+  // Si analyzePhotos detectó una posible persona real, viene aquí el id del
+  // ModerationFlag (action ITEM_HELD) para ligarlo: el objeto se crea oculto
+  // (status PENDING_MODERATION) hasta que un superadmin lo revise.
+  @IsOptional()
+  @IsString()
+  moderationFlagId?: string;
 }

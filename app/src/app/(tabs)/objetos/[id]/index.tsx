@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, useWindow
 import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
+import { TextField } from '../../../../components/ui/TextField';
 import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { useFt } from '../../../../context/ft-context';
@@ -19,6 +20,7 @@ import {
   removeItemFromCollection,
   removeItemTag,
   shareItem,
+  submitModerationAppeal,
   toggleFavorite,
   unshareItem,
   updateItem,
@@ -43,6 +45,7 @@ const STATUS_LABEL: Record<string, string> = {
   SOLD: 'Vendido',
   DONATED: 'Donado',
   LOST: 'Perdido',
+  PENDING_MODERATION: 'En revisión',
 };
 
 function InfoRow({ label, value }: { label: string; value: string | null }) {
@@ -79,6 +82,9 @@ export default function ItemDetailScreen() {
   const [loadingMarketPrice, setLoadingMarketPrice] = useState<'cached' | 'fresh' | null>(null);
   const [applyingNotes, setApplyingNotes] = useState(false);
   const [saleVisible, setSaleVisible] = useState(false);
+  const [appealMessage, setAppealMessage] = useState('');
+  const [submittingAppeal, setSubmittingAppeal] = useState(false);
+  const [appealError, setAppealError] = useState<string | null>(null);
   const marketPriceProcessing = useAiProcessing();
 
   const load = useCallback(async () => {
@@ -185,6 +191,20 @@ export default function ItemDetailScreen() {
       setError(authErrorMessage(err));
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const onSubmitAppeal = async () => {
+    if (!accessToken || !item || !appealMessage.trim()) return;
+    setSubmittingAppeal(true);
+    setAppealError(null);
+    try {
+      const updated = await submitModerationAppeal(accessToken, item.id, appealMessage.trim());
+      setItem(updated);
+    } catch (err) {
+      setAppealError(authErrorMessage(err));
+    } finally {
+      setSubmittingAppeal(false);
     }
   };
 
@@ -547,6 +567,41 @@ export default function ItemDetailScreen() {
               vuelve a ti.
             </Text>
             <Button label="Cancelar envío" variant="ghost" onPress={onCancelTransfer} loading={cancelling} />
+          </View>
+        ) : null}
+
+        {item.status === 'PENDING_MODERATION' ? (
+          <View className="mb-5 rounded-lg border border-primary bg-surface p-4">
+            <Text className="mb-1 text-sm font-semibold text-text">En revisión</Text>
+            <Text className="mb-4 text-xs text-textMuted">
+              Detectamos una posible persona real en la foto, así que este objeto está oculto de tu colección
+              mientras lo revisamos. Si crees que es un error, puedes pedirnos una aclaración.
+            </Text>
+            {item.moderationFlag?.userAppeal ? (
+              <View className="rounded-md border border-border bg-surfaceElevated p-3">
+                <Text className="mb-1 text-xs font-medium text-textSecondary">Tu aclaración</Text>
+                <Text className="text-sm text-text">{item.moderationFlag.userAppeal}</Text>
+              </View>
+            ) : (
+              <>
+                <TextField
+                  label="Aclaración (opcional)"
+                  placeholder="Cuéntanos por qué crees que es un error..."
+                  value={appealMessage}
+                  onChangeText={setAppealMessage}
+                  autoExpand
+                  multiline
+                />
+                {appealError ? <Text className="mb-2 text-xs text-danger">{appealError}</Text> : null}
+                <Button
+                  label="Enviar aclaración"
+                  variant="secondary"
+                  onPress={onSubmitAppeal}
+                  loading={submittingAppeal}
+                  disabled={!appealMessage.trim()}
+                />
+              </>
+            )}
           </View>
         ) : null}
 

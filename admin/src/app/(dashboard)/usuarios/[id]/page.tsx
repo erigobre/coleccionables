@@ -45,10 +45,26 @@ export default async function UsuarioDetailPage({ params }: { params: Promise<{ 
               Usuarios
             </Link>
             <ChevronRight className="size-3.5" />
-            <span className="text-foreground">{user.username ? `@${user.username}` : user.name}</span>
+            <span className="text-foreground">
+              {user.username ? (
+                <>
+                  <span className="text-primary">@</span>
+                  {user.username}
+                </>
+              ) : (
+                user.name
+              )}
+            </span>
           </div>
           <h1 className="mt-1 text-2xl font-bold text-foreground">
-            {user.username ? `@${user.username}` : user.name}
+            {user.username ? (
+              <>
+                <span className="text-primary">@</span>
+                {user.username}
+              </>
+            ) : (
+              user.name
+            )}
           </h1>
           {user.username && <p className="text-sm text-muted-foreground">{user.name}</p>}
         </div>

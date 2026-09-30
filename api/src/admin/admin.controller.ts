@@ -87,9 +87,10 @@ export class AdminController {
   // Cola de "reportes" de moderación de IA (contenido no apto / no
   // coleccionable) — plan confirmado con el owner 2026-09-22.
   @Get('moderation-flags')
-  findModerationFlags(@Query('reviewed') reviewed?: string) {
+  findModerationFlags(@Query('reviewed') reviewed?: string, @Query('category') category?: string) {
     return this.adminService.findModerationFlags(
       reviewed === undefined ? undefined : reviewed === 'true',
+      category,
     );
   }
 

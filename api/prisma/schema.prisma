@@ -398,6 +398,7 @@ model SupportRequest {
 enum ModerationAction {
   AUTO_SUSPENDED
   FLAGGED_FOR_REVIEW
+  ITEM_HELD // objeto creado pero oculto de "Objetos" hasta que un moderador lo revise (ver Item.status PENDING_MODERATION)
 }
 
 // Incidente detectado por la IA al analizar fotos (plan: bloqueo/reporte de
@@ -417,6 +418,18 @@ model ModerationFlag {
   category       String // ej. "sexually_explicit", "not_collectible", "possible_person"
   detail         String?           @db.Text // nota de la IA para que el revisor entienda qué vio
   action         ModerationAction
+  // Copia de las fotos ya subidas (mismas URLs que Item.photos) para que el
+  // superadmin las vea en Moderación sin depender de que el objeto exista o
+  // siga teniendo esas fotos ligadas.
+  photoUrls      Json?
+  // Solo se llena cuando action = ITEM_HELD: liga el objeto que quedó oculto
+  // en lo que se revisa (ver ItemsService.create).
+  itemId         String?           @unique
+  item           Item?             @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  // Aclaración que el usuario puede escribir desde la app cuando su objeto
+  // queda retenido (ITEM_HELD) y cree que fue un error de la IA.
+  userAppeal     String?           @db.Text
+  userAppealAt   DateTime?
   reviewedAt     DateTime?
   reviewedById   String? // id del superadmin que revisó (sin relación FK: no debe romperse si ese admin se borra)
   resolution     String?           @db.Text
@@ -603,6 +616,7 @@ enum ItemStatus {
   SOLD
   DONATED
   LOST
+  PENDING_MODERATION // IA detectó una persona real en la foto; oculto de "Objetos" hasta que un superadmin lo revise (ver ModerationFlag.action = ITEM_HELD)
 }
 
 // Estado comercial del objeto (independiente de ItemStatus): solo aplica si el dueño lo puso en venta.
@@ -698,6 +712,7 @@ model Item {
   transfers         Transfer[]
   shareLink         ShareLink?
   marketPriceChecks MarketPriceCheck[]
+  moderationFlag    ModerationFlag?
 
   @@index([ownerId, status])
   @@map("items")

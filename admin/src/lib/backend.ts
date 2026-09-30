@@ -4,6 +4,12 @@ import { getSession } from './session';
 // Next.js, que reenvía el JWT guardado en cookie httpOnly (ver session.ts).
 const API_BASE_URL = process.env.API_BASE_URL ?? 'https://api.frikidex.com';
 
+// Las fotos se guardan en la BD como ruta relativa del backend (`/uploads/x.jpg`),
+// mismo criterio que `resolvePhotoUrl` en la app móvil (app/src/lib/api.ts).
+export function resolvePhotoUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `${API_BASE_URL}${url}`;
+}
+
 export class BackendError extends Error {
   status: number;
   constructor(status: number, message: string) {

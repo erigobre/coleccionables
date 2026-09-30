@@ -187,6 +187,7 @@ export function itemFormToCreateDto(
     tagIds?: string[];
     photoUrls?: string[];
     avatarUrl?: string;
+    moderationFlagId?: string;
   },
 ): CreateItemDto {
   return { ...scalarFields(values), ...extra };
