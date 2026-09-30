@@ -31,6 +31,7 @@ function matchesQuery(item: Item, query: string): boolean {
     item.edition,
     item.uniqueIdentifier,
     ...item.collections.map((c) => c.collection.name),
+    ...item.tags.map((t) => t.tag.name),
   ]
     .filter(Boolean)
     .map((value) => normalize(value as string))

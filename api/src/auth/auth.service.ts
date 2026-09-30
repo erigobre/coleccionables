@@ -79,9 +79,13 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(dto.password, SALT_ROUNDS);
 
     const user = await this.prisma.$transaction(async (tx) => {
-      // La organización ya no la nombra el usuario a mano; se deriva de su nombre.
+      // La organización ya no la nombra el usuario a mano; se deriva de su
+      // @usuario. Se llama "Monedero de..." (no "Colección de...") porque en
+      // el superadmin esto identifica la unidad de facturación/saldo de FT
+      // (ver comentario en Organization, schema.prisma), no tiene relación
+      // con la sección "Colecciones" de la app.
       const organization = await tx.organization.create({
-        data: { name: `Colección de ${dto.name}` },
+        data: { name: `Monedero de ${username}` },
       });
 
       const createdUser = await tx.user.create({

@@ -11,6 +11,7 @@ import { DeleteUserDialog } from './delete-user-dialog';
 interface AdminUser {
   id: string;
   name: string;
+  username: string | null;
   email: string;
   role: string;
   status: string;
@@ -39,7 +40,7 @@ export default async function UsuariosPage({
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-2xl font-bold text-foreground">Usuarios</h1>
         <form className="w-64">
-          <Input name="search" placeholder="Buscar por nombre o correo" defaultValue={search ?? ''} />
+          <Input name="search" placeholder="Buscar por usuario, nombre o correo" defaultValue={search ?? ''} />
         </form>
       </div>
 
@@ -47,7 +48,7 @@ export default async function UsuariosPage({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Nombre</TableHead>
+              <TableHead>Usuario</TableHead>
               <TableHead>Correo</TableHead>
               <TableHead>Cuenta</TableHead>
               <TableHead>Rol</TableHead>
@@ -60,7 +61,7 @@ export default async function UsuariosPage({
               <TableRow key={user.id}>
                 <TableCell className="font-medium text-foreground">
                   <Link href={`/usuarios/${user.id}`} className="hover:underline">
-                    {user.name}
+                    {user.username ? `@${user.username}` : user.name}
                   </Link>
                 </TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>

@@ -12,7 +12,7 @@ interface UserDetail {
   id: string;
   name: string;
   email: string;
-  username: string;
+  username: string | null;
   role: string;
   status: string;
   createdAt: string;
@@ -45,9 +45,12 @@ export default async function UsuarioDetailPage({ params }: { params: Promise<{ 
               Usuarios
             </Link>
             <ChevronRight className="size-3.5" />
-            <span className="text-foreground">{user.name}</span>
+            <span className="text-foreground">{user.username ? `@${user.username}` : user.name}</span>
           </div>
-          <h1 className="mt-1 text-2xl font-bold text-foreground">{user.name}</h1>
+          <h1 className="mt-1 text-2xl font-bold text-foreground">
+            {user.username ? `@${user.username}` : user.name}
+          </h1>
+          {user.username && <p className="text-sm text-muted-foreground">{user.name}</p>}
         </div>
         <div className="flex items-center gap-2">
           <EditUserDialog userId={user.id} name={user.name} email={user.email} />
@@ -78,9 +81,9 @@ export default async function UsuarioDetailPage({ params }: { params: Promise<{ 
         </Card>
         <Card>
           <CardHeader>
-            <CardTitle>Usuario</CardTitle>
+            <CardTitle>Nombre real</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">@{user.username}</CardContent>
+          <CardContent className="text-sm text-muted-foreground">{user.name}</CardContent>
         </Card>
         <Card>
           <CardHeader>

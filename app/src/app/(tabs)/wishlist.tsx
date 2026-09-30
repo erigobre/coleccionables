@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useRef, useState, type ReactNode } from 'react';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AIProcessingOverlay } from '../../components/ui/AIProcessingOverlay';
@@ -445,10 +445,20 @@ export default function WishlistScreen() {
   const { accessToken } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ openAdd?: string }>();
   const [items, setItems] = useState<WishlistItem[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<WishlistItem | null>(null);
   const [adding, setAdding] = useState(false);
+
+  // Entrada desde el botón de wishlist en Home (?openAdd=1): abre el modal
+  // aquí mismo y limpia el parámetro para que no se reabra solo.
+  useEffect(() => {
+    if (params.openAdd) {
+      setAdding(true);
+      router.setParams({ openAdd: undefined });
+    }
+  }, [params.openAdd, router]);
 
   const load = useCallback(() => {
     if (!accessToken) return () => {};

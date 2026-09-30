@@ -120,6 +120,7 @@ export class ItemsService {
           { toyLine: { contains: term } },
           { edition: { contains: term } },
           { uniqueIdentifier: { contains: term } },
+          { tags: { some: { tag: { name: { contains: term } } } } },
         ],
       },
       include: ITEM_INCLUDE,

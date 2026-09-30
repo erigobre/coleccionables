@@ -200,6 +200,14 @@ export default function HomeScreen() {
       </Screen>
 
       <Pressable
+        onPress={() => router.push('/(tabs)/wishlist?openAdd=1')}
+        className="absolute h-16 w-16 items-center justify-center rounded-full shadow-lg"
+        style={{ right: 20, bottom: insets.bottom + 172, backgroundColor: colors.wishlist }}
+      >
+        <Ionicons name="heart" size={28} color={colors.white} />
+      </Pressable>
+
+      <Pressable
         onPress={() => router.push('/captura')}
         className="absolute h-16 w-16 items-center justify-center rounded-full bg-primary shadow-lg"
         style={{ right: 20, bottom: insets.bottom + 96 }}

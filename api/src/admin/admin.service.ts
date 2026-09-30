@@ -68,6 +68,7 @@ export class AdminService {
         ? {
             OR: [
               { name: { contains: search } },
+              { username: { contains: search } },
               { email: { contains: search } },
             ],
           }
@@ -75,6 +76,7 @@ export class AdminService {
       select: {
         id: true,
         name: true,
+        username: true,
         email: true,
         role: true,
         status: true,
