@@ -19,7 +19,10 @@ export function ResolveFlagDialog({
   isHeldItem: boolean;
 }) {
   const [open, setOpen] = useState(false);
-  const [approveItem, setApproveItem] = useState<'true' | 'false'>('true');
+  // Sin preseleccionar: el admin debe elegir explícitamente Aprobar/Rechazar
+  // antes de poder enviar, para no aprobar por accidente un objeto retenido
+  // con un clic apresurado en "Marcar como resuelto" (riesgo detectado 2026-09-30).
+  const [approveItem, setApproveItem] = useState<'true' | 'false' | null>(null);
   const action = resolveFlagAction.bind(null, flagId);
   const [state, formAction, pending] = useActionState(async (prev: ResolveFlagState, formData: FormData) => {
     const result = await action(prev, formData);
@@ -87,7 +90,7 @@ export function ResolveFlagDialog({
           )}
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <DialogFooter>
-            <Button type="submit" disabled={pending}>
+            <Button type="submit" disabled={pending || (isHeldItem && approveItem === null)}>
               {pending ? 'Guardando…' : 'Marcar como resuelto'}
             </Button>
           </DialogFooter>

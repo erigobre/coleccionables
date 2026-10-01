@@ -232,7 +232,7 @@ export default function YaLoTengoScreen() {
         {alreadyOwned ? (
           <>
             <Text className="mb-3 font-display text-2xl uppercase tracking-wide text-primary">¡Ya lo tienes!</Text>
-            <MatchCard match={best} highlight onOpen={() => router.push(`/(tabs)/objetos/${best.item.id}`)} />
+            <MatchCard match={best} highlight onOpen={() => router.push(`/objeto/${best.item.id}`)} />
           </>
         ) : (
           <View className="mb-2">
@@ -255,7 +255,7 @@ export default function YaLoTengoScreen() {
                 key={match.item.id}
                 match={match}
                 showVisualScore={!alreadyOwned}
-                onOpen={() => router.push(`/(tabs)/objetos/${match.item.id}`)}
+                onOpen={() => router.push(`/objeto/${match.item.id}`)}
               />
             ))}
           </View>
@@ -269,7 +269,7 @@ export default function YaLoTengoScreen() {
           <View className="mt-6">
             <Text className="mb-3 font-body-bold text-lg text-text">Objetos vendidos que se relacionan</Text>
             {result.soldMatches.map((match) => (
-              <MatchCard key={match.item.id} match={match} onOpen={() => router.push(`/(tabs)/objetos/${match.item.id}`)} />
+              <MatchCard key={match.item.id} match={match} onOpen={() => router.push(`/objeto/${match.item.id}`)} />
             ))}
           </View>
         ) : null}

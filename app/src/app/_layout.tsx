@@ -122,6 +122,22 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             headerLeft: () => <CloseHeaderButton variant="plain" />,
           }}
         />
+        {/* Mismo detalle que (tabs)/objetos/[id], pero como hermano de (tabs):
+            se usa cuando se entra desde ya-lo-tengo.tsx para que "atrás" vuelva
+            a esa pantalla de resultados en vez de cruzar hacia el stack de
+            Objetos (ver comentario en objeto/[id].tsx). */}
+        <Stack.Screen
+          name="objeto/[id]"
+          options={{
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.background },
+            headerShadowVisible: false,
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+            headerTitle: 'Objeto',
+            headerLeft: () => <CloseHeaderButton variant="plain" fallbackTo="/(tabs)/objetos" />,
+          }}
+        />
       </Stack.Protected>
     </Stack>
   );
