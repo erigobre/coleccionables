@@ -1,6 +1,7 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { TextField } from '../../../../components/ui/TextField';
 import { TransferAnimation } from '../../../../components/items/TransferAnimation';
@@ -99,19 +100,27 @@ export default function SellItemScreen() {
   // La animación solo corre cuando el backend ya aceptó el envío a alguien
   // que ya tiene cuenta (el caso sin cuenta usa el Alert de arriba).
   //
-  // gestureEnabled:false como salvaguarda extra: la pantalla ya es
-  // fullScreenModal (ver _layout.tsx), pero si el swipe-down quedara activo
-  // de cualquier forma, cerraría la animación a medio camino sin pasar por
-  // onDone (reportado como pantalla "pasmada" en iOS, 2026-10-01).
+  // Botón de cierre manual superpuesto: la animación no se está renderizando
+  // en iOS (bug sin resolver, 2026-10-01) y el swipe-down nativo del pageSheet
+  // no es confiable para salir — esto garantiza una salida sin depender de
+  // ninguno de los dos.
   if (sent && item) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+        <Stack.Screen options={{ headerShown: false }} />
         <TransferAnimation
           photoUri={item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined}
           recipientLabel={trimmedEmail}
           onDone={() => router.back()}
         />
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={12}
+          className="absolute left-4 h-10 w-10 items-center justify-center rounded-full bg-black/40"
+          style={{ top: 56 }}
+        >
+          <Ionicons name="close" size={24} color={colors.white} />
+        </Pressable>
       </>
     );
   }

@@ -26,11 +26,12 @@ export default function ObjetosStackLayout() {
       />
       <Stack.Screen name="[id]/edit" options={{ title: 'Editar objeto' }} />
       <Stack.Screen name="[id]/ubicacion" options={{ title: 'Cambiar ubicación', presentation: 'modal' }} />
-      {/* fullScreenModal (no "modal"/pageSheet): en iOS el pageSheet deja la
-          hoja parcial con gesto nativo de swipe-down activo incluso durante
-          TransferAnimation, y el swipe la cierra a medio camino sin pasar por
-          onDone — se veía como pantalla congelada (reportado 2026-10-01). */}
-      <Stack.Screen name="[id]/vender" options={{ title: 'Transferir objeto', presentation: 'fullScreenModal' }} />
+      {/* "modal" (pageSheet), no fullScreenModal: fullScreenModal desactiva por
+          completo el gesto nativo de swipe-down en iOS, y como la animación
+          de envío no se está renderizando (bug sin resolver, 2026-10-01), eso
+          dejaba al usuario sin ninguna forma de salir salvo cerrar la app.
+          Con pageSheet al menos el swipe-down sigue intentable. */}
+      <Stack.Screen name="[id]/vender" options={{ title: 'Transferir objeto', presentation: 'modal' }} />
       <Stack.Screen name="transferencias" options={{ title: 'Transferencias' }} />
     </Stack>
   );
