@@ -55,10 +55,12 @@ export class FtService {
   constructor(private readonly prisma: PrismaService) {}
 
   // Busca el lote personal (userId = esta persona, sigue a la persona sin
-  // importar su Organization) UNIONADO con el lote compartido de su
-  // Organization actual (userId null), y el compartido solo cuenta si la
-  // Organization tiene de verdad una suscripción activa — si se cancela, el
-  // monedero de suscripción simplemente deja de aparecer, sin tocar ninguna fila.
+  // importar su Organization) UNIONADO con los lotes compartidos de su
+  // Organization actual (userId null). Dentro de los compartidos: el PROMO
+  // (regalo manual del admin, independiente de cualquier plan) siempre cuenta;
+  // el SUBSCRIPTION solo cuenta si la Organization tiene de verdad una
+  // suscripción activa — si se cancela, ese monedero simplemente deja de
+  // aparecer, sin tocar ninguna fila.
   private async findActiveLots(client: Tx | PrismaService, userId: string): Promise<FtLot[]> {
     const user = await client.user.findUnique({
       where: { id: userId },
@@ -80,7 +82,10 @@ export class FtService {
           {
             OR: [
               { userId },
-              ...(hasActiveSubscription ? [{ organizationId: user.organizationId, userId: null }] : []),
+              { organizationId: user.organizationId, userId: null, source: 'PROMO' },
+              ...(hasActiveSubscription
+                ? [{ organizationId: user.organizationId, userId: null, source: 'SUBSCRIPTION' as const }]
+                : []),
             ],
           },
         ],
