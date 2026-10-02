@@ -1,3 +1,4 @@
+import { Image } from 'react-native';
 import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 
 export interface CompressedPhoto {
@@ -41,4 +42,24 @@ export async function rotatePhoto(uri: string): Promise<string> {
 export async function normalizeCameraOrientation(uri: string): Promise<string> {
   const result = await manipulateAsync(uri, [], { format: SaveFormat.JPEG });
   return result.uri;
+}
+
+// Recorta en píxeles reales de la imagen original (no de pantalla): el
+// cropper convierte la selección visual a este rectángulo antes de llamar.
+export async function cropPhoto(
+  uri: string,
+  crop: { originX: number; originY: number; width: number; height: number },
+): Promise<string> {
+  const result = await manipulateAsync(uri, [{ crop }], { format: SaveFormat.JPEG });
+  return result.uri;
+}
+
+export function getImageSize(uri: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    Image.getSize(
+      uri,
+      (width, height) => resolve({ width, height }),
+      (error) => reject(error),
+    );
+  });
 }

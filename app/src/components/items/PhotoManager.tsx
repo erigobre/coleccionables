@@ -6,6 +6,7 @@ import { authErrorMessage } from '../../context/auth-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { addItemPhotos, removeItemPhoto, uploadItemPhotos, type ItemPhoto } from '../../lib/items';
 import { colors } from '../../theme/tokens';
+import { ImageCropper } from '../ui/ImageCropper';
 
 const MAX_PHOTOS = 8;
 
@@ -22,6 +23,10 @@ interface PhotoManagerProps {
 export function PhotoManager({ accessToken, itemId, photos, onChanged }: PhotoManagerProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Fotos nuevas pendientes de recortar antes de subirse, una por una.
+  const [cropJob, setCropJob] = useState<{ queue: string[]; results: string[] } | null>(null);
+  // Foto ya subida que se está recortando desde su miniatura.
+  const [existingCrop, setExistingCrop] = useState<{ photoId: string; uri: string } | null>(null);
 
   const run = async (action: () => Promise<void>) => {
     setBusy(true);
@@ -36,12 +41,28 @@ export function PhotoManager({ accessToken, itemId, photos, onChanged }: PhotoMa
     }
   };
 
-  const addFromPicker = (result: ImagePicker.ImagePickerResult) =>
+  const uploadNewPhotos = (uris: string[]) =>
     run(async () => {
-      if (result.canceled) return;
-      const urls = await uploadItemPhotos(accessToken, result.assets.map((asset) => asset.uri));
+      const urls = await uploadItemPhotos(accessToken, uris);
       await addItemPhotos(accessToken, itemId, urls);
     });
+
+  const addFromPicker = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    setCropJob({ queue: result.assets.map((asset) => asset.uri), results: [] });
+  };
+
+  const onCropQueueResolved = (uri: string) => {
+    if (!cropJob) return;
+    const results = [...cropJob.results, uri];
+    const queue = cropJob.queue.slice(1);
+    if (queue.length === 0) {
+      setCropJob(null);
+      uploadNewPhotos(results);
+    } else {
+      setCropJob({ queue, results });
+    }
+  };
 
   const onCamera = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
@@ -72,6 +93,14 @@ export function PhotoManager({ accessToken, itemId, photos, onChanged }: PhotoMa
         {photos.map((photo) => (
           <View key={photo.id} className="mr-3 pt-1">
             <Image source={{ uri: resolvePhotoUrl(photo.url) }} style={{ width: 96, height: 96, borderRadius: 12 }} />
+            <Pressable
+              onPress={() => setExistingCrop({ photoId: photo.id, uri: resolvePhotoUrl(photo.url) })}
+              disabled={busy}
+              accessibilityLabel="Recortar foto"
+              className="absolute bottom-1 left-1 h-6 w-6 items-center justify-center rounded-full bg-black/60"
+            >
+              <Ionicons name="crop" size={13} color={colors.text} />
+            </Pressable>
             <Pressable
               onPress={() => run(() => removeItemPhoto(accessToken, itemId, photo.id))}
               disabled={busy}
@@ -104,6 +133,28 @@ export function PhotoManager({ accessToken, itemId, photos, onChanged }: PhotoMa
       </ScrollView>
       {busy ? <ActivityIndicator color={colors.primary} style={{ marginTop: 12 }} /> : null}
       {error ? <Text className="mt-2 text-sm text-danger">{error}</Text> : null}
+      {cropJob ? (
+        <ImageCropper
+          uri={cropJob.queue[0]}
+          onCancel={() => onCropQueueResolved(cropJob.queue[0])}
+          onConfirm={onCropQueueResolved}
+        />
+      ) : null}
+      {existingCrop ? (
+        <ImageCropper
+          uri={existingCrop.uri}
+          onCancel={() => setExistingCrop(null)}
+          onConfirm={(croppedUri) => {
+            const { photoId } = existingCrop;
+            setExistingCrop(null);
+            run(async () => {
+              const urls = await uploadItemPhotos(accessToken, [croppedUri]);
+              await addItemPhotos(accessToken, itemId, urls);
+              await removeItemPhoto(accessToken, itemId, photoId);
+            });
+          }}
+        />
+      ) : null}
     </View>
   );
 }

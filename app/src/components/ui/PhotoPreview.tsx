@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, View } from 'react-native';
 import { rotatePhoto } from '../../lib/image';
 import { colors } from '../../theme/tokens';
+import { ImageCropper } from './ImageCropper';
 
 interface PhotoPreviewProps {
   photos: string[];
@@ -16,6 +17,7 @@ interface PhotoPreviewProps {
 export function PhotoPreview({ photos, setPhotos, disabled }: PhotoPreviewProps) {
   const [selected, setSelected] = useState<number | null>(null);
   const [rotating, setRotating] = useState(false);
+  const [cropping, setCropping] = useState(false);
 
   // Al agregar/quitar fotos, la vista vuelve a la última.
   useEffect(() => setSelected(null), [photos.length]);
@@ -40,6 +42,14 @@ export function PhotoPreview({ photos, setPhotos, disabled }: PhotoPreviewProps)
       <View className="flex-1">
         <Image source={{ uri: photos[shownIndex] }} style={{ flex: 1, borderRadius: 16 }} resizeMode="contain" />
         <Pressable
+          onPress={() => setCropping(true)}
+          disabled={disabled || rotating}
+          accessibilityLabel="Recortar foto"
+          className="absolute bottom-3 right-16 h-11 w-11 items-center justify-center rounded-full bg-black/60 active:opacity-80"
+        >
+          <Ionicons name="crop" size={22} color={colors.text} />
+        </Pressable>
+        <Pressable
           onPress={onRotate}
           disabled={disabled || rotating}
           accessibilityLabel="Girar foto"
@@ -52,6 +62,17 @@ export function PhotoPreview({ photos, setPhotos, disabled }: PhotoPreviewProps)
           )}
         </Pressable>
       </View>
+      {cropping ? (
+        <ImageCropper
+          uri={photos[shownIndex]}
+          onCancel={() => setCropping(false)}
+          onConfirm={(croppedUri) => {
+            const index = shownIndex;
+            setPhotos((prev) => prev.map((uri, i) => (i === index ? croppedUri : uri)));
+            setCropping(false);
+          }}
+        />
+      ) : null}
       <ScrollView horizontal className="mt-3 max-h-20 flex-grow-0" showsHorizontalScrollIndicator={false}>
         {photos.map((uri, index) => (
           <View key={uri} className="mr-2 pt-1">
