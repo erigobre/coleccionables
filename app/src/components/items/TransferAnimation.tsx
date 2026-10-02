@@ -11,9 +11,9 @@ import Animated, {
 } from 'react-native-reanimated';
 import { colors } from '../../theme/tokens';
 
-const TOTAL_MS = 2300;
+const TOTAL_MS = 3300; // 2300 + 1s extra de espera al final, sin recortar la secuencia animada (todas las keyframes terminan en 1900ms).
 const PHOTO_SIZE = 168;
-const BALL_SIZE = 116;
+const BOX_SIZE = 116;
 
 interface TransferAnimationProps {
   photoUri?: string;
@@ -21,8 +21,8 @@ interface TransferAnimationProps {
   onDone: () => void;
 }
 
-// Animación "envío de Pokémon" (plan §5.3.9.3): la foto se comprime en una
-// cápsula, esta se sacude y sale disparada hacia arriba. Todo cuelga de un único
+// Animación de envío (plan §5.3.9.3): la foto se encoge en la caja de Frikidex,
+// esta se sacude y sale disparada hacia arriba. Todo cuelga de un único
 // reloj `t` (en ms) para que la secuencia sea determinista y fácil de ajustar.
 export function TransferAnimation({ photoUri, recipientLabel, onDone }: TransferAnimationProps) {
   const { height } = useWindowDimensions();
@@ -40,7 +40,7 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 0-450: la foto gira y se encoge; la cápsula aparece en su lugar.
+  // 0-450: la foto gira y se encoge; la caja aparece en su lugar.
   const photoStyle = useAnimatedStyle(() => ({
     opacity: interpolate(t.value, [300, 450], [1, 0], Extrapolation.CLAMP),
     transform: [
@@ -49,8 +49,8 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
     ],
   }));
 
-  // 700-1150: la cápsula se sacude. 1150-1900: sale disparada hacia arriba.
-  const ballStyle = useAnimatedStyle(() => {
+  // 700-1150: la caja se sacude. 1150-1900: sale disparada hacia arriba.
+  const boxStyle = useAnimatedStyle(() => {
     const launch = interpolate(t.value, [1150, 1900], [0, 1], Extrapolation.CLAMP);
     return {
       opacity: interpolate(t.value, [300, 450, 1650, 1900], [0, 1, 1, 0], Extrapolation.CLAMP),
@@ -88,9 +88,9 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
           style={[
             {
               position: 'absolute',
-              width: BALL_SIZE,
-              height: BALL_SIZE,
-              borderRadius: BALL_SIZE / 2,
+              width: BOX_SIZE,
+              height: BOX_SIZE,
+              borderRadius: BOX_SIZE / 2,
               borderWidth: 3,
               borderColor: colors.primary,
             },
@@ -98,8 +98,11 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
           ]}
         />
 
-        <Animated.View style={[{ position: 'absolute' }, ballStyle]}>
-          <Capsule />
+        <Animated.View style={[{ position: 'absolute' }, boxStyle]}>
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={{ width: BOX_SIZE, height: BOX_SIZE, borderRadius: 24 }}
+          />
         </Animated.View>
 
         <Animated.View style={photoStyle}>
@@ -122,23 +125,6 @@ export function TransferAnimation({ photoUri, recipientLabel, onDone }: Transfer
           Esperando que {recipientLabel} lo acepte
         </Text>
       </Animated.View>
-    </View>
-  );
-}
-
-// Cápsula de Frikidex: mitad violeta, mitad crema, botón lima al centro.
-function Capsule() {
-  return (
-    <View
-      style={{ width: BALL_SIZE, height: BALL_SIZE, borderRadius: BALL_SIZE / 2 }}
-      className="items-center justify-center overflow-hidden border-4 border-backgroundDeep bg-text"
-    >
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: BALL_SIZE / 2 }} className="bg-secondary" />
-      <View style={{ position: 'absolute', top: BALL_SIZE / 2 - 5, left: 0, right: 0, height: 10 }} className="bg-backgroundDeep" />
-      <View
-        style={{ width: 34, height: 34, borderRadius: 17 }}
-        className="items-center justify-center border-4 border-backgroundDeep bg-primary"
-      />
     </View>
   );
 }

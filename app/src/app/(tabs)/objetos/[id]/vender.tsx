@@ -98,10 +98,15 @@ export default function SellItemScreen() {
 
   // La animación solo corre cuando el backend ya aceptó el envío a alguien
   // que ya tiene cuenta (el caso sin cuenta usa el Alert de arriba).
+  //
+  // gestureEnabled:false como salvaguarda extra: la pantalla ya es
+  // fullScreenModal (ver _layout.tsx), pero si el swipe-down quedara activo
+  // de cualquier forma, cerraría la animación a medio camino sin pasar por
+  // onDone (reportado como pantalla "pasmada" en iOS, 2026-10-01).
   if (sent && item) {
     return (
       <>
-        <Stack.Screen options={{ headerShown: false }} />
+        <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
         <TransferAnimation
           photoUri={item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined}
           recipientLabel={trimmedEmail}

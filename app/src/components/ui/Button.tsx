@@ -1,4 +1,4 @@
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, Text, View } from 'react-native';
 import { colors } from '../../theme/tokens';
 import { FtCoin } from './FtCoin';
 
@@ -46,6 +46,13 @@ const SPINNER_COLOR: Record<NonNullable<ButtonProps['variant']>, string> = {
   ghost: colors.primary,
 };
 
+// Bungee (font-display) renderiza visiblemente más grande en Android que en
+// iOS al mismo tamaño declarado (métrica de la fuente, no font scaling del
+// sistema) — a 17px el label se partía a dos líneas en Android (reportado
+// 2026-10-01). allowFontScaling=false además evita que el tamaño de texto
+// del sistema del teléfono infle un botón de ancho fijo.
+const LABEL_SIZE = Platform.OS === 'android' ? 14 : 17;
+
 export function Button({ label, onPress, loading, disabled, variant = 'primary', ftCost }: ButtonProps) {
   const isDisabled = disabled || loading;
 
@@ -62,7 +69,9 @@ export function Button({ label, onPress, loading, disabled, variant = 'primary',
       ) : (
         <View className="flex-row flex-wrap items-center justify-center gap-x-1.5">
           <Text
-            className={`text-center font-display text-[17px] uppercase tracking-wide ${
+            allowFontScaling={false}
+            style={{ fontSize: LABEL_SIZE }}
+            className={`text-center font-display uppercase tracking-wide ${
               isDisabled ? 'text-disabledText' : TEXT_CLASS[variant]
             }`}
           >

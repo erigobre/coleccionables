@@ -1,7 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { Pressable, Text, View } from 'react-native';
+import { Platform, Pressable, Text, View } from 'react-native';
 import { colors } from '../theme/tokens';
+
+// Mismo ajuste que Button.tsx: a 11px "Colecciones" se partía "-es" a un
+// segundo renglón en Android por cómo esa plataforma renderiza DM Sans más
+// grande que iOS al mismo tamaño declarado (reportado 2026-10-01).
+const LABEL_SIZE = Platform.OS === 'android' ? 10 : 11;
 
 type IconName = keyof typeof Ionicons.glyphMap;
 
@@ -59,7 +64,12 @@ export function GlassTabBar({ state, navigation, insets }: TabBarProps) {
           return (
             <Pressable key={route.key} onPress={onPress} className="flex-1 items-center justify-center py-3">
               <Ionicons name={isFocused ? meta.active : meta.inactive} size={22} color={isFocused ? colors.primary : colors.textMuted} />
-              <Text className="font-body-medium mt-1 text-[11px]" style={{ color: isFocused ? colors.primary : colors.textMuted }}>
+              <Text
+                allowFontScaling={false}
+                numberOfLines={1}
+                className="font-body-medium mt-1"
+                style={{ fontSize: LABEL_SIZE, color: isFocused ? colors.primary : colors.textMuted }}
+              >
                 {meta.label}
               </Text>
             </Pressable>

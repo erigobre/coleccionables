@@ -35,7 +35,10 @@ export class NotificationsService {
   async sendPushToUser(userId: string, message: PushMessage) {
     try {
       const tokens = await this.prisma.pushToken.findMany({ where: { userId } });
-      if (tokens.length === 0) return;
+      if (tokens.length === 0) {
+        this.logger.warn(`Sin push token registrado para usuario ${userId}, no se envía "${message.title}"`);
+        return;
+      }
 
       const batches: (typeof tokens)[] = [];
       for (let i = 0; i < tokens.length; i += EXPO_BATCH_SIZE) {
@@ -56,11 +59,21 @@ export class NotificationsService {
           ),
         });
 
-        const json = (await res.json()) as { data?: { status: string; details?: { error?: string } }[] };
+        const json = (await res.json()) as { data?: { status: string; message?: string; details?: { error?: string } }[] };
         const tickets = json.data ?? [];
         for (let i = 0; i < tickets.length; i++) {
-          if (tickets[i]?.status === 'error' && tickets[i]?.details?.error === 'DeviceNotRegistered') {
-            await this.prisma.pushToken.delete({ where: { token: batch[i].token } }).catch(() => {});
+          const ticket = tickets[i];
+          if (ticket?.status === 'error') {
+            if (ticket.details?.error === 'DeviceNotRegistered') {
+              await this.prisma.pushToken.delete({ where: { token: batch[i].token } }).catch(() => {});
+            } else {
+              // Credenciales FCM/APNs mal configuradas, token malformado, etc. — se
+              // logueaba y se descartaba en silencio, lo que hacía imposible
+              // diagnosticar por qué no llegaban pushes (detectado 2026-10-01).
+              this.logger.error(
+                `Expo push ticket error para ${batch[i].platform ?? 'plataforma desconocida'}: ${ticket.details?.error ?? 'sin código'} — ${ticket.message ?? ''}`,
+              );
+            }
           }
         }
       }
