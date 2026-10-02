@@ -8,6 +8,7 @@ import { UsersModule } from './users/users.module.js';
 import { LocationsModule } from './locations/locations.module.js';
 import { SeasonsModule } from './seasons/seasons.module.js';
 import { CollectionsModule } from './collections/collections.module.js';
+import { CollectionMembersModule } from './collections/collection-members.module.js';
 import { TagsModule } from './tags/tags.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { AiModule } from './ai/ai.module.js';
@@ -45,6 +46,7 @@ import { ReferralsModule } from './referrals/referrals.module.js';
     LocationsModule,
     SeasonsModule,
     CollectionsModule,
+    CollectionMembersModule,
     TagsModule,
     StorageModule,
     AiModule,

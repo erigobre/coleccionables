@@ -18,6 +18,8 @@ export default function ColeccionesStackLayout() {
       <Stack.Screen name="[id]/edit" options={{ title: 'Editar colección' }} />
       <Stack.Screen name="[id]/ubicacion" options={{ title: 'Reubicar colección', presentation: 'modal' }} />
       <Stack.Screen name="[id]/regresar" options={{ title: 'Ubicación permanente' }} />
+      <Stack.Screen name="[id]/miembros" options={{ title: 'Miembros' }} />
+      <Stack.Screen name="invitacion" options={{ title: 'Invitación', presentation: 'modal' }} />
     </Stack>
   );
 }

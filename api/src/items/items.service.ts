@@ -108,6 +108,10 @@ export class ItemsService {
       });
     }
 
+    if (collectionIds?.length) {
+      await this.locationsService.syncInheritedLocationAccess(item.id);
+    }
+
     return item;
   }
 
@@ -279,12 +283,14 @@ export class ItemsService {
       create: { itemId: id, collectionId },
       update: {},
     });
+    await this.locationsService.syncInheritedLocationAccess(id);
   }
 
   async removeFromCollection(ownerId: string, id: string, collectionId: string) {
     await this.assertEditableItem(ownerId, id);
     await this.collectionsService.assertCanRemoveItems(ownerId, collectionId);
     await this.prisma.itemCollection.deleteMany({ where: { itemId: id, collectionId } });
+    await this.locationsService.syncInheritedLocationAccess(id);
   }
 
   async addTag(ownerId: string, id: string, tagId: string) {
@@ -320,7 +326,7 @@ export class ItemsService {
     await this.locationsService.findOne(ownerId, dto.locationId);
 
     if (dto.assignment === LocationChangeAssignment.INDEFINIDO) {
-      return this.prisma.item.update({
+      const updated = await this.prisma.item.update({
         where: { id },
         data: {
           currentLocationId: dto.locationId,
@@ -330,6 +336,8 @@ export class ItemsService {
           returnedFromSeason: true,
         },
       });
+      await this.locationsService.syncInheritedLocationAccess(id);
+      return updated;
     }
 
     if (!dto.seasonId) {
@@ -340,7 +348,7 @@ export class ItemsService {
       throw new NotFoundException('Temporada no encontrada');
     }
 
-    return this.prisma.item.update({
+    const updated = await this.prisma.item.update({
       where: { id },
       data: {
         currentLocationId: dto.locationId,
@@ -349,12 +357,14 @@ export class ItemsService {
         returnedFromSeason: false,
       },
     });
+    await this.locationsService.syncInheritedLocationAccess(id);
+    return updated;
   }
 
   // Botón rápido de la vista de Temporadas (plan §5.5.8).
   async returnToPermanentLocation(ownerId: string, id: string) {
     const item = await this.assertEditableItem(ownerId, id);
-    return this.prisma.item.update({
+    const updated = await this.prisma.item.update({
       where: { id: item.id },
       data: {
         currentLocationId: item.permanentLocationId,
@@ -363,6 +373,8 @@ export class ItemsService {
         returnedFromSeason: true,
       },
     });
+    await this.locationsService.syncInheritedLocationAccess(id);
+    return updated;
   }
 
   // "Objetos similares" del Home (plan §7.2).
@@ -384,7 +396,10 @@ export class ItemsService {
   }
 
   // Flujo "¿Ya lo tengo?" de Home (plan §5.1 y §7.2). Incluye al final los
-  // objetos vendidos relacionados, de solo lectura (plan §5.3.9.5).
+  // objetos vendidos relacionados, de solo lectura (plan §5.3.9.5). Además de
+  // los objetos propios, busca entre los del "grupo familiar": objetos de
+  // otros miembros ya vinculados a una colección compartida en común, para
+  // detectar si el objeto ya lo tiene alguien de la familia.
   async match(ownerId: string, dto: MatchItemDto) {
     // Para las tarjetas de resultado: primera foto y ubicación actual.
     const include = {
@@ -392,13 +407,24 @@ export class ItemsService {
       photos: { orderBy: { order: 'asc' as const }, take: 1 },
       currentLocation: { select: { id: true, name: true } },
     };
-    const [activeCandidates, soldCandidates] = await Promise.all([
+    const sharedCollectionIds = await this.sharedCollectionIdsFor(ownerId);
+    const [ownCandidates, groupCandidates, soldCandidates] = await Promise.all([
       this.prisma.item.findMany({ where: { ownerId, status: { notIn: ['SOLD', 'PENDING_MODERATION'] } }, include }),
+      sharedCollectionIds.length
+        ? this.prisma.item.findMany({
+            where: {
+              ownerId: { not: ownerId },
+              status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
+              collections: { some: { collectionId: { in: sharedCollectionIds } } },
+            },
+            include,
+          })
+        : Promise.resolve([]),
       this.prisma.item.findMany({ where: { ownerId, status: 'SOLD' }, include }),
     ]);
 
     const target: SimilarityCandidate = { ...dto };
-    const matches = this.rankCandidates(target, activeCandidates);
+    const matches = this.rankCandidates(target, [...ownCandidates, ...groupCandidates]);
     const soldMatches = this.rankCandidates(target, soldCandidates);
 
     return {
@@ -857,5 +883,16 @@ export class ItemsService {
       throw new BadRequestException('Un objeto en transferencia no se puede editar hasta que responda el receptor');
     }
     return item;
+  }
+
+  // Colecciones compartidas (grupo familiar) donde userId es miembro junto con
+  // al menos otra persona — una colección con un solo CollectionMember todavía
+  // no está realmente compartida (p. ej. invitación enviada pero no aceptada).
+  private async sharedCollectionIdsFor(userId: string) {
+    const memberships = await this.prisma.collectionMember.findMany({
+      where: { userId },
+      select: { collectionId: true, collection: { select: { _count: { select: { members: true } } } } },
+    });
+    return memberships.filter((m) => m.collection._count.members > 1).map((m) => m.collectionId);
   }
 }

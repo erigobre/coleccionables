@@ -31,11 +31,22 @@ Notifications.setNotificationHandler({
 function useNotificationNavigation() {
   useEffect(() => {
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as { type?: string; seasonId?: string } | undefined;
-      if (data?.type === 'transfer') {
+      const data = response.notification.request.content.data as
+        | { type?: string; seasonId?: string; collectionId?: string; collectionName?: string }
+        | undefined;
+      if (data?.type === 'transfer' || data?.type === 'transfer_accepted') {
         router.push('/(tabs)/objetos/transferencias');
       } else if (data?.type === 'season' && data.seasonId) {
         router.push(`/(tabs)/perfil/temporadas/${data.seasonId}`);
+      } else if (data?.type === 'collection_invite' && data.collectionId) {
+        router.push({
+          pathname: '/(tabs)/colecciones/invitacion',
+          params: { collectionId: data.collectionId, collectionName: data.collectionName ?? '' },
+        });
+      } else if (data?.type === 'collection_joined' && data.collectionId) {
+        router.push(`/(tabs)/colecciones/${data.collectionId}/miembros`);
+      } else if (data?.type === 'collection_removed') {
+        router.push('/(tabs)/colecciones');
       }
     });
     return () => sub.remove();

@@ -1,22 +1,26 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LocationsService } from '../locations/locations.service.js';
+import { CollectionsService } from './collections.service.js';
 import { LocationChangeAssignment } from '../items/dto/change-location.dto.js';
 import type { MoveCollectionDto } from './dto/move-collection.dto.js';
 
 // Reubicación en bloque: aplica a cada objeto de la colección la misma regla que
 // ItemsService.changeLocation. Solo se mueven los ACTIVE: un objeto en transferencia
 // no se puede editar (si el receptor rechaza, pisaríamos el cambio) y los vendidos,
-// donados o perdidos ya no están con el dueño.
+// donados o perdidos ya no están con el dueño. En una colección compartida, afecta
+// los objetos de todos los miembros (no solo los de quien ejecuta la acción), ya
+// que quien la ejecuta ya pasó assertCanManageItems (OWNER o EDITOR).
 @Injectable()
 export class CollectionLocationService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly locationsService: LocationsService,
+    private readonly collectionsService: CollectionsService,
   ) {}
 
   async moveAll(ownerId: string, collectionId: string, dto: MoveCollectionDto) {
-    await this.assertOwnedCollection(ownerId, collectionId);
+    await this.collectionsService.assertCanManageItems(ownerId, collectionId);
     await this.locationsService.findOne(ownerId, dto.locationId);
 
     const isTemporal = dto.assignment === LocationChangeAssignment.TEMPORAL;
@@ -31,7 +35,7 @@ export class CollectionLocationService {
     }
 
     const links = await this.prisma.itemCollection.findMany({
-      where: { collectionId, item: { ownerId } },
+      where: { collectionId },
       select: { item: { select: { id: true, status: true } } },
     });
     const movableIds = links.filter((l) => l.item.status === 'ACTIVE').map((l) => l.item.id);
@@ -55,6 +59,7 @@ export class CollectionLocationService {
               returnedFromSeason: true,
             },
       });
+      await Promise.all(movableIds.map((itemId) => this.locationsService.syncInheritedLocationAccess(itemId)));
     }
 
     return { updated: movableIds.length, skippedInTransfer: pending };
@@ -63,12 +68,12 @@ export class CollectionLocationService {
   // "Marcar todos" de la vista de regreso a la ubicación permanente: cada objeto
   // que esté fuera de su lugar vuelve al suyo (misma regla que ItemsService.returnToPermanentLocation).
   async returnAll(ownerId: string, collectionId: string) {
-    await this.assertOwnedCollection(ownerId, collectionId);
+    await this.collectionsService.assertCanManageItems(ownerId, collectionId);
 
     const links = await this.prisma.itemCollection.findMany({
       where: {
         collectionId,
-        item: { ownerId, status: 'ACTIVE', permanentLocationId: { not: null } },
+        item: { status: 'ACTIVE', permanentLocationId: { not: null } },
       },
       select: { item: { select: { id: true, currentLocationId: true, permanentLocationId: true, locationAssignment: true } } },
     });
@@ -89,15 +94,8 @@ export class CollectionLocationService {
         }),
       ),
     );
+    await Promise.all(away.map((i) => this.locationsService.syncInheritedLocationAccess(i.id)));
 
     return { returned: away.length };
-  }
-
-  private async assertOwnedCollection(ownerId: string, id: string) {
-    const collection = await this.prisma.collection.findUnique({ where: { id } });
-    if (!collection || collection.ownerId !== ownerId) {
-      throw new NotFoundException('Colección no encontrada');
-    }
-    return collection;
   }
 }

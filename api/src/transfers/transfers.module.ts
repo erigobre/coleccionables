@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ScheduleModule } from '@nestjs/schedule';
 import { CollectionsModule } from '../collections/collections.module.js';
+import { LocationsModule } from '../locations/locations.module.js';
 import { NotificationsModule } from '../notifications/notifications.module.js';
 import { EmailModule } from '../email/email.module.js';
 import { TransfersController } from './transfers.controller.js';
@@ -8,7 +9,7 @@ import { TransfersService } from './transfers.service.js';
 import { TransfersCronService } from './transfers-cron.service.js';
 
 @Module({
-  imports: [ScheduleModule.forRoot(), CollectionsModule, NotificationsModule, EmailModule],
+  imports: [ScheduleModule.forRoot(), CollectionsModule, LocationsModule, NotificationsModule, EmailModule],
   controllers: [TransfersController],
   providers: [TransfersService, TransfersCronService],
   exports: [TransfersService],

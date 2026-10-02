@@ -64,15 +64,15 @@ model User {
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
-  email        String   @unique
+  email        String     @unique
   // @usuario único para poder seguir gente y armar el feed de la colección (plan futuro).
-  username     String?  @unique
+  username     String?    @unique
   passwordHash String
   name         String
   role         UserRole   @default(OWNER)
   status       UserStatus @default(ACTIVE)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
 
   locations             Location[]
   seasons               Season[]
@@ -82,6 +82,7 @@ model User {
   wishlistItems         WishlistItem[]
   sentTransfers         Transfer[]         @relation("TransferSender")
   receivedTransfers     Transfer[]         @relation("TransferReceiver")
+  initiatedTransfers    Transfer[]         @relation("TransferInitiatedBy")
   usageEvents           UsageEvent[]
   locationMemberships   LocationMember[]
   collectionMemberships CollectionMember[]
@@ -220,10 +221,10 @@ model UsageEvent {
 // (Fase 9); esta tabla guarda el costo vigente, sembrado con valores iniciales
 // en la migración.
 enum FtServiceKey {
-  CREATE_WITH_AI      // Analizar fotos al dar de alta (sin búsqueda web)
-  SCAN_HAVE_IT        // "¿Ya lo tengo?" con foto (sin búsqueda web)
-  BARCODE_LOOKUP      // Lectura de código de barras (con búsqueda web)
-  MARKET_PRICE_FRESH  // Precio de mercado, consulta nueva a Gemini (con búsqueda web)
+  CREATE_WITH_AI // Analizar fotos al dar de alta (sin búsqueda web)
+  SCAN_HAVE_IT // "¿Ya lo tengo?" con foto (sin búsqueda web)
+  BARCODE_LOOKUP // Lectura de código de barras (con búsqueda web)
+  MARKET_PRICE_FRESH // Precio de mercado, consulta nueva a Gemini (con búsqueda web)
   MARKET_PRICE_CACHED // Precio de mercado, reutilizando el último resultado guardado
 }
 
@@ -248,10 +249,10 @@ model FtConfig {
 
 enum FtLotSource {
   MONTHLY_FREE // Regalo mensual del plan gratuito
-  PURCHASE     // Compra real (IAP / Stripe) — fase futura
-  PROMO        // Regalo manual del superadmin
-  REFUND       // Devolución de un cobro que se retuvo (HELD) pero falló
-  REFERRAL     // Bono del programa de invitaciones (invitado o invitador)
+  PURCHASE // Compra real (IAP / Stripe) — fase futura
+  PROMO // Regalo manual del superadmin
+  REFUND // Devolución de un cobro que se retuvo (HELD) pero falló
+  REFERRAL // Bono del programa de invitaciones (invitado o invitador)
 }
 
 // El saldo se guarda por "lotes", no como un solo número: así cada lote puede
@@ -274,13 +275,13 @@ model FtLot {
 
 enum FtTransactionType {
   CHARGE // Consumo por una acción de IA
-  GRANT  // Alta de FT: regalo mensual, promo o compra
+  GRANT // Alta de FT: regalo mensual, promo o compra
 }
 
 enum FtTransactionStatus {
-  HELD      // Descontado del saldo, esperando que la acción de IA termine (patrón hold/confirm/release)
+  HELD // Descontado del saldo, esperando que la acción de IA termine (patrón hold/confirm/release)
   CONFIRMED // La acción de IA terminó bien; el cobro queda en firme
-  RELEASED  // La acción de IA falló; el saldo se devolvió (lote FtLotSource.REFUND)
+  RELEASED // La acción de IA falló; el saldo se devolvió (lote FtLotSource.REFUND)
 }
 
 // Bitácora de cada movimiento de FT. `idempotencyKey` evita cobrar 2 veces si
@@ -313,20 +314,20 @@ model FtTransaction {
 // estaban hardcodeados en la landing. Los campos `store*`/`stripe*` quedan
 // listos para la fase de pagos (aún no construida) para no migrar de nuevo.
 model FtPackage {
-  id                     String    @id @default(cuid())
-  code                   String    @unique
-  ftAmount               Int
-  priceMxnCents          Int
-  badge                  String?
-  isActive               Boolean   @default(true)
-  sortOrder              Int       @default(0)
-  availableFrom          DateTime?
-  availableUntil         DateTime?
-  stripePriceId          String?
-  storeProductIdIos      String?
-  storeProductIdAndroid  String?
-  createdAt              DateTime  @default(now())
-  updatedAt              DateTime  @updatedAt
+  id                    String    @id @default(cuid())
+  code                  String    @unique
+  ftAmount              Int
+  priceMxnCents         Int
+  badge                 String?
+  isActive              Boolean   @default(true)
+  sortOrder             Int       @default(0)
+  availableFrom         DateTime?
+  availableUntil        DateTime?
+  stripePriceId         String?
+  storeProductIdIos     String?
+  storeProductIdAndroid String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@map("ft_packages")
 }
@@ -336,22 +337,22 @@ model FtPackage {
 // `annualEnabled`/`annualPriceMxnCents` ya existen para activar anual después
 // sin volver a migrar.
 model FtPlan {
-  id                    String    @id @default(cuid())
-  code                  String    @unique
+  id                    String   @id @default(cuid())
+  code                  String   @unique
   label                 String
   ftAmountMonthly       Int
   monthlyPriceMxnCents  Int
   annualPriceMxnCents   Int?
-  annualEnabled         Boolean   @default(false)
+  annualEnabled         Boolean  @default(false)
   badge                 String?
-  isActive              Boolean   @default(true)
-  sortOrder             Int       @default(0)
+  isActive              Boolean  @default(true)
+  sortOrder             Int      @default(0)
   stripePriceIdMonthly  String?
   stripePriceIdAnnual   String?
   storeProductIdIos     String?
   storeProductIdAndroid String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
 
   @@map("ft_plans")
 }
@@ -409,14 +410,14 @@ enum ModerationAction {
 // que FtTransaction) para que el historial de moderación sobreviva aunque la
 // cuenta se borre después.
 model ModerationFlag {
-  id             String            @id @default(cuid())
+  id             String           @id @default(cuid())
   organizationId String
-  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   userId         String?
-  user           User?             @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user           User?            @relation(fields: [userId], references: [id], onDelete: SetNull)
   context        String // endpoint/flujo que lo disparó: "analyzePhotos" | "identify"
   category       String // ej. "sexually_explicit", "not_collectible", "possible_person"
-  detail         String?           @db.Text // nota de la IA para que el revisor entienda qué vio
+  detail         String?          @db.Text // nota de la IA para que el revisor entienda qué vio
   action         ModerationAction
   // Copia de las fotos ya subidas (mismas URLs que Item.photos) para que el
   // superadmin las vea en Moderación sin depender de que el objeto exista o
@@ -424,16 +425,16 @@ model ModerationFlag {
   photoUrls      Json?
   // Solo se llena cuando action = ITEM_HELD: liga el objeto que quedó oculto
   // en lo que se revisa (ver ItemsService.create).
-  itemId         String?           @unique
-  item           Item?             @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  itemId         String?          @unique
+  item           Item?            @relation(fields: [itemId], references: [id], onDelete: SetNull)
   // Aclaración que el usuario puede escribir desde la app cuando su objeto
   // queda retenido (ITEM_HELD) y cree que fue un error de la IA.
-  userAppeal     String?           @db.Text
+  userAppeal     String?          @db.Text
   userAppealAt   DateTime?
   reviewedAt     DateTime?
   reviewedById   String? // id del superadmin que revisó (sin relación FK: no debe romperse si ese admin se borra)
-  resolution     String?           @db.Text
-  createdAt      DateTime          @default(now())
+  resolution     String?          @db.Text
+  createdAt      DateTime         @default(now())
 
   @@index([organizationId, createdAt])
   @@map("moderation_flags")
@@ -542,9 +543,10 @@ model Collection {
   createdAt DateTime         @default(now())
   updatedAt DateTime         @updatedAt
 
-  members   CollectionMember[]
-  itemLinks ItemCollection[]
-  shareLink CollectionShareLink?
+  members               CollectionMember[]
+  itemLinks             ItemCollection[]
+  shareLink             CollectionShareLink?
+  groupRemovalTransfers Transfer[]
 
   @@map("collections")
 }
@@ -678,7 +680,7 @@ model Item {
   // Venta: saleStatus null = no está en venta. salePrice se muestra en el enlace público
   // salvo cuando saleStatus = SOLD.
   saleStatus SaleStatus?
-  salePrice  Decimal?   @db.Decimal(10, 2)
+  salePrice  Decimal?    @db.Decimal(10, 2)
 
   currentLocationId   String?
   currentLocation     Location?              @relation("ItemCurrentLocation", fields: [currentLocationId], references: [id], onDelete: SetNull)
@@ -817,6 +819,22 @@ model Transfer {
   expiresAt   DateTime // createdAt + 7 días (decisión confirmada en el plan)
   respondedAt DateTime?
   createdAt   DateTime       @default(now())
+
+  // Set solo cuando esta transferencia no la inició el propio dueño sino el
+  // OWNER de una colección compartida, al expulsarlo del grupo y pedirle que
+  // ceda sus objetos a otro miembro (ver CollectionMembersService.removeMember,
+  // modo TRANSFER). Si se rechaza o expira, se revierte como una expulsión
+  // normal (se desvincula el objeto de la colección, pero sigue siendo de
+  // fromUserId).
+  initiatedByUserId String?
+  initiatedByUser   User?   @relation("TransferInitiatedBy", fields: [initiatedByUserId], references: [id], onDelete: SetNull)
+
+  // Colección compartida de la que salió la expulsión que disparó esta
+  // transferencia (solo junto con initiatedByUserId). Si se rechaza o expira,
+  // se usa para desvincular el objeto de esa colección (TransfersService.reject
+  // / expireOverdueTransfers), ya que el ex-miembro no logró ceder el objeto.
+  initiatedFromCollectionId String?
+  initiatedFromCollection   Collection? @relation(fields: [initiatedFromCollectionId], references: [id], onDelete: SetNull)
 
   @@index([toEmail, toUserId, status])
   @@map("transfers")

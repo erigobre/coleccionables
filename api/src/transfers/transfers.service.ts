@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
+import { LocationsService } from '../locations/locations.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { EmailService } from '../email/email.service.js';
 import { validateEmailDomain } from '../common/email-validation.js';
@@ -18,6 +19,7 @@ export class TransfersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly collectionsService: CollectionsService,
+    private readonly locationsService: LocationsService,
     private readonly notifications: NotificationsService,
     private readonly emailService: EmailService,
   ) {}
@@ -34,7 +36,16 @@ export class TransfersService {
     return { structureValid, tldValid, suggestion, hasAccount: !!toUser };
   }
 
-  async initiate(fromUserId: string, fromUserName: string, dto: InitiateTransferDto) {
+  // options.initiatedByUserId: set solo cuando esta transferencia no la pide el
+  // propio dueño sino el OWNER de una colección compartida, al expulsarlo del
+  // grupo y pedirle que ceda sus objetos a otro miembro (ver
+  // CollectionMembersService.removeMember, modo TRANSFER).
+  async initiate(
+    fromUserId: string,
+    fromUserName: string,
+    dto: InitiateTransferDto,
+    options?: { initiatedByUserId?: string; initiatedFromCollectionId?: string },
+  ) {
     const item = await this.prisma.item.findUnique({ where: { id: dto.itemId } });
     if (!item || item.ownerId !== fromUserId) {
       throw new NotFoundException('Objeto no encontrado');
@@ -69,6 +80,8 @@ export class TransfersService {
           toUserId: toUser?.id ?? null,
           toEmail: dto.toUserEmail,
           expiresAt,
+          initiatedByUserId: options?.initiatedByUserId,
+          initiatedFromCollectionId: options?.initiatedFromCollectionId,
         },
       }),
     ]);
@@ -147,6 +160,22 @@ export class TransfersService {
 
     // El original ya no es del vendedor: sale de su colección automática "En Venta".
     await this.collectionsService.removeFromSaleCollection(originalItem.ownerId, originalItem.id);
+    await this.locationsService.syncInheritedLocationAccess(newItem.id);
+
+    // Si esta transferencia vino de una expulsión de grupo familiar, el OWNER
+    // que la pidió no es ninguna de las dos partes del Transfer (ni fromUser ni
+    // toUser) y de otro modo nunca se entera de que se concretó.
+    if (transfer.initiatedByUserId) {
+      const recipient = await this.prisma.user.findUniqueOrThrow({ where: { id: toUserId }, select: { name: true } });
+      this.notifications
+        .sendPushToUser(transfer.initiatedByUserId, {
+          title: 'Transferencia aceptada',
+          body: `${recipient.name} aceptó "${originalItem.name}"`,
+          data: { type: 'transfer_accepted', transferId: transfer.id },
+        })
+        .catch(() => {});
+    }
+
     return newItem;
   }
 
@@ -160,6 +189,7 @@ export class TransfersService {
       }),
       this.prisma.item.update({ where: { id: transfer.itemId }, data: { status: 'ACTIVE' } }),
     ]);
+    await this.detachFromGroupCollectionIfNeeded(transfer);
   }
 
   // El remitente se arrepiente (o se equivocó de correo) antes de que el receptor
@@ -219,9 +249,23 @@ export class TransfersService {
         }),
         this.prisma.item.update({ where: { id: transfer.itemId }, data: { status: 'ACTIVE' } }),
       ]);
+      await this.detachFromGroupCollectionIfNeeded(transfer);
     }
 
     return overdue.length;
+  }
+
+  // Si esta transferencia venía de una expulsión de grupo familiar (ver
+  // CollectionMembersService.removeMember, modo TRANSFER) y no se concretó
+  // (rechazada o expirada), el objeto se queda con su dueño original pero sale
+  // de la colección compartida — se resuelve igual que una expulsión en modo
+  // "sacar los objetos".
+  private async detachFromGroupCollectionIfNeeded(transfer: { initiatedByUserId: string | null; initiatedFromCollectionId: string | null; itemId: string }) {
+    if (!transfer.initiatedByUserId || !transfer.initiatedFromCollectionId) return;
+    await this.prisma.itemCollection.deleteMany({
+      where: { itemId: transfer.itemId, collectionId: transfer.initiatedFromCollectionId },
+    });
+    await this.locationsService.syncInheritedLocationAccess(transfer.itemId);
   }
 
   private async assertPendingTransferForReceiver(toUserId: string, transferId: string) {

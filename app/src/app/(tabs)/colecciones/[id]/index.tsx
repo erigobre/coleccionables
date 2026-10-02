@@ -238,6 +238,16 @@ export default function CollectionDetailScreen() {
           <Ionicons name="pencil" size={22} color={colors.primaryText} />
         </Pressable>
       ) : null}
+      {!collection.isSystem ? (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/miembros`)}
+          accessibilityLabel="Miembros de la colección"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-surfaceElevated shadow-lg"
+          style={{ right: 20, bottom: insets.bottom + 232 }}
+        >
+          <Ionicons name="people" size={22} color={colors.text} />
+        </Pressable>
+      ) : null}
     </View>
   );
 }

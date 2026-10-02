@@ -1,4 +1,5 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import type { Collection, SharedRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from './default-collections.js';
 import type { CreateCollectionDto } from './dto/create-collection.dto.js';
@@ -7,6 +8,10 @@ import type { RemoveCollectionDto } from './dto/remove-collection.dto.js';
 
 const SALE_COLLECTION_NAME = 'En Venta';
 const SALE_COLLECTION_ICON = 'pricetag-outline';
+
+// VIEWER no se usa hoy para colecciones (solo EDITOR/OWNER vía CollectionMember),
+// pero se mantiene en el ranking por si se habilita más adelante.
+const ROLE_RANK: Record<SharedRole, number> = { VIEWER: 0, EDITOR: 1, OWNER: 2 };
 
 @Injectable()
 export class CollectionsService {
@@ -26,9 +31,11 @@ export class CollectionsService {
 
   // Orden por default: mayor cantidad de objetos, descendente (plan §5.2.4).
   // Las colecciones suspendidas no aparecen en la vista de Colecciones.
-  async findAllActive(ownerId: string) {
+  // Incluye las colecciones propias y aquellas compartidas donde el usuario
+  // es miembro (grupo familiar, ver CollectionMembersService).
+  async findAllActive(userId: string) {
     const collections = await this.prisma.collection.findMany({
-      where: { ownerId, status: 'ACTIVE' },
+      where: { status: 'ACTIVE', OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
       include: { _count: { select: { itemLinks: true } } },
     });
 
@@ -38,9 +45,9 @@ export class CollectionsService {
   }
 
   // "En Venta" (isSystem) no se administra desde aquí: no se edita, suspende ni borra.
-  async findAllForManagement(ownerId: string) {
+  async findAllForManagement(userId: string) {
     const collections = await this.prisma.collection.findMany({
-      where: { ownerId, isSystem: false },
+      where: { isSystem: false, OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
       include: { _count: { select: { itemLinks: true } } },
     });
     return collections.map((c) => ({ ...c, itemCount: c._count.itemLinks }));
@@ -88,8 +95,10 @@ export class CollectionsService {
 
   // Usado por ItemsModule antes de vincular un objeto a una colección:
   // no se pueden agregar objetos nuevos a una colección suspendida (plan §5.2.5).
-  async assertCanAddItems(ownerId: string, collectionId: string) {
-    const collection = await this.assertOwnedCollection(ownerId, collectionId);
+  // EDITOR (default al unirse a una colección compartida) ya puede agregar
+  // sus propios objetos, no hace falta ser OWNER.
+  async assertCanAddItems(userId: string, collectionId: string) {
+    const collection = await this.assertCollectionRole(userId, collectionId, 'EDITOR');
     if (collection.isSystem) {
       throw new BadRequestException(`La colección "${collection.name}" la administra el sistema`);
     }
@@ -102,8 +111,8 @@ export class CollectionsService {
   }
 
   // Quitar un objeto de "En Venta" a mano no está permitido: se hace desactivando la venta.
-  async assertCanRemoveItems(ownerId: string, collectionId: string) {
-    const collection = await this.assertOwnedCollection(ownerId, collectionId);
+  async assertCanRemoveItems(userId: string, collectionId: string) {
+    const collection = await this.assertCollectionRole(userId, collectionId, 'EDITOR');
     if (collection.isSystem) {
       throw new BadRequestException(
         `Este objeto sale de "${collection.name}" al desactivar su venta o marcarlo como vendido`,
@@ -152,8 +161,10 @@ export class CollectionsService {
     }
   }
 
-  private async assertUserManageable(ownerId: string, id: string) {
-    const collection = await this.assertOwnedCollection(ownerId, id);
+  // Editar/suspender/eliminar la colección es exclusivo del OWNER, aunque
+  // esté compartida con otros miembros (EDITOR/VIEWER no pueden).
+  private async assertUserManageable(userId: string, id: string) {
+    const collection = await this.assertCollectionRole(userId, id, 'OWNER');
     if (collection.isSystem) {
       throw new BadRequestException(`La colección "${collection.name}" la administra el sistema y no se puede modificar`);
     }
@@ -180,10 +191,41 @@ export class CollectionsService {
     ]);
   }
 
-  private async assertOwnedCollection(ownerId: string, id: string) {
+  // Dueño real (Collection.ownerId) o miembro vía CollectionMember (colección
+  // compartida, grupo familiar) — ambos cuentan como acceso válido, para no
+  // depender de sembrar un CollectionMember(OWNER) en cada colección existente.
+  private async getMembership(userId: string, id: string): Promise<{ collection: Collection; role: SharedRole }> {
     const collection = await this.prisma.collection.findUnique({ where: { id } });
-    if (!collection || collection.ownerId !== ownerId) {
-      throw new NotFoundException('Colección no encontrada');
+    if (!collection) throw new NotFoundException('Colección no encontrada');
+    if (collection.ownerId === userId) return { collection, role: 'OWNER' };
+    const member = await this.prisma.collectionMember.findUnique({
+      where: { collectionId_userId: { collectionId: id, userId } },
+    });
+    if (!member) throw new NotFoundException('Colección no encontrada');
+    return { collection, role: member.role };
+  }
+
+  private async assertOwnedCollection(userId: string, id: string) {
+    const { collection } = await this.getMembership(userId, id);
+    return collection;
+  }
+
+  // Expuesto para CollectionLocationService (mover/regresar en bloque): exige
+  // ser al menos EDITOR, igual que agregar/quitar objetos uno por uno.
+  async assertCanManageItems(userId: string, collectionId: string) {
+    return this.assertCollectionRole(userId, collectionId, 'EDITOR');
+  }
+
+  // Expuesto para CollectionMembersService: invitar/expulsar miembros del
+  // grupo familiar es exclusivo del OWNER de la colección.
+  async assertOwnerRole(userId: string, collectionId: string) {
+    return this.assertCollectionRole(userId, collectionId, 'OWNER');
+  }
+
+  private async assertCollectionRole(userId: string, id: string, minRole: 'EDITOR' | 'OWNER') {
+    const { collection, role } = await this.getMembership(userId, id);
+    if (ROLE_RANK[role] < ROLE_RANK[minRole]) {
+      throw new ForbiddenException('No tienes permiso para esta acción en la colección');
     }
     return collection;
   }

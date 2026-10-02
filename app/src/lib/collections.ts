@@ -106,3 +106,49 @@ export function unshareCollection(accessToken: string, id: string) {
 export function fetchCollectionShare(accessToken: string, id: string) {
   return apiFetch<{ shared: boolean; url: string | null }>(`/collections/${id}/share`, { accessToken });
 }
+
+// "Grupo familiar": varios usuarios comparten una colección. Cada objeto
+// conserva su dueño real; esto solo afecta visibilidad (ver plan "Colecciones
+// compartidas").
+export type SharedRole = 'OWNER' | 'EDITOR' | 'VIEWER';
+
+export interface CollectionMember {
+  role: SharedRole;
+  createdAt: string;
+  user: { id: string; name: string; username: string };
+}
+
+export function inviteCollectionMember(accessToken: string, id: string, username: string) {
+  return apiFetch<{ invited: true }>(`/collections/${id}/invite`, {
+    method: 'POST',
+    body: { username },
+    accessToken,
+  });
+}
+
+export function acceptCollectionInvite(accessToken: string, id: string) {
+  return apiFetch<CollectionMember>(`/collections/${id}/invite/accept`, { method: 'POST', accessToken });
+}
+
+export function fetchCollectionMembers(accessToken: string, id: string) {
+  return apiFetch<CollectionMember[]>(`/collections/${id}/members`, { accessToken });
+}
+
+export function fetchMemberRemovalPreview(accessToken: string, id: string, memberUserId: string) {
+  return apiFetch<{ itemCount: number; locationCount: number }>(
+    `/collections/${id}/members/${memberUserId}/removal-preview`,
+    { accessToken },
+  );
+}
+
+export function removeCollectionMember(
+  accessToken: string,
+  id: string,
+  memberUserId: string,
+  dto: { mode: 'DETACH' | 'TRANSFER'; transferToUserId?: string },
+) {
+  return apiFetch<{ mode: 'DETACH' | 'TRANSFER'; itemsDetached?: number; itemsOffered?: number }>(
+    `/collections/${id}/members/${memberUserId}/remove`,
+    { method: 'POST', body: dto, accessToken },
+  );
+}

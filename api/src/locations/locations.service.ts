@@ -133,14 +133,21 @@ export class LocationsService {
     return { qrToken: location.qrToken, qrImageDataUrl: dataUrl };
   }
 
-  // v1: solo el owner de la ubicación puede ver el contenido al escanear (ver plan §5.5.4).
+  // El owner de la ubicación siempre puede ver el contenido al escanear. Un
+  // miembro de un grupo familiar también, si tiene acceso de solo lectura
+  // (LocationMember, heredado de una colección compartida en común).
   async resolveByToken(token: string, requestingUserId: string) {
     const location = await this.prisma.location.findUnique({ where: { qrToken: token } });
     if (!location) {
       throw new NotFoundException('Código QR no reconocido');
     }
     if (location.ownerId !== requestingUserId) {
-      throw new ForbiddenException('No tienes acceso a esta ubicación');
+      const member = await this.prisma.locationMember.findUnique({
+        where: { locationId_userId: { locationId: location.id, userId: requestingUserId } },
+      });
+      if (!member) {
+        throw new ForbiddenException('No tienes acceso a esta ubicación');
+      }
     }
 
     const descendantIds = await this.collectDescendantIds(location.ownerId, location.id);
@@ -171,6 +178,91 @@ export class LocationsService {
       throw new NotFoundException('Ubicación no encontrada');
     }
     return location;
+  }
+
+  // Tras vincular/desvincular un objeto de una colección, o cambiar su
+  // ubicación (uno por uno o en bloque desde CollectionLocationService),
+  // otorga/revoca accesos de solo lectura (LocationMember con source
+  // INHERITED_FROM_COLLECTION) a los demás miembros de cada colección
+  // compartida a la que el objeto pertenezca, sobre su ubicación actual y
+  // permanente — así el grupo familiar puede ver dónde está sin ser su dueño.
+  // Vive aquí (no en ItemsService) porque CollectionsModule ya depende de
+  // LocationsModule y ItemsModule depende de CollectionsModule: ponerlo en
+  // ItemsService crearía una dependencia circular con CollectionLocationService.
+  async syncInheritedLocationAccess(itemId: string) {
+    const item = await this.prisma.item.findUnique({
+      where: { id: itemId },
+      select: {
+        ownerId: true,
+        currentLocationId: true,
+        permanentLocationId: true,
+        collections: { select: { collection: { select: { members: { select: { userId: true } } } } } },
+      },
+    });
+    if (!item) return;
+
+    const memberIds = new Set<string>();
+    for (const { collection } of item.collections) {
+      if (collection.members.length <= 1) continue;
+      for (const member of collection.members) {
+        if (member.userId !== item.ownerId) memberIds.add(member.userId);
+      }
+    }
+
+    const locationIds = [...new Set([item.currentLocationId, item.permanentLocationId].filter((v): v is string => v != null))];
+
+    if (memberIds.size > 0 && locationIds.length > 0) {
+      await Promise.all(
+        locationIds.flatMap((locationId) =>
+          [...memberIds].map((userId) =>
+            this.prisma.locationMember.upsert({
+              where: { locationId_userId: { locationId, userId } },
+              create: { locationId, userId, role: 'VIEWER', source: 'INHERITED_FROM_COLLECTION' },
+              update: {},
+            }),
+          ),
+        ),
+      );
+    }
+
+    await this.revokeStaleInheritedLocationAccess(item.ownerId);
+  }
+
+  // Recorre las ubicaciones del owner que tengan algún acceso heredado y
+  // quita los que ya no correspondan: ningún objeto suyo en esa ubicación
+  // sigue vinculado a una colección compartida con ese miembro.
+  private async revokeStaleInheritedLocationAccess(ownerId: string) {
+    const locations = await this.prisma.location.findMany({
+      where: { ownerId, members: { some: { source: 'INHERITED_FROM_COLLECTION' } } },
+      select: {
+        id: true,
+        members: { where: { source: 'INHERITED_FROM_COLLECTION' }, select: { userId: true } },
+        itemsAsCurrent: {
+          select: { collections: { select: { collection: { select: { members: { select: { userId: true } } } } } } },
+        },
+        itemsAsPermanent: {
+          select: { collections: { select: { collection: { select: { members: { select: { userId: true } } } } } } },
+        },
+      },
+    });
+
+    for (const location of locations) {
+      const stillVisibleTo = new Set<string>();
+      for (const item of [...location.itemsAsCurrent, ...location.itemsAsPermanent]) {
+        for (const { collection } of item.collections) {
+          if (collection.members.length <= 1) continue;
+          for (const member of collection.members) {
+            if (member.userId !== ownerId) stillVisibleTo.add(member.userId);
+          }
+        }
+      }
+      const toRevoke = location.members.map((m) => m.userId).filter((userId) => !stillVisibleTo.has(userId));
+      if (toRevoke.length) {
+        await this.prisma.locationMember.deleteMany({
+          where: { locationId: location.id, source: 'INHERITED_FROM_COLLECTION', userId: { in: toRevoke } },
+        });
+      }
+    }
   }
 
   private async collectDescendantIds(ownerId: string, rootId: string): Promise<Set<string>> {
