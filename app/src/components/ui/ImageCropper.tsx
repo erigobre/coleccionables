@@ -84,7 +84,12 @@ export function ImageCropper({ uri, onConfirm, onCancel }: ImageCropperProps) {
 
   const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
 
+  // Debe llevar la directiva 'worklet' explícita: se pasa por referencia a
+  // .onEnd() en dos gestos distintos (no inline en el call site), y el plugin
+  // de Babel de Reanimated solo workletiza automáticamente funciones literales
+  // escritas directamente ahí. Sin esto crashea el hilo de UI al soltar el dedo.
   const clampAfterGesture = () => {
+    'worklet';
     if (!display) return;
     const maxOffsetX = Math.max(0, (display.width * scale.value - box.width) / 2);
     const maxOffsetY = Math.max(0, (display.height * scale.value - box.height) / 2);
