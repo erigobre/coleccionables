@@ -18,12 +18,19 @@ interface Payment {
   periodEnd: string;
 }
 
+interface SelectableFtPlan {
+  id: string;
+  label: string;
+  maxInvitedMembers: number;
+}
+
 interface AdminOrganization {
   id: string;
   name: string;
   plan: string | null;
   subscriptionStatus: string;
   sponsored: boolean;
+  activeFtPlan: SelectableFtPlan | null;
   _count: { users: number };
   payments: Payment[];
 }
@@ -53,7 +60,10 @@ function renderOrgName(name: string) {
 }
 
 export default async function OrganizacionesPage() {
-  const organizations = await backendFetch<AdminOrganization[]>('/admin/organizations');
+  const [organizations, ftPlans] = await Promise.all([
+    backendFetch<AdminOrganization[]>('/admin/organizations'),
+    backendFetch<SelectableFtPlan[]>('/admin/ft-plans'),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -66,7 +76,8 @@ export default async function OrganizacionesPage() {
               <div>
                 <h2 className="text-lg font-semibold text-foreground">{renderOrgName(org.name)}</h2>
                 <p className="text-sm text-muted-foreground">
-                  {org._count.users} usuario(s) · Plan: {org.plan ?? '—'}
+                  {org._count.users} usuario(s) · Plan: {org.plan ?? '—'} · Suscripción FT:{' '}
+                  {org.activeFtPlan ? `${org.activeFtPlan.label} (${org.activeFtPlan.maxInvitedMembers} familiares)` : '—'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -91,6 +102,8 @@ export default async function OrganizacionesPage() {
                   name={org.name}
                   plan={org.plan}
                   subscriptionStatus={org.subscriptionStatus}
+                  activeFtPlanId={org.activeFtPlan?.id ?? null}
+                  ftPlans={ftPlans}
                 />
                 <AddPaymentDialog organizationId={org.id} organizationName={org.name} />
                 <GrantFtDialog organizationId={org.id} organizationName={org.name} />

@@ -99,6 +99,7 @@ export class AdminService {
       include: {
         _count: { select: { users: true } },
         payments: { orderBy: { periodStart: 'desc' }, take: 12 },
+        activeFtPlan: { select: { id: true, label: true, maxInvitedMembers: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -116,6 +117,7 @@ export class AdminService {
         name: dto.name,
         plan: dto.plan,
         subscriptionStatus: dto.subscriptionStatus,
+        ...(dto.activeFtPlanId !== undefined ? { activeFtPlanId: dto.activeFtPlanId || null } : {}),
       },
     });
     await this.logAction(admin, 'organization.update', 'Organization', organizationId, { ...dto });

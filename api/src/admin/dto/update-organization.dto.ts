@@ -18,4 +18,11 @@ export class UpdateOrganizationDto {
   @IsOptional()
   @IsEnum(SubscriptionStatus)
   subscriptionStatus?: SubscriptionStatus;
+
+  // Plan de suscripción de FrikiTokens activo (plan "Ajustes de cuenta +
+  // Wallet de FrikiTokens"): mientras no haya cobro real, se asigna a mano
+  // desde aquí. '' (string vacío del <select>) se interpreta como "ninguno".
+  @IsOptional()
+  @IsString()
+  activeFtPlanId?: string;
 }

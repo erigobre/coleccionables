@@ -23,6 +23,7 @@ enum UserRole {
 enum UserStatus {
   ACTIVE
   SUSPENDED // bloqueada por moderación (ver ModerationFlag) o manualmente por un superadmin
+  PENDING_DELETION // pidió eliminar su cuenta; se anonimiza a los 15 días si no vuelve a iniciar sesión (AccountDeletionCronService)
 }
 
 enum SubscriptionStatus {
@@ -47,14 +48,23 @@ model Organization {
   users    User[]
   payments Payment[]
 
-  // FrikiTokens: el saldo cuelga de la Organization (igual que plan/payments),
-  // no del User, porque así ya se factura todo lo demás (plan §7.1: los
-  // miembros de una misma Organization comparten plan/pago).
+  // FrikiTokens — modelo de "3 monederos" por persona (rediseño Oct 2026,
+  // ver plan "Ajustes de cuenta + Wallet de FrikiTokens"): gratis y comprado
+  // viven en el User y viajan con la persona sin importar su Organization;
+  // el ÚNICO saldo que vive aquí es el de la suscripción compartida
+  // (FtLot.source = SUBSCRIPTION, userId: null), y solo existe mientras haya
+  // un plan activo. `ftLots`/`ftTransactions` siguen colgando de Organization
+  // porque el lote SUBSCRIPTION y el feed de transacciones de toda la
+  // familia son por Organization (ver FtService.findActiveLots/getTransactions).
   ftLots         FtLot[]
   ftTransactions FtTransaction[]
-  ftFreeGrantAt  DateTime? // última vez que se le dio el regalo mensual de FT gratis
+
+  activeFtPlanId        String?
+  activeFtPlan          FtPlan?   @relation(fields: [activeFtPlanId], references: [id], onDelete: SetNull)
+  ftSubscriptionGrantAt DateTime? // última vez que se otorgó el lote mensual SUBSCRIPTION (FtGrantCronService)
 
   moderationFlags ModerationFlag[]
+  invites         OrganizationInvite[]
 
   @@map("organizations")
 }
@@ -74,21 +84,24 @@ model User {
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
 
-  locations             Location[]
-  seasons               Season[]
-  collections           Collection[]
-  tags                  Tag[]
-  items                 Item[]
-  wishlistItems         WishlistItem[]
-  sentTransfers         Transfer[]         @relation("TransferSender")
-  receivedTransfers     Transfer[]         @relation("TransferReceiver")
-  initiatedTransfers    Transfer[]         @relation("TransferInitiatedBy")
-  usageEvents           UsageEvent[]
-  locationMemberships   LocationMember[]
-  collectionMemberships CollectionMember[]
-  ftTransactions        FtTransaction[] // quién disparó cada cobro, para auditoría
-  moderationFlags       ModerationFlag[] // incidentes de moderación de IA disparados por este usuario
-  pushTokens            PushToken[]
+  locations                   Location[]
+  seasons                     Season[]
+  collections                 Collection[]
+  tags                        Tag[]
+  items                       Item[]
+  wishlistItems               WishlistItem[]
+  sentTransfers               Transfer[]           @relation("TransferSender")
+  receivedTransfers           Transfer[]           @relation("TransferReceiver")
+  initiatedTransfers          Transfer[]           @relation("TransferInitiatedBy")
+  usageEvents                 UsageEvent[]
+  locationMemberships         LocationMember[]
+  collectionMemberships       CollectionMember[]
+  ftTransactions              FtTransaction[] // quién disparó cada cobro, para auditoría
+  ftLots                      FtLot[] // lotes personales (gratis/comprado/referido/reembolso) — viajan con la persona, no con la Organization
+  moderationFlags             ModerationFlag[] // incidentes de moderación de IA disparados por este usuario
+  pushTokens                  PushToken[]
+  sentOrganizationInvites     OrganizationInvite[] @relation("OrganizationInviteSentBy")
+  receivedOrganizationInvites OrganizationInvite[] @relation("OrganizationInviteTarget")
 
   // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
   // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
@@ -121,6 +134,23 @@ model User {
   registrationIp    String?
   referralSuspended Boolean @default(false)
   referralBonusPaid Boolean @default(false)
+
+  // Ajustes de cuenta (plan "Ajustes de cuenta + Wallet de FrikiTokens", Oct
+  // 2026). usernameChangedAt impone el cooldown de 30 días para cambiar de
+  // @usuario; emailVerificationToken expira a las 24h; deletionRequestedAt
+  // dispara el borrado/anonimización a los 15 días (AccountDeletionCronService)
+  // si no vuelve a iniciar sesión antes (AuthService.login reactiva).
+  avatarUrl                       String?
+  usernameChangedAt               DateTime?
+  emailVerified                   Boolean   @default(false)
+  emailVerificationToken          String?   @unique
+  emailVerificationTokenExpiresAt DateTime?
+  deletionRequestedAt             DateTime?
+
+  // Regalo mensual de FT gratis: movido aquí desde Organization (antes todo
+  // el saldo era por Organization; ahora el monedero "gratis" es personal y
+  // sigue a la persona sin importar su Organization — ver FtGrantCronService).
+  ftFreeGrantAt DateTime?
 
   @@map("users")
 }
@@ -248,21 +278,30 @@ model FtConfig {
 }
 
 enum FtLotSource {
-  MONTHLY_FREE // Regalo mensual del plan gratuito
-  PURCHASE // Compra real (IAP / Stripe) — fase futura
-  PROMO // Regalo manual del superadmin
-  REFUND // Devolución de un cobro que se retuvo (HELD) pero falló
-  REFERRAL // Bono del programa de invitaciones (invitado o invitador)
+  MONTHLY_FREE // Regalo mensual del plan gratuito (personal, userId asignado)
+  PURCHASE // Compra real (IAP / Stripe) — fase futura (personal, userId asignado)
+  PROMO // Regalo manual del superadmin (compartido, userId null)
+  REFUND // Devolución de un cobro que se retuvo (HELD) pero falló (personal, vuelve a quien gastó)
+  REFERRAL // Bono del programa de invitaciones (personal, userId asignado)
+  SUBSCRIPTION // Lote mensual del plan de suscripción activo de la Organization (compartido, userId null)
 }
 
 // El saldo se guarda por "lotes", no como un solo número: así cada lote puede
 // expirar por su cuenta (ej. el regalo mensual) y se gasta primero el que
 // vence antes (o el que ya expiró se ignora), sin afectar lotes comprados que
-// no expiran.
+// no expiran. `userId` es la regla central del modelo de "3 monederos" (Oct
+// 2026): null = lote COMPARTIDO por toda la Organization (PROMO/SUBSCRIPTION);
+// asignado = lote PERSONAL, ligado a esa persona sin importar en qué
+// Organization esté hoy (MONTHLY_FREE/PURCHASE/REFERRAL/REFUND). Ver
+// FtService.findActiveLots, que busca por userId sin filtrar por
+// organizationId — así el saldo personal sigue a la persona sin migrar filas
+// al cambiar de Organization.
 model FtLot {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?        @relation(fields: [userId], references: [id], onDelete: Cascade)
   source         FtLotSource
   amount         Int // saldo restante de este lote
   originalAmount Int // monto original, para historial/reportes
@@ -270,6 +309,7 @@ model FtLot {
   createdAt      DateTime     @default(now())
 
   @@index([organizationId, expiresAt])
+  @@index([userId, expiresAt])
   @@map("ft_lots")
 }
 
@@ -353,6 +393,13 @@ model FtPlan {
   storeProductIdAndroid String?
   createdAt             DateTime @default(now())
   updatedAt             DateTime @updatedAt
+
+  // Cuántos familiares adicionales (sin contar al OWNER) puede invitar una
+  // Organization con este plan activo — ej. plan barato: 2, plan caro: 5
+  // (plan "Ajustes de cuenta + Wallet de FrikiTokens", Oct 2026).
+  maxInvitedMembers Int @default(0)
+
+  organizations Organization[]
 
   @@map("ft_plans")
 }
@@ -838,6 +885,40 @@ model Transfer {
 
   @@index([toEmail, toUserId, status])
   @@map("transfers")
+}
+
+// ---------------------------------------------------------------------------
+// Familiares de Organization (monedero de suscripción compartida) — distinto
+// de CollectionMember (eso comparte colecciones de objetos). Invitar a una
+// cuenta que YA existe requiere su aceptación explícita (no se puede mover a
+// alguien de Organization sin su consentimiento); mismo espíritu que
+// Transfer: expira sola si no se responde (OrganizationInvitesCronService).
+// ---------------------------------------------------------------------------
+
+enum OrganizationInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model OrganizationInvite {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String
+  invitedByUser   User   @relation("OrganizationInviteSentBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  targetUserId    String
+  targetUser      User   @relation("OrganizationInviteTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  status      OrganizationInviteStatus @default(PENDING)
+  createdAt   DateTime                 @default(now())
+  respondedAt DateTime?
+
+  @@index([targetUserId, status])
+  @@index([organizationId, status])
+  @@map("organization_invites")
 }
 
 // ---------------------------------------------------------------------------

@@ -10,16 +10,26 @@ import { updateOrganizationAction, type EditOrganizationState } from './actions'
 
 const initialState: EditOrganizationState = {};
 
+interface SelectableFtPlan {
+  id: string;
+  label: string;
+  maxInvitedMembers: number;
+}
+
 export function EditOrganizationDialog({
   organizationId,
   name,
   plan,
   subscriptionStatus,
+  activeFtPlanId,
+  ftPlans,
 }: {
   organizationId: string;
   name: string;
   plan: string | null;
   subscriptionStatus: string;
+  activeFtPlanId: string | null;
+  ftPlans: SelectableFtPlan[];
 }) {
   const [open, setOpen] = useState(false);
   const action = updateOrganizationAction.bind(null, organizationId);
@@ -60,6 +70,22 @@ export function EditOrganizationDialog({
               <option value="PAST_DUE">PAST_DUE</option>
               <option value="CANCELED">CANCELED</option>
               <option value="SPONSORED">SPONSORED</option>
+            </select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="activeFtPlanId">Plan de suscripción de FrikiTokens (familiar)</Label>
+            <select
+              id="activeFtPlanId"
+              name="activeFtPlanId"
+              defaultValue={activeFtPlanId ?? ''}
+              className="h-8 w-full rounded-lg border border-border bg-background px-2.5 text-sm text-foreground"
+            >
+              <option value="">Ninguno</option>
+              {ftPlans.map((ftPlan) => (
+                <option key={ftPlan.id} value={ftPlan.id}>
+                  {ftPlan.label} ({ftPlan.maxInvitedMembers} familiares)
+                </option>
+              ))}
             </select>
           </div>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}

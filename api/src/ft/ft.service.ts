@@ -1,18 +1,49 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import type { FtLot, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { ChargeParams, ConfirmParams, GrantParams } from './ft.types.js';
 
-// Se gasta primero el lote que expira antes (ej. el regalo mensual); los que
+const ACTIVE_SUBSCRIPTION_STATUSES = ['ACTIVE', 'SPONSORED'] as const;
+
+// Rango de consumo (plan "3 monederos", Oct 2026): gratis/promo/referido/
+// reembolso primero, luego suscripción, al final lo comprado — así nunca se
+// queman primero los FT que la persona pagó. Dentro de cada rango se sigue
+// gastando primero el lote que expira antes (ej. el regalo mensual); los que
 // no expiran (compras) se dejan para el final. Se ordena en JS: en MySQL los
-// NULL de `expiresAt` quedarían primero en ASC, justo al revés de lo que
-// se necesita aquí.
+// NULL de `expiresAt` quedarían primero en ASC, justo al revés de lo que se
+// necesita aquí.
+const BURN_RANK: Record<FtLot['source'], number> = {
+  MONTHLY_FREE: 0,
+  PROMO: 0,
+  REFERRAL: 0,
+  REFUND: 0,
+  SUBSCRIPTION: 1,
+  PURCHASE: 2,
+};
+
 function sortByBurnOrder(lots: FtLot[]): FtLot[] {
   return [...lots].sort((a, b) => {
+    const rankDiff = BURN_RANK[a.source] - BURN_RANK[b.source];
+    if (rankDiff !== 0) return rankDiff;
     if (a.expiresAt === null) return b.expiresAt === null ? 0 : 1;
     if (b.expiresAt === null) return -1;
     return a.expiresAt.getTime() - b.expiresAt.getTime();
   });
+}
+
+// Agrupa lotes en los 3 monederos que ve la persona: "free" junta todo lo que
+// no es ni suscripción ni compra (promo/referido/reembolso se sienten igual
+// de "regalo" para el usuario, no amerita un 4to grupo en la UI).
+function summarizeWallets(lots: FtLot[]) {
+  let free = 0;
+  let subscription = 0;
+  let purchased = 0;
+  for (const lot of lots) {
+    if (lot.source === 'SUBSCRIPTION') subscription += lot.amount;
+    else if (lot.source === 'PURCHASE') purchased += lot.amount;
+    else free += lot.amount;
+  }
+  return { free, subscription, purchased };
 }
 
 type Tx = Prisma.TransactionClient;
@@ -23,21 +54,45 @@ export class FtService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  private async findActiveLots(client: Tx | PrismaService, organizationId: string): Promise<FtLot[]> {
+  // Busca el lote personal (userId = esta persona, sigue a la persona sin
+  // importar su Organization) UNIONADO con el lote compartido de su
+  // Organization actual (userId null), y el compartido solo cuenta si la
+  // Organization tiene de verdad una suscripción activa — si se cancela, el
+  // monedero de suscripción simplemente deja de aparecer, sin tocar ninguna fila.
+  private async findActiveLots(client: Tx | PrismaService, userId: string): Promise<FtLot[]> {
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: { organizationId: true, organization: { select: { subscriptionStatus: true, activeFtPlanId: true } } },
+    });
+    if (!user) {
+      throw new NotFoundException('Usuario no encontrado');
+    }
+
+    const hasActiveSubscription =
+      user.organization.activeFtPlanId !== null &&
+      (ACTIVE_SUBSCRIPTION_STATUSES as readonly string[]).includes(user.organization.subscriptionStatus);
+
     const lots = await client.ftLot.findMany({
       where: {
-        organizationId,
         amount: { gt: 0 },
         OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        AND: [
+          {
+            OR: [
+              { userId },
+              ...(hasActiveSubscription ? [{ organizationId: user.organizationId, userId: null }] : []),
+            ],
+          },
+        ],
       },
     });
     return sortByBurnOrder(lots);
   }
 
-  async getBalance(organizationId: string) {
-    const lots = await this.findActiveLots(this.prisma, organizationId);
+  async getBalance(userId: string) {
+    const lots = await this.findActiveLots(this.prisma, userId);
     const balance = lots.reduce((sum, lot) => sum + lot.amount, 0);
-    return { balance, lots };
+    return { balance, ...summarizeWallets(lots), lots };
   }
 
   // Catálogo de costos por acción, para que la app muestre "Analizar (2 FT)"
@@ -59,6 +114,44 @@ export class FtService {
     });
   }
 
+  // Estado de cuenta descargable del mes (decisión #7 del plan de Ajustes:
+  // CSV, no PDF — no hay ninguna librería de generación de PDF en el
+  // proyecto). `month` viene como "YYYY-MM" desde la app.
+  async getMonthlyStatementCsv(organizationId: string, month: string) {
+    if (!/^\d{4}-\d{2}$/.test(month)) {
+      throw new HttpException('Formato de mes inválido, se espera YYYY-MM', HttpStatus.BAD_REQUEST);
+    }
+    const [year, monthIndex] = month.split('-').map(Number);
+    const periodStart = new Date(year, monthIndex - 1, 1);
+    const periodEnd = new Date(year, monthIndex, 1);
+
+    const transactions = await this.prisma.ftTransaction.findMany({
+      where: { organizationId, createdAt: { gte: periodStart, lt: periodEnd } },
+      orderBy: { createdAt: 'asc' },
+      include: { user: { select: { name: true, username: true } } },
+    });
+
+    const header = 'Fecha,Tipo,Servicio,Persona,Monto,Estado';
+    const rows = transactions.map((transaction) => {
+      const fecha = transaction.createdAt.toISOString();
+      const tipo = transaction.type === 'GRANT' ? 'Regalo' : 'Cargo';
+      const servicio = transaction.service ?? '';
+      const persona = transaction.user?.username ?? transaction.user?.name ?? '';
+      const monto = transaction.type === 'GRANT' ? transaction.ftAmount : -transaction.ftAmount;
+      const estado = transaction.status;
+      return [fecha, tipo, servicio, persona, monto, estado]
+        .map((value) => `"${String(value).replace(/"/g, '""')}"`)
+        .join(',');
+    });
+
+    const csv = [header, ...rows].join('\n');
+    return {
+      filename: `frikidex-estado-de-cuenta-${month}.csv`,
+      mimeType: 'text/csv',
+      base64: Buffer.from(csv, 'utf-8').toString('base64'),
+    };
+  }
+
   // Paso 1 del patrón hold/confirm/release: retiene el costo ANTES de llamar a
   // Gemini. Si la acción de IA falla después, quien la llama debe avisar con
   // `release()` para devolver el saldo; si sale bien, con `confirm()`.
@@ -77,7 +170,7 @@ export class FtService {
     const cost = config.ftCost;
 
     const transaction = await this.prisma.$transaction(async (tx) => {
-      const lots = await this.findActiveLots(tx, organizationId);
+      const lots = await this.findActiveLots(tx, userId);
       const available = lots.reduce((sum, lot) => sum + lot.amount, 0);
       if (available < cost) {
         throw new HttpException(
@@ -149,6 +242,7 @@ export class FtService {
       await tx.ftLot.create({
         data: {
           organizationId: transaction.organizationId,
+          userId: transaction.userId ?? null,
           source: 'REFUND',
           amount: transaction.ftAmount,
           originalAmount: transaction.ftAmount,
@@ -198,6 +292,7 @@ export class FtService {
       await tx.ftLot.create({
         data: {
           organizationId: params.organizationId,
+          userId: params.userId ?? null,
           source: params.source,
           amount: params.amount,
           originalAmount: params.amount,

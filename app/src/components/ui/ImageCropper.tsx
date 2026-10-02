@@ -18,14 +18,17 @@ interface ImageCropperProps {
   uri: string;
   onConfirm: (croppedUri: string) => void;
   onCancel: () => void;
+  // Foto de perfil (plan de Ajustes): fuerza 1:1 y oculta los botones de
+  // proporción, en vez de sugerir una según orientación.
+  lockedRatio?: RatioKey;
 }
 
 // Recorte propio con pan/zoom (plan "Recorte de imágenes" §2): proporción
 // sugerida según orientación de la foto, con botones para cambiarla a mano.
-export function ImageCropper({ uri, onConfirm, onCancel }: ImageCropperProps) {
+export function ImageCropper({ uri, onConfirm, onCancel, lockedRatio }: ImageCropperProps) {
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [imageSize, setImageSize] = useState<{ width: number; height: number } | null>(null);
-  const [ratioKey, setRatioKey] = useState<RatioKey>('1:1');
+  const [ratioKey, setRatioKey] = useState<RatioKey>(lockedRatio ?? '1:1');
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -37,7 +40,9 @@ export function ImageCropper({ uri, onConfirm, onCancel }: ImageCropperProps) {
       .then((size) => {
         if (!active) return;
         setImageSize(size);
-        setRatioKey(size.width > size.height ? '4:3' : size.width < size.height ? '3:4' : '1:1');
+        if (!lockedRatio) {
+          setRatioKey(size.width > size.height ? '4:3' : size.width < size.height ? '3:4' : '1:1');
+        }
       })
       .catch(() => {
         if (active) setError('No se pudo leer la foto');
@@ -45,7 +50,7 @@ export function ImageCropper({ uri, onConfirm, onCancel }: ImageCropperProps) {
     return () => {
       active = false;
     };
-  }, [uri]);
+  }, [uri, lockedRatio]);
 
   const box = useMemo(() => {
     const ratio = RATIOS[ratioKey];
@@ -207,19 +212,21 @@ export function ImageCropper({ uri, onConfirm, onCancel }: ImageCropperProps) {
           )}
         </View>
 
-        <View className="w-full flex-row justify-center gap-3">
-          {(Object.keys(RATIOS) as RatioKey[]).map((key) => (
-            <Pressable
-              key={key}
-              onPress={() => setRatioKey(key)}
-              className={`rounded-full px-4 py-2 ${key === ratioKey ? 'bg-primary' : 'bg-surfaceElevated'}`}
-            >
-              <Text className={key === ratioKey ? 'text-primaryText' : 'text-textSecondary'}>
-                {RATIO_LABEL[key]}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
+        {!lockedRatio ? (
+          <View className="w-full flex-row justify-center gap-3">
+            {(Object.keys(RATIOS) as RatioKey[]).map((key) => (
+              <Pressable
+                key={key}
+                onPress={() => setRatioKey(key)}
+                className={`rounded-full px-4 py-2 ${key === ratioKey ? 'bg-primary' : 'bg-surfaceElevated'}`}
+              >
+                <Text className={key === ratioKey ? 'text-primaryText' : 'text-textSecondary'}>
+                  {RATIO_LABEL[key]}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
 
         {error ? <Text className="mt-3 text-center text-sm text-danger">{error}</Text> : null}
 

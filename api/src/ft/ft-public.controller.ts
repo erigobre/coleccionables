@@ -37,6 +37,7 @@ export class FtPublicController {
         annualPriceMxnCents: true,
         annualEnabled: true,
         badge: true,
+        maxInvitedMembers: true,
       },
     });
     return { plans };

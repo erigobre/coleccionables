@@ -1,26 +1,31 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Link } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
+import { FtCoin } from '../../../components/ui/FtCoin';
 import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
 import { useAuth } from '../../../context/auth-context';
+import { useFt } from '../../../context/ft-context';
 import { fetchMyReferralInfo } from '../../../lib/referrals';
 
 function MenuRow({
   icon,
   label,
   href,
+  badge,
 }: {
   icon: keyof typeof Ionicons.glyphMap;
   label: string;
   href?: string;
+  badge?: ReactNode;
 }) {
   const content = (
     <View className="flex-row items-center gap-3 border-b border-border py-4">
       <Ionicons name={icon} size={20} color={colors.textMuted} />
       <Text className="flex-1 text-base text-text">{label}</Text>
+      {badge}
       {href ? <Ionicons name="chevron-forward" size={18} color={colors.textMuted} /> : null}
     </View>
   );
@@ -35,6 +40,7 @@ function MenuRow({
 
 export default function PerfilScreen() {
   const { user, logout, accessToken } = useAuth();
+  const { balance } = useFt();
   const [canInvite, setCanInvite] = useState(false);
 
   useEffect(() => {
@@ -72,8 +78,20 @@ export default function PerfilScreen() {
         {canInvite ? (
           <MenuRow icon="people-outline" label="Invitar amigos" href="/(tabs)/perfil/invitar" />
         ) : null}
-        <MenuRow icon="stats-chart-outline" label="Estadísticas" />
-        <MenuRow icon="settings-outline" label="Ajustes" />
+        <MenuRow
+          icon="wallet-outline"
+          label="FrikiTokens"
+          href="/(tabs)/perfil/wallet"
+          badge={
+            balance != null ? (
+              <View className="flex-row items-center gap-1">
+                <FtCoin size={13} />
+                <Text className="font-display text-sm text-primary">{balance.toLocaleString('es-MX')}</Text>
+              </View>
+            ) : null
+          }
+        />
+        <MenuRow icon="settings-outline" label="Ajustes" href="/(tabs)/perfil/ajustes" />
       </View>
 
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />

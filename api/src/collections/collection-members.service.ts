@@ -28,7 +28,9 @@ export class CollectionMembersService {
   async inviteMember(ownerId: string, collectionId: string, dto: InviteMemberDto) {
     const collection = await this.collectionsService.assertOwnerRole(ownerId, collectionId);
 
-    const invitee = await this.prisma.user.findUnique({ where: { username: dto.username } });
+    // status: 'ACTIVE' — una cuenta PENDING_DELETION no debe ser invitable
+    // por nadie mientras espera sus 15 días de gracia (plan de Ajustes §2).
+    const invitee = await this.prisma.user.findUnique({ where: { username: dto.username, status: 'ACTIVE' } });
     if (!invitee) {
       throw new NotFoundException('No existe ningún usuario con ese @usuario');
     }

@@ -180,8 +180,8 @@ export class AuthService {
       const amount = await this.ftService.getConfigValue('SIGNUP_FREE_FT', SIGNUP_FREE_FT_FALLBACK);
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + FREE_FT_LOT_DAYS);
-      await this.prisma.organization.update({
-        where: { id: user.organizationId },
+      await this.prisma.user.update({
+        where: { id: user.id },
         data: { ftFreeGrantAt: new Date() },
       });
       await this.ftService.grant({
@@ -220,6 +220,17 @@ export class AuthService {
       throw new UnauthorizedException('Tu cuenta está suspendida. Contacta a soporte si crees que es un error.');
     }
 
+    // Un login explícito con contraseña cuenta como "volvió" (decisión #2 del
+    // plan de Ajustes): reactiva la cuenta antes de los 15 días de gracia. Un
+    // refresh token viejo NO reactiva (ver refresh() abajo) — podría disparar
+    // solo porque la app seguía abierta en background.
+    if (user.status === 'PENDING_DELETION') {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { status: 'ACTIVE', deletionRequestedAt: null },
+      });
+    }
+
     await this.prisma.usageEvent.create({
       data: { userId: user.id, type: 'LOGIN' },
     });
@@ -251,6 +262,9 @@ export class AuthService {
     if (user.status === 'SUSPENDED') {
       throw new UnauthorizedException('Tu cuenta está suspendida');
     }
+    if (user.status === 'PENDING_DELETION') {
+      throw new UnauthorizedException('Tu cuenta está programada para eliminarse. Inicia sesión con tu contraseña para reactivarla.');
+    }
 
     return this.issueTokens({
       sub: user.id,
@@ -260,6 +274,14 @@ export class AuthService {
       role: user.role,
       organizationId: user.organizationId,
     });
+  }
+
+  // Envoltorio público de issueTokens para que UsersService pueda firmar
+  // tokens nuevos tras editar nombre/@usuario/contraseña, sin duplicar la
+  // lógica de firma ni esperar al refresh de 15 min para que la app refleje
+  // el cambio.
+  reissueTokens(payload: JwtPayload): Promise<Tokens> {
+    return this.issueTokens(payload);
   }
 
   private async issueTokens(payload: JwtPayload): Promise<Tokens> {

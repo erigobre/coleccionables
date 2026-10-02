@@ -8,6 +8,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../../global.css';
+import { AppLockGate } from '../components/AppLockGate';
 import { CloseHeaderButton } from '../components/CloseHeaderButton';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { FtProvider } from '../context/ft-context';
@@ -47,6 +48,12 @@ function useNotificationNavigation() {
         router.push(`/(tabs)/colecciones/${data.collectionId}/miembros`);
       } else if (data?.type === 'collection_removed') {
         router.push('/(tabs)/colecciones');
+      } else if (data?.type === 'organization_invite') {
+        router.push('/(tabs)/perfil/wallet/invitaciones');
+      } else if (data?.type === 'organization_invite_accepted' || data?.type === 'organization_invite_rejected') {
+        router.push('/(tabs)/perfil/wallet/familiares');
+      } else if (data?.type === 'organization_member_removed') {
+        router.push('/(tabs)/perfil/wallet');
       }
     });
     return () => sub.remove();
@@ -63,7 +70,9 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <AuthProvider>
           <FtProvider>
-            <RootNavigator fontsLoaded={fontsLoaded} />
+            <AppLockGate>
+              <RootNavigator fontsLoaded={fontsLoaded} />
+            </AppLockGate>
             <StatusBar style="light" />
           </FtProvider>
         </AuthProvider>

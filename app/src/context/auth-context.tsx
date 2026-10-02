@@ -25,6 +25,7 @@ interface AuthContextValue {
     acceptedLegal: boolean;
   }) => Promise<void>;
   logout: () => Promise<void>;
+  applyTokens: (next: AuthTokens) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -94,8 +95,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login,
       register,
       logout,
+      applyTokens,
     }),
-    [tokens, isLoading, login, register, logout],
+    [tokens, isLoading, login, register, logout, applyTokens],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

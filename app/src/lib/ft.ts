@@ -19,15 +19,21 @@ export interface FtServiceConfig {
 
 export interface FtLot {
   id: string;
-  source: 'MONTHLY_FREE' | 'PURCHASE' | 'PROMO' | 'REFUND';
+  source: 'MONTHLY_FREE' | 'PURCHASE' | 'PROMO' | 'REFUND' | 'REFERRAL' | 'SUBSCRIPTION';
   amount: number;
   originalAmount: number;
   expiresAt: string | null;
   createdAt: string;
 }
 
+// Los 3 monederos (plan de Ajustes/Wallet): gratis y comprado son siempre
+// personales; subscription solo tiene saldo si la Organization tiene un plan
+// activo (ver OrganizationsService / FtService.findActiveLots).
 export interface FtBalance {
   balance: number;
+  free: number;
+  subscription: number;
+  purchased: number;
   lots: FtLot[];
 }
 
@@ -54,6 +60,17 @@ export function fetchFtTransactions(accessToken: string, take?: number) {
   return apiFetch<FtTransaction[]>(`/ft/transactions${query}`, { accessToken });
 }
 
+export interface FtStatementFile {
+  filename: string;
+  mimeType: string;
+  base64: string;
+}
+
+// `month` en formato YYYY-MM.
+export function fetchFtStatement(accessToken: string, month: string) {
+  return apiFetch<FtStatementFile>(`/ft/transactions/statement?month=${encodeURIComponent(month)}`, { accessToken });
+}
+
 export interface FtPackageOption {
   code: string;
   ftAmount: number;
@@ -66,4 +83,22 @@ export interface FtPackageOption {
 // mismos paquetes/precios que el resto del proyecto.
 export function fetchFtPackages() {
   return apiFetch<{ packages: FtPackageOption[] }>('/ft/packages').then((r) => r.packages);
+}
+
+export interface FtPlanOption {
+  code: string;
+  label: string;
+  ftAmountMonthly: number;
+  monthlyPriceMxnCents: number;
+  annualPriceMxnCents: number | null;
+  annualEnabled: boolean;
+  badge: string | null;
+  maxInvitedMembers: number;
+}
+
+// Público (sin auth) — tabla de planes de suscripción familiar para la
+// landing de beneficios (wallet/suscripcion.tsx). El botón de suscribirse
+// sigue mostrando "Muy pronto" (decisión #1 del plan: sin cobro real todavía).
+export function fetchFtPlans() {
+  return apiFetch<{ plans: FtPlanOption[] }>('/ft/plans').then((r) => r.plans);
 }

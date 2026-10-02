@@ -32,7 +32,10 @@ export class TransfersService {
     if (!structureValid || !tldValid) {
       return { structureValid, tldValid, suggestion, hasAccount: false };
     }
-    const toUser = await this.prisma.user.findUnique({ where: { email } });
+    // status: 'ACTIVE' — una cuenta PENDING_DELETION se trata como inexistente
+    // (plan de Ajustes §2): la transferencia sigue el camino de "invitar por
+    // correo" en vez de intentar entregarse a una cuenta desactivada.
+    const toUser = await this.prisma.user.findUnique({ where: { email, status: 'ACTIVE' } });
     return { structureValid, tldValid, suggestion, hasAccount: !!toUser };
   }
 
@@ -63,7 +66,7 @@ export class TransfersService {
       });
     }
 
-    const toUser = await this.prisma.user.findUnique({ where: { email: dto.toUserEmail } });
+    const toUser = await this.prisma.user.findUnique({ where: { email: dto.toUserEmail, status: 'ACTIVE' } });
     if (toUser?.id === fromUserId) {
       throw new BadRequestException('No puedes transferirte un objeto a ti mismo');
     }

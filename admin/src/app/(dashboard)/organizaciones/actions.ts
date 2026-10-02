@@ -117,6 +117,7 @@ export async function updateOrganizationAction(
   const name = String(formData.get('name') ?? '').trim();
   const plan = String(formData.get('plan') ?? '').trim() || undefined;
   const subscriptionStatus = String(formData.get('subscriptionStatus') ?? '').trim() || undefined;
+  const activeFtPlanId = String(formData.get('activeFtPlanId') ?? '').trim();
 
   if (!name) {
     return { error: 'El nombre es obligatorio' };
@@ -125,7 +126,7 @@ export async function updateOrganizationAction(
   try {
     await backendFetch(`/admin/organizations/${organizationId}`, {
       method: 'PATCH',
-      body: { name, plan, subscriptionStatus },
+      body: { name, plan, subscriptionStatus, activeFtPlanId },
     });
   } catch {
     return { error: 'No se pudo actualizar la organización' };

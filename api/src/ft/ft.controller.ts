@@ -9,10 +9,11 @@ import { FtService } from './ft.service.js';
 export class FtController {
   constructor(private readonly ftService: FtService) {}
 
-  // Contador persistente de saldo (plan §6 reglas de UI obligatorias).
+  // Contador persistente de saldo (plan §6 reglas de UI obligatorias). Por
+  // persona (modelo de 3 monederos), no por Organization — ver FtService.getBalance.
   @Get('balance')
   getBalance(@CurrentUser() user: AuthenticatedUser) {
-    return this.ftService.getBalance(user.organizationId);
+    return this.ftService.getBalance(user.id);
   }
 
   // Catálogo de costos por acción, para mostrar "Analizar (2 FT)" en vivo.
@@ -25,5 +26,10 @@ export class FtController {
   getTransactions(@CurrentUser() user: AuthenticatedUser, @Query('take') take?: string) {
     const parsed = take ? Number.parseInt(take, 10) : undefined;
     return this.ftService.getTransactions(user.organizationId, parsed && parsed > 0 ? parsed : undefined);
+  }
+
+  @Get('transactions/statement')
+  getStatement(@CurrentUser() user: AuthenticatedUser, @Query('month') month: string) {
+    return this.ftService.getMonthlyStatementCsv(user.organizationId, month);
   }
 }

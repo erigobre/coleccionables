@@ -55,7 +55,13 @@
       ],
       "expo-font",
       "expo-sharing",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Frikidex usa Face ID para desbloquear la app como alternativa a tu PIN."
+        }
+      ]
     ],
     "extra": {
       "router": {
