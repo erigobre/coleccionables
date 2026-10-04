@@ -130,6 +130,24 @@ export function acceptCollectionInvite(accessToken: string, id: string) {
   return apiFetch<CollectionMember>(`/collections/${id}/invite/accept`, { method: 'POST', accessToken });
 }
 
+export function rejectCollectionInvite(accessToken: string, id: string) {
+  return apiFetch<{ success: true }>(`/collections/${id}/invite/reject`, { method: 'POST', accessToken });
+}
+
+// Invitaciones pendientes dirigidas a mí — alimenta la pantalla de
+// "Notificaciones" (fallback si se perdió el push, ver _layout.tsx).
+export interface CollectionInvite {
+  id: string;
+  collectionId: string;
+  createdAt: string;
+  collection: { name: string };
+  invitedByUser: { name: string; username: string | null };
+}
+
+export function fetchMyCollectionInvites(accessToken: string) {
+  return apiFetch<CollectionInvite[]>('/collections/invites/mine', { accessToken });
+}
+
 export function fetchCollectionMembers(accessToken: string, id: string) {
   return apiFetch<CollectionMember[]>(`/collections/${id}/members`, { accessToken });
 }

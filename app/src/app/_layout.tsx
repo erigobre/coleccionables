@@ -27,34 +27,55 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Navega según el tipo de notificación al tocarla (app abierta, en background
-// o cerrada — el listener cubre los tres casos por igual).
+type NotificationData =
+  | { type?: string; seasonId?: string; collectionId?: string; collectionName?: string }
+  | undefined;
+
+function navigateForNotificationData(data: NotificationData) {
+  if (data?.type === 'transfer' || data?.type === 'transfer_accepted') {
+    router.push('/(tabs)/objetos/transferencias');
+  } else if (data?.type === 'season' && data.seasonId) {
+    router.push(`/(tabs)/perfil/temporadas/${data.seasonId}`);
+  } else if (data?.type === 'collection_invite' && data.collectionId) {
+    router.push({
+      pathname: '/(tabs)/colecciones/invitacion',
+      params: { collectionId: data.collectionId, collectionName: data.collectionName ?? '' },
+    });
+  } else if (data?.type === 'collection_invite_rejected') {
+    router.push('/notificaciones');
+  } else if (data?.type === 'collection_joined' && data.collectionId) {
+    router.push(`/(tabs)/colecciones/${data.collectionId}/miembros`);
+  } else if (data?.type === 'collection_removed') {
+    router.push('/(tabs)/colecciones');
+  } else if (data?.type === 'organization_invite') {
+    router.push('/(tabs)/perfil/wallet/invitaciones');
+  } else if (data?.type === 'organization_invite_accepted' || data?.type === 'organization_invite_rejected') {
+    router.push('/(tabs)/perfil/wallet/familiares');
+  } else if (data?.type === 'organization_member_removed') {
+    router.push('/(tabs)/perfil/wallet');
+  }
+}
+
+// Navega según el tipo de notificación al tocarla. `addNotificationResponseReceivedListener`
+// cubre los casos de app abierta o en background, pero NO el de app cerrada
+// del todo (cold start): ahí expo-notifications nunca dispara ese listener,
+// solo deja la respuesta disponible vía getLastNotificationResponseAsync()
+// (bug confirmado 2026-10-02 — antes este comentario decía, incorrectamente,
+// que el listener solo ya cubría los tres casos). Se limpia con
+// clearLastNotificationResponseAsync() tras manejarla para no re-navegar con
+// una respuesta vieja cada vez que la app vuelve a abrirse.
 function useNotificationNavigation() {
   useEffect(() => {
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content.data as NotificationData;
+      navigateForNotificationData(data);
+      Notifications.clearLastNotificationResponseAsync().catch(() => {});
+    });
+
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data as
-        | { type?: string; seasonId?: string; collectionId?: string; collectionName?: string }
-        | undefined;
-      if (data?.type === 'transfer' || data?.type === 'transfer_accepted') {
-        router.push('/(tabs)/objetos/transferencias');
-      } else if (data?.type === 'season' && data.seasonId) {
-        router.push(`/(tabs)/perfil/temporadas/${data.seasonId}`);
-      } else if (data?.type === 'collection_invite' && data.collectionId) {
-        router.push({
-          pathname: '/(tabs)/colecciones/invitacion',
-          params: { collectionId: data.collectionId, collectionName: data.collectionName ?? '' },
-        });
-      } else if (data?.type === 'collection_joined' && data.collectionId) {
-        router.push(`/(tabs)/colecciones/${data.collectionId}/miembros`);
-      } else if (data?.type === 'collection_removed') {
-        router.push('/(tabs)/colecciones');
-      } else if (data?.type === 'organization_invite') {
-        router.push('/(tabs)/perfil/wallet/invitaciones');
-      } else if (data?.type === 'organization_invite_accepted' || data?.type === 'organization_invite_rejected') {
-        router.push('/(tabs)/perfil/wallet/familiares');
-      } else if (data?.type === 'organization_member_removed') {
-        router.push('/(tabs)/perfil/wallet');
-      }
+      const data = response.notification.request.content.data as NotificationData;
+      navigateForNotificationData(data);
     });
     return () => sub.remove();
   }, []);
@@ -139,6 +160,18 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             headerTintColor: colors.text,
             headerTitleStyle: { color: colors.text },
             headerTitle: 'Nuevo objeto',
+            headerLeft: () => <CloseHeaderButton variant="plain" />,
+          }}
+        />
+        <Stack.Screen
+          name="notificaciones"
+          options={{
+            headerShown: true,
+            headerStyle: { backgroundColor: colors.background },
+            headerShadowVisible: false,
+            headerTintColor: colors.text,
+            headerTitleStyle: { color: colors.text },
+            headerTitle: 'Notificaciones',
             headerLeft: () => <CloseHeaderButton variant="plain" />,
           }}
         />

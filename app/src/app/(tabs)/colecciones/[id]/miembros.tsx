@@ -164,6 +164,7 @@ export default function CollectionMembersScreen() {
   const [username, setUsername] = useState('');
   const [inviting, setInviting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [removalTarget, setRemovalTarget] = useState<CollectionMember | null>(null);
 
   const load = useCallback(async () => {
@@ -190,11 +191,14 @@ export default function CollectionMembersScreen() {
 
   const onInvite = async () => {
     if (!accessToken || !id || !username.trim()) return;
+    const targetUsername = username.trim().replace(/^@/, '');
     setInviting(true);
     setError(null);
+    setNotice(null);
     try {
-      await inviteCollectionMember(accessToken, id, username.trim().replace(/^@/, ''));
+      await inviteCollectionMember(accessToken, id, targetUsername);
       setUsername('');
+      setNotice(`Invitación enviada a @${targetUsername}.`);
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {
@@ -268,13 +272,17 @@ export default function CollectionMembersScreen() {
           <TextField
             label="Invitar por @usuario"
             value={username}
-            onChangeText={setUsername}
+            onChangeText={(value) => {
+              setUsername(value);
+              setNotice(null);
+            }}
             placeholder="@usuario"
             editable={!maxReached}
           />
           {maxReached ? (
             <Text className="mb-3 text-xs text-textMuted">Esta colección ya alcanzó el máximo de miembros.</Text>
           ) : null}
+          {notice ? <Text className="mb-3 text-sm text-textSecondary">{notice}</Text> : null}
           <Button
             label="Invitar"
             onPress={onInvite}

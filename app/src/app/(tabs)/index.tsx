@@ -9,7 +9,9 @@ import { Screen } from '../../components/ui/Screen';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
 import { useFt } from '../../context/ft-context';
 import { resolvePhotoUrl } from '../../lib/api';
+import { fetchMyCollectionInvites } from '../../lib/collections';
 import { fetchItems, type Item } from '../../lib/items';
+import { fetchMyInvites } from '../../lib/organizations';
 import { colors } from '../../theme/tokens';
 
 function StatCard({
@@ -61,6 +63,19 @@ export default function HomeScreen() {
 
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+
+  // Alimenta el badge de la campana: solo lo pendiente por aceptar/rechazar
+  // (invitaciones a colecciones compartidas + familia de FrikiTokens), no un
+  // historial completo de notificaciones (decisión confirmada 2026-10-02).
+  const loadPendingCount = useCallback(() => {
+    if (!accessToken) return;
+    Promise.all([fetchMyCollectionInvites(accessToken), fetchMyInvites(accessToken)])
+      .then(([collectionInvites, orgInvites]) => setPendingCount(collectionInvites.length + orgInvites.length))
+      .catch(() => {});
+  }, [accessToken]);
+
+  useFocusEffect(useCallback(loadPendingCount, [loadPendingCount]));
 
   const load = useCallback(() => {
     if (!accessToken) return;
@@ -88,17 +103,35 @@ export default function HomeScreen() {
   return (
     <View style={{ flex: 1 }}>
       <Screen>
-      <View className="flex-row items-center gap-2.5">
-        <Image
-          source={require('../../../assets/icon.png')}
-          style={{ width: 30, height: 30, borderRadius: 7 }}
-        />
-        <View>
-          <Text className="font-display text-lg text-text">
-            FRIKI<Text className="text-primary">DEX</Text>
-          </Text>
-          <Text className="text-[9px] uppercase tracking-widest text-textMuted">La dex de tus coleccionables</Text>
+      <View className="flex-row items-center justify-between">
+        <View className="flex-row items-center gap-2.5">
+          <Image
+            source={require('../../../assets/icon.png')}
+            style={{ width: 30, height: 30, borderRadius: 7 }}
+          />
+          <View>
+            <Text className="font-display text-lg text-text">
+              FRIKI<Text className="text-primary">DEX</Text>
+            </Text>
+            <Text className="text-[9px] uppercase tracking-widest text-textMuted">La dex de tus coleccionables</Text>
+          </View>
         </View>
+
+        <Pressable
+          onPress={() => router.push('/notificaciones')}
+          accessibilityLabel="Notificaciones"
+          className="h-10 w-10 items-center justify-center rounded-full active:bg-surface"
+        >
+          <Ionicons name="notifications-outline" size={24} color={colors.text} />
+          {pendingCount > 0 ? (
+            <View
+              className="absolute items-center justify-center rounded-full bg-danger"
+              style={{ top: 4, right: 4, minWidth: 16, height: 16, paddingHorizontal: 3 }}
+            >
+              <Text className="text-[10px] font-body-bold text-white">{pendingCount > 9 ? '9+' : pendingCount}</Text>
+            </View>
+          ) : null}
+        </Pressable>
       </View>
 
       {error && items !== null ? <Text className="mt-4 text-sm text-danger">{error}</Text> : null}
