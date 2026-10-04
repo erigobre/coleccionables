@@ -102,6 +102,8 @@ model User {
   pushTokens                  PushToken[]
   sentOrganizationInvites     OrganizationInvite[] @relation("OrganizationInviteSentBy")
   receivedOrganizationInvites OrganizationInvite[] @relation("OrganizationInviteTarget")
+  sentCollectionInvites       CollectionInvite[]   @relation("CollectionInviteSentBy")
+  receivedCollectionInvites   CollectionInvite[]   @relation("CollectionInviteTarget")
 
   // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
   // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
@@ -198,6 +200,36 @@ model LocationMember {
 
   @@unique([locationId, userId])
   @@map("location_members")
+}
+
+// Invitación a unirse a una colección compartida (requiere aceptación,
+// mismo espíritu que OrganizationInvite/Transfer). Antes de esto, inviteMember
+// solo mandaba un push sin guardar fila — si se perdía el push no había forma
+// de aceptar (bug reportado 2026-10-02). Expira sola (CollectionInvitesCronService).
+enum CollectionInviteStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model CollectionInvite {
+  id           String     @id @default(cuid())
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  invitedByUserId String
+  invitedByUser   User   @relation("CollectionInviteSentBy", fields: [invitedByUserId], references: [id], onDelete: Cascade)
+  targetUserId    String
+  targetUser      User   @relation("CollectionInviteTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  status      CollectionInviteStatus @default(PENDING)
+  createdAt   DateTime               @default(now())
+  respondedAt DateTime?
+
+  @@index([targetUserId, status])
+  @@index([collectionId, status])
+  @@map("collection_invites")
 }
 
 // Fase 2 de negocio (pagos SaaS reales) — modelo listo desde ahora.
@@ -594,6 +626,7 @@ model Collection {
   itemLinks             ItemCollection[]
   shareLink             CollectionShareLink?
   groupRemovalTransfers Transfer[]
+  invites               CollectionInvite[]
 
   @@map("collections")
 }

@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { FtService } from '../ft/ft.service.js';
@@ -48,12 +48,27 @@ export class CollectionMembersService {
     await this.ensureOwnerMembership(ownerId, collectionId);
     await this.assertUnderMemberCap(collectionId);
 
+    // Se persiste la invitación (bug reportado 2026-10-02): antes solo se
+    // mandaba el push, y si se perdía/dismisseaba no había ninguna otra forma
+    // de aceptarla. Ahora queda una fila consultable desde la pantalla de
+    // "Notificaciones" aunque el push nunca llegue.
+    const pendingInvite = await this.prisma.collectionInvite.findFirst({
+      where: { collectionId, targetUserId: invitee.id, status: 'PENDING' },
+    });
+    if (pendingInvite) {
+      throw new ConflictException('Ya tienes una invitación pendiente para esa persona');
+    }
+
+    const invite = await this.prisma.collectionInvite.create({
+      data: { collectionId, invitedByUserId: ownerId, targetUserId: invitee.id },
+    });
+
     const inviter = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } });
     this.notifications
       .sendPushToUser(invitee.id, {
         title: 'Invitación a colección compartida',
         body: `${inviter.name} te invitó a unirte a "${collection.name}"`,
-        data: { type: 'collection_invite', collectionId, collectionName: collection.name },
+        data: { type: 'collection_invite', collectionId, collectionName: collection.name, inviteId: invite.id },
       })
       .catch(() => {});
 
@@ -76,6 +91,14 @@ export class CollectionMembersService {
 
     const member = await this.prisma.collectionMember.create({ data: { collectionId, userId, role: 'EDITOR' } });
 
+    // Si se llegó aquí desde la invitación persistida (pantalla de
+    // Notificaciones, o el deep-link del push), se marca aceptada. Si no hay
+    // fila (invitación vieja de antes de este fix), no pasa nada.
+    await this.prisma.collectionInvite.updateMany({
+      where: { collectionId, targetUserId: userId, status: 'PENDING' },
+      data: { status: 'ACCEPTED', respondedAt: new Date() },
+    });
+
     if (collection.ownerId !== userId) {
       const joined = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true } });
       this.notifications
@@ -88,6 +111,45 @@ export class CollectionMembersService {
     }
 
     return member;
+  }
+
+  // Invitaciones pendientes dirigidas al caller — alimenta la pantalla de
+  // "Notificaciones" (plan de pendientes-por-aceptar, Oct 2026): la única
+  // forma de ver/aceptar una invitación si se perdió el push.
+  listMyInvites(userId: string) {
+    return this.prisma.collectionInvite.findMany({
+      where: { targetUserId: userId, status: 'PENDING' },
+      include: {
+        collection: { select: { name: true } },
+        invitedByUser: { select: { name: true, username: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  async rejectInvite(userId: string, collectionId: string) {
+    const invite = await this.prisma.collectionInvite.findFirst({
+      where: { collectionId, targetUserId: userId, status: 'PENDING' },
+    });
+    if (!invite) {
+      throw new NotFoundException('Invitación no encontrada');
+    }
+
+    await this.prisma.collectionInvite.update({
+      where: { id: invite.id },
+      data: { status: 'REJECTED', respondedAt: new Date() },
+    });
+
+    const collection = await this.prisma.collection.findUnique({ where: { id: collectionId }, select: { name: true } });
+    this.notifications
+      .sendPushToUser(invite.invitedByUserId, {
+        title: 'Invitación rechazada',
+        body: `Tu invitación a "${collection?.name ?? 'una colección'}" fue rechazada`,
+        data: { type: 'collection_invite_rejected', collectionId },
+      })
+      .catch(() => {});
+
+    return { success: true };
   }
 
   async listMembers(userId: string, collectionId: string) {

@@ -25,6 +25,11 @@ export class CollectionMembersController {
     return this.membersService.acceptInvite(user.id, collectionId);
   }
 
+  @Post('invite/reject')
+  rejectInvite(@CurrentUser() user: AuthenticatedUser, @Param('id') collectionId: string) {
+    return this.membersService.rejectInvite(user.id, collectionId);
+  }
+
   @Get('members')
   listMembers(@CurrentUser() user: AuthenticatedUser, @Param('id') collectionId: string) {
     return this.membersService.listMembers(user.id, collectionId);
@@ -47,5 +52,19 @@ export class CollectionMembersController {
     @Body() dto: RemoveMemberDto,
   ) {
     return this.membersService.removeMember(user.id, collectionId, memberUserId, dto);
+  }
+}
+
+// Controlador separado (path literal, sin :id) para no competir con las rutas
+// de arriba — alimenta la pantalla de "Notificaciones" (invitaciones a
+// colecciones pendientes de aceptar/rechazar que me mandaron a mí).
+@Controller('collections/invites')
+@UseGuards(JwtAuthGuard)
+export class CollectionInvitesController {
+  constructor(private readonly membersService: CollectionMembersService) {}
+
+  @Get('mine')
+  listMyInvites(@CurrentUser() user: AuthenticatedUser) {
+    return this.membersService.listMyInvites(user.id);
   }
 }
