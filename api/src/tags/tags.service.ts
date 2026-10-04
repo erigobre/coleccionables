@@ -1,4 +1,4 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CreateTagDto } from './dto/create-tag.dto.js';
 
@@ -6,15 +6,31 @@ import type { CreateTagDto } from './dto/create-tag.dto.js';
 export class TagsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  // Un tag se identifica por su nombre: si ya existe (sin importar mayúsculas),
+  // se devuelve ese en vez de rechazar la creación. Así "crea si no existe" nunca
+  // falla con un duplicado.
   async create(ownerId: string, dto: CreateTagDto) {
-    const existing = await this.prisma.tag.findUnique({
-      where: { ownerId_name: { ownerId, name: dto.name } },
-    });
-    if (existing) {
-      throw new ConflictException('Ya existe un tag con ese nombre');
+    const name = dto.name.trim();
+    const existing = await this.findByName(ownerId, name);
+    if (existing) return existing;
+    try {
+      return await this.prisma.tag.create({
+        data: { ownerId, name, type: dto.type },
+      });
+    } catch (err) {
+      // Dos peticiones simultáneas con el mismo nombre: la segunda choca con el
+      // índice único (P2002); en ese caso el tag ya quedó creado por la primera.
+      if ((err as { code?: string }).code === 'P2002') {
+        const created = await this.findByName(ownerId, name);
+        if (created) return created;
+      }
+      throw err;
     }
-    return this.prisma.tag.create({
-      data: { ownerId, name: dto.name, type: dto.type },
+  }
+
+  private findByName(ownerId: string, name: string) {
+    return this.prisma.tag.findFirst({
+      where: { ownerId, name: { equals: name, mode: 'insensitive' } },
     });
   }
 

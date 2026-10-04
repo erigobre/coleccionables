@@ -1,4 +1,4 @@
-import { apiFetch, ApiError } from './api';
+import { apiFetch } from './api';
 
 export type TagType = 'COLOR_PRINCIPAL' | 'FRANCHISE' | 'GENERIC';
 
@@ -25,17 +25,8 @@ export function createTag(accessToken: string, dto: { name: string; type?: TagTy
   return apiFetch<Tag>('/tags', { method: 'POST', body: dto, accessToken });
 }
 
-// El backend rechaza nombres duplicados (409) — para un flujo de "crea si no
-// existe" simplemente se reusa el tag ya existente con ese nombre.
-export async function findOrCreateTag(accessToken: string, name: string, type?: TagType): Promise<Tag> {
-  try {
-    return await createTag(accessToken, { name, type });
-  } catch (err) {
-    if (err instanceof ApiError && err.status === 409) {
-      const existing = await fetchTags(accessToken);
-      const match = existing.find((tag) => tag.name === name);
-      if (match) return match;
-    }
-    throw err;
-  }
+// El backend ya devuelve el tag existente si ese nombre ya está (sin distinguir
+// mayúsculas), así que "crea si no existe" es una sola llamada.
+export function findOrCreateTag(accessToken: string, name: string, type?: TagType): Promise<Tag> {
+  return createTag(accessToken, { name, type });
 }

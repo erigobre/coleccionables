@@ -87,7 +87,26 @@ export function ImageCropper({ uri, onConfirm, onCancel, lockedRatio }: ImageCro
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ratioKey, display?.width, display?.height]);
 
-  const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max);
+  // Estas dos funciones se llaman desde los worklets de los gestos (hilo de UI).
+  // Sin la directiva 'worklet' Reanimated lanza "non-worklet function on the UI
+  // thread" en cada evento de pinch/pan: crash 2026-10-04 (build 13) con
+  // excepción de Hermes dentro de worklets::runSync.
+  const clamp = (value: number, min: number, max: number) => {
+    'worklet';
+    return Math.min(Math.max(value, min), max);
+  };
+
+  // iOS puede mandar un e.scale no finito justo al soltar los dedos de forma
+  // desigual en el pinch (confirmado en log de crash 2026-10-02: SIGABRT por
+  // excepción de Hermes sin capturar dentro del worklet — Reanimated aborta
+  // si un shared value recibe NaN). Sin este guard, ese NaN se propaga a
+  // scale.value y de ahí a translateX/translateY vía clampAfterGesture. Se
+  // workletiza igual que `clamp` arriba (función local llamada desde un
+  // worklet, sin necesidad de la directiva explícita).
+  const isFiniteNumber = (n: number) => {
+    'worklet';
+    return typeof n === 'number' && n === n && n !== Infinity && n !== -Infinity;
+  };
 
   // Debe llevar la directiva 'worklet' explícita: se pasa por referencia a
   // .onEnd() en dos gestos distintos (no inline en el call site), y el plugin
@@ -96,6 +115,15 @@ export function ImageCropper({ uri, onConfirm, onCancel, lockedRatio }: ImageCro
   const clampAfterGesture = () => {
     'worklet';
     if (!display) return;
+    // Si scale/translate ya quedó en NaN (ver guard en pinchGesture.onUpdate),
+    // no se intenta clampear: se resetea a un estado válido en vez de mandar
+    // NaN a withTiming, que es lo que abortaba el hilo de UI.
+    if (!isFiniteNumber(scale.value) || !isFiniteNumber(translateX.value) || !isFiniteNumber(translateY.value)) {
+      scale.value = 1;
+      translateX.value = 0;
+      translateY.value = 0;
+      return;
+    }
     const maxOffsetX = Math.max(0, (display.width * scale.value - box.width) / 2);
     const maxOffsetY = Math.max(0, (display.height * scale.value - box.height) / 2);
     translateX.value = withTiming(clamp(translateX.value, -maxOffsetX, maxOffsetX), { duration: 150 });
@@ -118,6 +146,7 @@ export function ImageCropper({ uri, onConfirm, onCancel, lockedRatio }: ImageCro
       startScale.value = scale.value;
     })
     .onUpdate((e) => {
+      if (!isFiniteNumber(e.scale)) return;
       scale.value = clamp(startScale.value * e.scale, 1, MAX_SCALE);
     })
     .onEnd(clampAfterGesture);
@@ -138,11 +167,15 @@ export function ImageCropper({ uri, onConfirm, onCancel, lockedRatio }: ImageCro
     try {
       // Se re-clampa aquí (no solo en onEnd del gesto) por si se confirma
       // mientras el withTiming de "regreso al límite" todavía está animando.
-      const s = scale.value;
+      // Mismo guard de NaN que clampAfterGesture: si algo quedó inválido, se
+      // usa el estado neutro (sin esto cropPhoto recibiría NaN y fallaría).
+      const s = isFiniteNumber(scale.value) ? scale.value : 1;
+      const rawTx = isFiniteNumber(translateX.value) ? translateX.value : 0;
+      const rawTy = isFiniteNumber(translateY.value) ? translateY.value : 0;
       const maxOffsetX = Math.max(0, (display.width * s - box.width) / 2);
       const maxOffsetY = Math.max(0, (display.height * s - box.height) / 2);
-      const tx = clamp(translateX.value, -maxOffsetX, maxOffsetX);
-      const ty = clamp(translateY.value, -maxOffsetY, maxOffsetY);
+      const tx = clamp(rawTx, -maxOffsetX, maxOffsetX);
+      const ty = clamp(rawTy, -maxOffsetY, maxOffsetY);
       const originX = clamp((-((box.width - display.width * s) / 2) - tx) / (display.baseScale * s), 0, imageSize.width);
       const originY = clamp((-((box.height - display.height * s) / 2) - ty) / (display.baseScale * s), 0, imageSize.height);
       const width = clamp(box.width / (display.baseScale * s), 1, imageSize.width - originX);

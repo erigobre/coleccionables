@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, loginRequest, registerRequest, setTokenListener, type AuthTokens } from '../lib/api';
+import { freshInstallReady } from '../lib/fresh-install';
 import { clearTokens, decodeJwtPayload, loadTokens, saveTokens } from '../lib/auth-storage';
 import { registerPushToken, unregisterCurrentPushToken } from '../lib/push';
 
@@ -39,7 +40,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    loadTokens()
+    freshInstallReady()
+      .then(() => loadTokens())
       .then((saved) => {
         setTokens(saved);
         // Sesión ya guardada: el token de push puede haber cambiado o no haberse
