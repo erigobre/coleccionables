@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { TextField } from '../../../../components/ui/TextField';
 import { TransferAnimation } from '../../../../components/items/TransferAnimation';
@@ -100,14 +100,16 @@ export default function SellItemScreen() {
   // La animación solo corre cuando el backend ya aceptó el envío a alguien
   // que ya tiene cuenta (el caso sin cuenta usa el Alert de arriba).
   //
-  // Botón de cierre manual superpuesto: la animación no se está renderizando
-  // en iOS (bug sin resolver, 2026-10-01) y el swipe-down nativo del pageSheet
-  // no es confiable para salir — esto garantiza una salida sin depender de
-  // ninguno de los dos.
-  if (sent && item) {
-    return (
-      <>
-        <Stack.Screen options={{ headerShown: false }} />
+  // Se dibuja como capa absoluta dentro de esta misma pantalla, NO como un
+  // <Modal> nativo anidado: en iOS, un Modal presentado desde una pantalla
+  // que ya es pageSheet puede no mostrarse nunca y sin ningún error (reporte
+  // 2026-10-04: el envío sí se completaba en el servidor pero no aparecía
+  // nada en pantalla). Una vista absoluta no depende de presentación nativa.
+  //
+  // Botón de cierre manual superpuesto por si la animación no termina.
+  const transferOverlay =
+    item && sent ? (
+      <View style={StyleSheet.absoluteFill} className="bg-backgroundDeep">
         <TransferAnimation
           photoUri={item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined}
           recipientLabel={trimmedEmail}
@@ -121,9 +123,8 @@ export default function SellItemScreen() {
         >
           <Ionicons name="close" size={24} color={colors.white} />
         </Pressable>
-      </>
-    );
-  }
+      </View>
+    ) : null;
 
   if (!item) {
     return (
@@ -134,47 +135,50 @@ export default function SellItemScreen() {
   }
 
   return (
-    <ScrollView
-      className="flex-1 bg-background"
-      contentContainerStyle={{ paddingTop: 16, paddingBottom: 60, paddingHorizontal: 20 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      <Text className="font-body-bold mb-1 text-lg text-text">{item.name}</Text>
-      <Text className="mb-6 text-sm text-textMuted">
-        La otra persona recibirá una solicitud y elegirá a qué colección suya lo agrega. Mientras responde, el objeto
-        queda "En transferencia" y no se puede editar. Si no responde en 7 días, vuelve a ti.
-      </Text>
-
-      <TextField
-        label="Correo de quien lo recibirá"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoComplete="email"
-        placeholder="correo@ejemplo.com"
-        error={recipientStatus === 'invalid' && !suggestion ? 'Ese correo no parece válido' : undefined}
-      />
-
-      {recipientStatus === 'checking' ? (
-        <View className="-mt-2 mb-6 flex-row items-center">
-          <ActivityIndicator size="small" color={colors.textMuted} />
-        </View>
-      ) : recipientStatus === 'invalid' && suggestion ? (
-        <Text className="-mt-2 mb-6 text-xs text-danger" onPress={useSuggestion}>
-          ¿Quisiste decir <Text className="font-body-bold">{suggestion}</Text>? Toca para usarlo.
+    <>
+      <ScrollView
+        className="flex-1 bg-background"
+        contentContainerStyle={{ paddingTop: 16, paddingBottom: 60, paddingHorizontal: 20 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <Text className="font-body-bold mb-1 text-lg text-text">{item.name}</Text>
+        <Text className="mb-6 text-sm text-textMuted">
+          La otra persona recibirá una solicitud y elegirá a qué colección suya lo agrega. Mientras responde, el
+          objeto queda "En transferencia" y no se puede editar. Si no responde en 7 días, vuelve a ti.
         </Text>
-      ) : recipientStatus === 'valid' && !hasAccount ? (
-        <Text className="-mt-2 mb-6 text-xs text-textMuted">
-          Esa persona todavía no tiene cuenta en Frikidex: le enviaremos un correo de invitación para que se
-          registre y acepte la transferencia.
-        </Text>
-      ) : (
-        <View className="mb-6" />
-      )}
 
-      {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
+        <TextField
+          label="Correo de quien lo recibirá"
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoComplete="email"
+          placeholder="correo@ejemplo.com"
+          error={recipientStatus === 'invalid' && !suggestion ? 'Ese correo no parece válido' : undefined}
+        />
 
-      <Button label="Enviar objeto" onPress={onSend} loading={sending} disabled={!emailValid} />
-    </ScrollView>
+        {recipientStatus === 'checking' ? (
+          <View className="-mt-2 mb-6 flex-row items-center">
+            <ActivityIndicator size="small" color={colors.textMuted} />
+          </View>
+        ) : recipientStatus === 'invalid' && suggestion ? (
+          <Text className="-mt-2 mb-6 text-xs text-danger" onPress={useSuggestion}>
+            ¿Quisiste decir <Text className="font-body-bold">{suggestion}</Text>? Toca para usarlo.
+          </Text>
+        ) : recipientStatus === 'valid' && !hasAccount ? (
+          <Text className="-mt-2 mb-6 text-xs text-textMuted">
+            Esa persona todavía no tiene cuenta en Frikidex: le enviaremos un correo de invitación para que se
+            registre y acepte la transferencia.
+          </Text>
+        ) : (
+          <View className="mb-6" />
+        )}
+
+        {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
+
+        <Button label="Enviar objeto" onPress={onSend} loading={sending} disabled={!emailValid} />
+      </ScrollView>
+      {transferOverlay}
+    </>
   );
 }

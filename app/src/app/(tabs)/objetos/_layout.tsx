@@ -32,7 +32,15 @@ export default function ObjetosStackLayout() {
           dejaba al usuario sin ninguna forma de salir salvo cerrar la app.
           Con pageSheet al menos el swipe-down sigue intentable. */}
       <Stack.Screen name="[id]/vender" options={{ title: 'Transferir objeto', presentation: 'modal' }} />
-      <Stack.Screen name="transferencias" options={{ title: 'Transferencias' }} />
+      {/* Se puede abrir directo desde una notificación (cold start, sin historial
+          dentro de este stack): sin este botón no hay forma de salir de la pantalla. */}
+      <Stack.Screen
+        name="transferencias"
+        options={{
+          title: 'Transferencias',
+          headerLeft: () => <CloseHeaderButton variant="plain" fallbackTo="/(tabs)/objetos" />,
+        }}
+      />
     </Stack>
   );
 }
