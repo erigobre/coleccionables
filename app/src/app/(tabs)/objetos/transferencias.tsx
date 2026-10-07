@@ -202,7 +202,7 @@ export default function TransferenciasScreen() {
                     {transfer.item.name}
                   </Text>
                   <Text className="mt-0.5 text-xs text-textMuted" numberOfLines={1}>
-                    Para {transfer.toUser.email}
+                    Para {transfer.toUser?.email ?? transfer.toEmail}
                   </Text>
                   <Text className="mt-0.5 text-xs text-textMuted">
                     Vuelve a ti en {daysLeft(transfer.expiresAt)} día(s) si no responde
@@ -233,7 +233,7 @@ export default function TransferenciasScreen() {
                   {transfer.item.name}
                 </Text>
                 <Text className="text-xs text-textMuted" numberOfLines={1}>
-                  {transfer.toUser.email}
+                  {transfer.toUser?.email ?? transfer.toEmail}
                 </Text>
               </View>
               <Text className={`text-xs ${transfer.status === 'ACCEPTED' ? 'text-primary' : 'text-textMuted'}`}>

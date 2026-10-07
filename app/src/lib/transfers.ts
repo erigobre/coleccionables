@@ -20,8 +20,11 @@ export interface IncomingTransfer extends TransferBase {
   fromUser: { id: string; name: string };
 }
 
+// toUser es null mientras el destinatario no tenga cuenta (la transferencia
+// se envió por invitación de correo); en ese caso el correo está en toEmail.
 export interface OutgoingTransfer extends TransferBase {
-  toUser: { id: string; name: string; email: string };
+  toUser: { id: string; name: string; email: string } | null;
+  toEmail: string;
 }
 
 export function initiateTransfer(accessToken: string, itemId: string, toUserEmail: string) {

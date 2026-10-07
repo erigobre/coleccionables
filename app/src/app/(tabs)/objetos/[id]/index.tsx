@@ -562,7 +562,7 @@ export default function ItemDetailScreen() {
           <View className="mb-5 rounded-lg border border-primary bg-surface p-4">
             <Text className="mb-1 text-sm font-semibold text-text">Esperando respuesta</Text>
             <Text className="mb-4 text-xs text-textMuted">
-              Enviado a {pendingTransfer.toUser.email}. Si no responde en{' '}
+              Enviado a {pendingTransfer.toUser?.email ?? pendingTransfer.toEmail}. Si no responde en{' '}
               {Math.max(0, Math.ceil((new Date(pendingTransfer.expiresAt).getTime() - Date.now()) / 86_400_000))} día(s),
               vuelve a ti.
             </Text>
