@@ -1,9 +1,31 @@
 import { apiFetch } from './api';
 import type { ItemLocationRef, ItemPhoto, ItemScalar } from './items';
 
+// Lista cerrada: debe coincidir con api/src/locations/location-icons.ts.
+export const LOCATION_ICON_OPTIONS = [
+  { key: 'home', label: 'Casa' },
+  { key: 'business', label: 'Edificio' },
+  { key: 'storefront', label: 'Local' },
+  { key: 'archive', label: 'Bodega' },
+  { key: 'cube', label: 'Caja' },
+  { key: 'bed', label: 'Mueble' },
+  { key: 'library', label: 'Librero' },
+  { key: 'briefcase', label: 'Maleta' },
+  { key: 'shirt', label: 'Ropero' },
+  { key: 'car', label: 'Auto' },
+  { key: 'bus', label: 'Camión' },
+  { key: 'heart', label: 'Corazón' },
+  { key: 'lock-closed', label: 'Seguro' },
+] as const;
+
+export type LocationIconKey = (typeof LOCATION_ICON_OPTIONS)[number]['key'];
+
+export const DEFAULT_LOCATION_ICON: LocationIconKey = 'archive';
+
 export interface LocationNode {
   id: string;
   name: string;
+  icon: string | null;
   parentId: string | null;
   isPermanentDefault: boolean;
   qrToken: string;
@@ -16,7 +38,7 @@ export function fetchLocationTree(accessToken: string) {
 
 export function createLocation(
   accessToken: string,
-  dto: { name: string; parentId?: string },
+  dto: { name: string; icon?: LocationIconKey; parentId?: string },
 ) {
   return apiFetch<LocationNode>('/locations', { method: 'POST', body: dto, accessToken });
 }
@@ -24,7 +46,7 @@ export function createLocation(
 export function updateLocation(
   accessToken: string,
   id: string,
-  dto: { name?: string; parentId?: string | null },
+  dto: { name?: string; icon?: LocationIconKey; parentId?: string | null },
 ) {
   return apiFetch<LocationNode>(`/locations/${id}`, { method: 'PATCH', body: dto, accessToken });
 }

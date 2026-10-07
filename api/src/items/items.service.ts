@@ -340,12 +340,15 @@ export class ItemsService {
       return updated;
     }
 
-    if (!dto.seasonId) {
-      throw new BadRequestException('Debes indicar a qué temporada se liga el cambio temporal');
-    }
-    const season = await this.prisma.season.findUnique({ where: { id: dto.seasonId } });
-    if (!season || season.ownerId !== ownerId) {
-      throw new NotFoundException('Temporada no encontrada');
+    // Sin temporada ("No aplica"): solo cambia la ubicación actual, la principal
+    // se queda como estaba y no hay temporada que dispare el regreso automático.
+    let currentSeasonId: string | null = null;
+    if (dto.seasonId) {
+      const season = await this.prisma.season.findUnique({ where: { id: dto.seasonId } });
+      if (!season || season.ownerId !== ownerId) {
+        throw new NotFoundException('Temporada no encontrada');
+      }
+      currentSeasonId = dto.seasonId;
     }
 
     const updated = await this.prisma.item.update({
@@ -353,7 +356,7 @@ export class ItemsService {
       data: {
         currentLocationId: dto.locationId,
         locationAssignment: 'TEMPORAL',
-        currentSeasonId: dto.seasonId,
+        currentSeasonId,
         returnedFromSeason: false,
       },
     });

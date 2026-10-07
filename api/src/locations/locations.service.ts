@@ -12,6 +12,7 @@ import type { UpdateLocationDto } from './dto/update-location.dto.js';
 export interface LocationNode {
   id: string;
   name: string;
+  icon: string | null;
   parentId: string | null;
   isPermanentDefault: boolean;
   qrToken: string;
@@ -28,7 +29,7 @@ export class LocationsService {
     }
 
     return this.prisma.location.create({
-      data: { ownerId, name: dto.name, parentId: dto.parentId ?? null },
+      data: { ownerId, name: dto.name, icon: dto.icon ?? null, parentId: dto.parentId ?? null },
     });
   }
 
@@ -44,6 +45,7 @@ export class LocationsService {
         {
           id: location.id,
           name: location.name,
+          icon: location.icon,
           parentId: location.parentId,
           isPermanentDefault: location.isPermanentDefault,
           qrToken: location.qrToken,
@@ -89,6 +91,7 @@ export class LocationsService {
       where: { id: location.id },
       data: {
         name: dto.name,
+        icon: dto.icon === undefined ? undefined : dto.icon,
         parentId: dto.parentId === undefined ? undefined : dto.parentId,
       },
     });

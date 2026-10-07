@@ -5,15 +5,18 @@ import * as Sharing from 'expo-sharing';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
+import { LocationIconPicker } from '../../../../components/ui/LocationIconPicker';
 import { TextField } from '../../../../components/ui/TextField';
 import { colors } from '../../../../theme/tokens';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import {
   createLocation,
+  DEFAULT_LOCATION_ICON,
   deleteLocation,
   fetchLocationQr,
   fetchLocationTree,
   updateLocation,
+  type LocationIconKey,
   type LocationNode,
 } from '../../../../lib/locations';
 
@@ -35,6 +38,7 @@ export default function LocationDetailScreen() {
   const [error, setError] = useState<string | null>(null);
 
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState<LocationIconKey>(DEFAULT_LOCATION_ICON);
   const [renaming, setRenaming] = useState(false);
   const [savingName, setSavingName] = useState(false);
 
@@ -54,7 +58,10 @@ export default function LocationDetailScreen() {
       const tree = await fetchLocationTree(accessToken);
       const found = findNode(tree, id);
       setNode(found ?? null);
-      if (found) setName(found.name);
+      if (found) {
+        setName(found.name);
+        setIcon((found.icon as LocationIconKey | null) ?? DEFAULT_LOCATION_ICON);
+      }
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -71,7 +78,7 @@ export default function LocationDetailScreen() {
     setError(null);
     setSavingName(true);
     try {
-      await updateLocation(accessToken, node.id, { name: name.trim() });
+      await updateLocation(accessToken, node.id, { name: name.trim(), icon });
       setRenaming(false);
       await load();
     } catch (err) {
@@ -175,6 +182,7 @@ export default function LocationDetailScreen() {
       {renaming ? (
         <View className="mb-6">
           <TextField label="Nombre" value={name} onChangeText={setName} autoFocus />
+          <LocationIconPicker value={icon} onChange={setIcon} />
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Button
@@ -183,6 +191,7 @@ export default function LocationDetailScreen() {
                 onPress={() => {
                   setRenaming(false);
                   setName(node.name);
+                  setIcon((node.icon as LocationIconKey | null) ?? DEFAULT_LOCATION_ICON);
                 }}
               />
             </View>

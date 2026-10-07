@@ -1,18 +1,33 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useState, type ComponentProps, type ReactNode } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Button } from '../../../../components/ui/Button';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
-import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../../../../lib/locations';
+import {
+  DEFAULT_LOCATION_ICON,
+  fetchLocationTree,
+  flattenLocationTree,
+  type LocationIconKey,
+  type LocationNode,
+} from '../../../../lib/locations';
 import { fetchSeasons, type Season } from '../../../../lib/seasons';
 import { changeItemLocation, type LocationChangeAssignment } from '../../../../lib/items';
 import { colors } from '../../../../theme/tokens';
 
 type Step = 'destination' | 'assignment' | 'season';
 
-// Mosaico cuadrado (1:1) para ubicaciones y temporadas. Por ahora muestra la
-// inicial dentro de un círculo; el icono configurable se agregará después.
-function SquareTile({ name, onPress }: { name: string; onPress: () => void }) {
+// Mosaico cuadrado (1:1). Muestra el icono de la ubicación; si no hay icono
+// (temporadas o "No aplica"), muestra la inicial dentro de un círculo.
+function SquareTile({
+  name,
+  icon,
+  onPress,
+}: {
+  name: string;
+  icon?: ComponentProps<typeof Ionicons>['name'];
+  onPress: () => void;
+}) {
   const initial = name.trim().charAt(0).toUpperCase() || '?';
   return (
     <Pressable
@@ -21,7 +36,11 @@ function SquareTile({ name, onPress }: { name: string; onPress: () => void }) {
       className="aspect-square items-center justify-center rounded-2xl border border-border bg-surfaceElevated p-2 active:opacity-80"
     >
       <View className="mb-2 h-12 w-12 items-center justify-center rounded-full bg-surface">
-        <Text className="font-display text-lg text-primary">{initial}</Text>
+        {icon ? (
+          <Ionicons name={icon} size={24} color={colors.primary} />
+        ) : (
+          <Text className="font-display text-lg text-primary">{initial}</Text>
+        )}
       </View>
       <Text className="text-center text-sm text-text" numberOfLines={2}>
         {name}
@@ -119,6 +138,7 @@ export default function ChangeLocationScreen() {
                 <SquareTile
                   key={node.id}
                   name={node.name}
+                  icon={(node.icon as LocationIconKey | null) ?? DEFAULT_LOCATION_ICON}
                   onPress={() => {
                     setLocationId(node.id);
                     setStep('assignment');
@@ -160,24 +180,32 @@ export default function ChangeLocationScreen() {
         {step === 'season' ? (
           <View>
             <Text className="mb-4 text-sm text-textMuted">¿A qué temporada se liga este cambio?</Text>
+            <View className="flex-row flex-wrap justify-between gap-3">
+              {/* "No aplica" va siempre primero: cambia la ubicación sin ligarla a una temporada. */}
+              <SquareTile
+                name="No aplica"
+                icon="close-circle-outline"
+                onPress={() => {
+                  if (!locationId || !assignment) return;
+                  finish({ destination: 'LOCATION', locationId, assignment });
+                }}
+              />
+              {seasons.map((season) => (
+                <SquareTile
+                  key={season.id}
+                  name={season.name}
+                  onPress={() => {
+                    if (!locationId || !assignment) return;
+                    finish({ destination: 'LOCATION', locationId, assignment, seasonId: season.id });
+                  }}
+                />
+              ))}
+            </View>
             {seasons.length === 0 ? (
-              <Text className="text-sm text-textMuted">
+              <Text className="mt-4 text-sm text-textMuted">
                 No tienes temporadas creadas todavía. Crea una desde Perfil → Temporadas.
               </Text>
-            ) : (
-              <View className="flex-row flex-wrap justify-between gap-3">
-                {seasons.map((season) => (
-                  <SquareTile
-                    key={season.id}
-                    name={season.name}
-                    onPress={() => {
-                      if (!locationId || !assignment) return;
-                      finish({ destination: 'LOCATION', locationId, assignment, seasonId: season.id });
-                    }}
-                  />
-                ))}
-              </View>
-            )}
+            ) : null}
           </View>
         ) : null}
       </ScrollView>

@@ -7,7 +7,14 @@ import { EmptyState } from '../../../../components/ui/EmptyState';
 import { TextField } from '../../../../components/ui/TextField';
 import { colors } from '../../../../theme/tokens';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
-import { createLocation, fetchLocationTree, type LocationNode } from '../../../../lib/locations';
+import { LocationIconPicker } from '../../../../components/ui/LocationIconPicker';
+import {
+  createLocation,
+  DEFAULT_LOCATION_ICON,
+  fetchLocationTree,
+  type LocationIconKey,
+  type LocationNode,
+} from '../../../../lib/locations';
 
 function LocationRow({
   node,
@@ -25,7 +32,11 @@ function LocationRow({
         className="flex-row items-center gap-3 border-b border-border py-3"
         style={{ paddingLeft: 16 + depth * 20 }}
       >
-        <Ionicons name={depth === 0 ? 'location-outline' : 'return-down-forward-outline'} size={18} color={colors.textMuted} />
+        <Ionicons
+          name={(node.icon as LocationIconKey | null) ?? (depth === 0 ? 'location-outline' : 'return-down-forward-outline')}
+          size={18}
+          color={colors.textMuted}
+        />
         <Text className="flex-1 text-base text-text">{node.name}</Text>
         {node.isPermanentDefault ? (
           <Text className="text-xs text-textMuted">Permanente</Text>
@@ -46,6 +57,7 @@ export default function UbicacionesScreen() {
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
   const [name, setName] = useState('');
+  const [icon, setIcon] = useState<LocationIconKey>(DEFAULT_LOCATION_ICON);
   const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
@@ -68,8 +80,9 @@ export default function UbicacionesScreen() {
     setError(null);
     setSaving(true);
     try {
-      await createLocation(accessToken, { name: name.trim() });
+      await createLocation(accessToken, { name: name.trim(), icon });
       setName('');
+      setIcon(DEFAULT_LOCATION_ICON);
       setShowCreate(false);
       await load();
     } catch (err) {
@@ -129,6 +142,7 @@ export default function UbicacionesScreen() {
             placeholder="Ej. Bodega 1"
             autoFocus
           />
+          <LocationIconPicker value={icon} onChange={setIcon} />
           <View className="flex-row gap-3">
             <View className="flex-1">
               <Button
@@ -137,6 +151,7 @@ export default function UbicacionesScreen() {
                 onPress={() => {
                   setShowCreate(false);
                   setName('');
+                  setIcon(DEFAULT_LOCATION_ICON);
                 }}
               />
             </View>

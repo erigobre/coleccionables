@@ -550,6 +550,8 @@ model Location {
   ownerId  String
   owner    User       @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   name     String
+  // Clave de un icono de la lista fija en api/src/locations/location-icons.ts (null = genérico)
+  icon     String?
   parentId String?
   // Cascade (antes NoAction): sin esto, borrar un usuario con ubicaciones
   // anidadas falla con FK constraint en MySQL (pedido 2026-09-26, bug
