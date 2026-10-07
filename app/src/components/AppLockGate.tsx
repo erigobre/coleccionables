@@ -33,7 +33,11 @@ export function AppLockGate({ children }: { children: ReactNode }) {
     const sub = AppState.addEventListener('change', async (next) => {
       const prev = appState.current;
       appState.current = next;
-      if (next === 'active' && prev !== 'active' && !authenticating.current) {
+      // Solo se bloquea al volver de background. El prompt de Face ID/huella
+      // pasa por "inactive" y regresa a "active", y no debe contar como regreso
+      // de segundo plano (ahí estaba el loop: el guard por tiempo fallaba si el
+      // evento llegaba después de los 500 ms).
+      if (next === 'active' && prev === 'background' && !authenticating.current) {
         const has = await hasPin();
         if (has) {
           biometricTried.current = false;
