@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { CollectionsService } from './collections.service.js';
@@ -24,14 +24,14 @@ export class CollectionLocationService {
     await this.locationsService.findOne(ownerId, dto.locationId);
 
     const isTemporal = dto.assignment === LocationChangeAssignment.TEMPORAL;
-    if (isTemporal) {
-      if (!dto.seasonId) {
-        throw new BadRequestException('Debes indicar a qué temporada se liga el cambio temporal');
-      }
+    // La temporada es opcional: "No aplica" mueve en temporal sin ligarlo a ninguna.
+    let currentSeasonId: string | null = null;
+    if (isTemporal && dto.seasonId) {
       const season = await this.prisma.season.findUnique({ where: { id: dto.seasonId } });
       if (!season || season.ownerId !== ownerId) {
         throw new NotFoundException('Temporada no encontrada');
       }
+      currentSeasonId = dto.seasonId;
     }
 
     const links = await this.prisma.itemCollection.findMany({
@@ -48,7 +48,7 @@ export class CollectionLocationService {
           ? {
               currentLocationId: dto.locationId,
               locationAssignment: 'TEMPORAL',
-              currentSeasonId: dto.seasonId,
+              currentSeasonId,
               returnedFromSeason: false,
             }
           : {
