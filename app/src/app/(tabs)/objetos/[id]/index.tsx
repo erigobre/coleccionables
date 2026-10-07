@@ -394,7 +394,7 @@ export default function ItemDetailScreen() {
           {item.locationAssignment === 'TEMPORAL' ? (
             <>
               <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
-              <InfoRow label="Ubicación principal" value={item.permanentLocation?.name ?? 'Sin definir'} />
+              <InfoRow label="Ubicación principal" value={item.permanentLocation?.name ?? 'Sin asignar'} />
             </>
           ) : null}
           <InfoRow label="Empaque" value={packagingLabel(item.packagingCondition)} />
