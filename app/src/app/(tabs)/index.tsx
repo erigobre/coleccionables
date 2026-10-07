@@ -221,7 +221,7 @@ export default function HomeScreen() {
                 ) : (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                     {favorites.map((item) => (
-                      <FavoriteCard key={item.id} item={item} onOpen={() => router.push(`/(tabs)/objetos/${item.id}`)} />
+                      <FavoriteCard key={item.id} item={item} onOpen={() => router.push(`/objeto/${item.id}`)} />
                     ))}
                   </ScrollView>
                 )}
