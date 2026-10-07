@@ -2,6 +2,14 @@ import { Stack } from 'expo-router';
 import { CloseHeaderButton } from '../../../components/CloseHeaderButton';
 import { colors } from '../../../theme/tokens';
 
+// Sin esto, entrar a un objeto desde otra pestaña (Home, Colecciones) deja el
+// detalle como única pantalla del stack: "atrás" sale a Home y el stack queda
+// con el detalle encima, así que al volver a Objetos aparece ese detalle y no
+// la lista. Con `index` como base, "atrás" siempre regresa a la lista.
+export const unstable_settings = {
+  initialRouteName: 'index',
+};
+
 export default function ObjetosStackLayout() {
   return (
     <Stack
