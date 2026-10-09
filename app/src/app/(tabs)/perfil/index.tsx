@@ -1,5 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 import { Link } from 'expo-router';
+import * as Updates from 'expo-updates';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
@@ -36,6 +38,24 @@ function MenuRow({
       <Pressable>{content}</Pressable>
     </Link>
   );
+}
+
+// Identificador de build/OTA, para diagnosticar desde el dispositivo si una
+// actualización llegó o no (sin esto, no había forma de saber qué versión
+// corría cada iPhone sin conectarlo a una Mac).
+function buildInfoLabel() {
+  const appVersion = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '?';
+  const nativeBuild = Constants.nativeBuildVersion ?? '?';
+  const base = `v${appVersion} (build ${nativeBuild})`;
+
+  if (Updates.isEmbeddedLaunch) {
+    return `${base} · sin OTA aplicada`;
+  }
+  const shortId = Updates.updateId ? Updates.updateId.slice(0, 8) : '?';
+  const date = Updates.createdAt
+    ? Updates.createdAt.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
+    : '?';
+  return `${base} · OTA ${date} (${shortId}) · ${Updates.channel ?? '?'}`;
 }
 
 export default function PerfilScreen() {
@@ -95,6 +115,8 @@ export default function PerfilScreen() {
       </View>
 
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
+
+      <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()}</Text>
     </Screen>
   );
 }
