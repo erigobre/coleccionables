@@ -10,6 +10,7 @@ import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
 import { useAuth } from '../../../context/auth-context';
 import { useFt } from '../../../context/ft-context';
+import { clearLastFatalError, readLastFatalError } from '../../../lib/crash-log';
 import { fetchMyReferralInfo } from '../../../lib/referrals';
 
 function MenuRow({
@@ -62,6 +63,7 @@ export default function PerfilScreen() {
   const { user, logout, accessToken } = useAuth();
   const { balance } = useFt();
   const [canInvite, setCanInvite] = useState(false);
+  const [lastFatalError, setLastFatalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -69,6 +71,10 @@ export default function PerfilScreen() {
       .then((info) => setCanInvite(info.canInvite))
       .catch(() => setCanInvite(false));
   }, [accessToken]);
+
+  useEffect(() => {
+    readLastFatalError().then(setLastFatalError);
+  }, []);
 
   return (
     <Screen>
@@ -117,6 +123,20 @@ export default function PerfilScreen() {
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
 
       <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()}</Text>
+
+      {lastFatalError ? (
+        <Pressable
+          onPress={() => {
+            clearLastFatalError();
+            setLastFatalError(null);
+          }}
+        >
+          <Text className="mt-2 text-center text-[10px] text-danger" numberOfLines={4}>
+            Último error capturado (toca para borrar):{'\n'}
+            {lastFatalError}
+          </Text>
+        </Pressable>
+      ) : null}
     </Screen>
   );
 }

@@ -12,7 +12,14 @@ import { AppLockGate } from '../components/AppLockGate';
 import { CloseHeaderButton } from '../components/CloseHeaderButton';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { FtProvider } from '../context/ft-context';
+import { installGlobalErrorHandler } from '../lib/crash-log';
 import { colors } from '../theme/tokens';
+
+// Se instala antes que cualquier otra cosa: los crashes que llegan vía
+// TestFlight no traen el mensaje/stack de JS (solo el nativo), así que esto
+// es lo único que puede capturar la causa real si la app truena justo al
+// abrir (ver investigación 2026-10-09). Leer el resultado en Perfil.
+installGlobalErrorHandler();
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
