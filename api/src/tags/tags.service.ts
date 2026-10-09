@@ -28,9 +28,12 @@ export class TagsService {
     }
   }
 
+  // MySQL ya compara `name` sin distinguir mayúsculas (collation
+  // utf8mb4_unicode_ci de la tabla `tags`), así que no hace falta (ni acepta
+  // Prisma con este proveedor) el argumento `mode: 'insensitive'` de Postgres.
   private findByName(ownerId: string, name: string) {
     return this.prisma.tag.findFirst({
-      where: { ownerId, name: { equals: name, mode: 'insensitive' } },
+      where: { ownerId, name: { equals: name } },
     });
   }
 
@@ -40,7 +43,7 @@ export class TagsService {
   findAll(ownerId: string, q?: string) {
     if (q && q.trim().length > 0) {
       return this.prisma.tag.findMany({
-        where: { ownerId, name: { contains: q.trim(), mode: 'insensitive' } },
+        where: { ownerId, name: { contains: q.trim() } },
         orderBy: { name: 'asc' },
         take: 20,
       });
