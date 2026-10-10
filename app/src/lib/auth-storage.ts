@@ -3,6 +3,35 @@ import type { AuthTokens } from './api';
 
 const ACCESS_TOKEN_KEY = 'frikidex.accessToken';
 const REFRESH_TOKEN_KEY = 'frikidex.refreshToken';
+const IDENTITY_MARKER_KEY = 'frikidex.lastIdentity';
+
+export interface IdentityMarker {
+  name: string;
+  email: string;
+}
+
+// A diferencia de los tokens, este marcador se guarda a propósito para que
+// sobreviva a una desinstalación (el Keychain de iOS no se borra con la app):
+// permite mostrar "Hola de nuevo, {nombre}" en el login tras reinstalar, sin
+// guardar nada sensible (ni contraseña ni tokens). Un logout manual sí lo
+// borra (ver AuthProvider.logout) para que ese caso siempre vea el login en blanco.
+export async function saveIdentityMarker(marker: IdentityMarker): Promise<void> {
+  await SecureStore.setItemAsync(IDENTITY_MARKER_KEY, JSON.stringify(marker));
+}
+
+export async function loadIdentityMarker(): Promise<IdentityMarker | null> {
+  const raw = await SecureStore.getItemAsync(IDENTITY_MARKER_KEY);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as IdentityMarker;
+  } catch {
+    return null;
+  }
+}
+
+export async function clearIdentityMarker(): Promise<void> {
+  await SecureStore.deleteItemAsync(IDENTITY_MARKER_KEY);
+}
 
 export async function saveTokens(tokens: AuthTokens): Promise<void> {
   await Promise.all([

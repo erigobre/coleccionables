@@ -1,7 +1,16 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ApiError, loginRequest, registerRequest, setTokenListener, type AuthTokens } from '../lib/api';
 import { freshInstallReady } from '../lib/fresh-install';
-import { clearTokens, decodeJwtPayload, loadTokens, saveTokens } from '../lib/auth-storage';
+import {
+  clearIdentityMarker,
+  clearTokens,
+  decodeJwtPayload,
+  loadIdentityMarker,
+  loadTokens,
+  saveIdentityMarker,
+  saveTokens,
+  type IdentityMarker,
+} from '../lib/auth-storage';
 import { registerPushToken, unregisterCurrentPushToken } from '../lib/push';
 
 export interface AuthUser {
@@ -27,6 +36,8 @@ interface AuthContextValue {
   }) => Promise<void>;
   logout: () => Promise<void>;
   applyTokens: (next: AuthTokens) => Promise<void>;
+  lastIdentity: IdentityMarker | null;
+  forgetIdentity: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -37,13 +48,15 @@ function userFromTokens(tokens: AuthTokens): AuthUser | null {
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [tokens, setTokens] = useState<AuthTokens | null>(null);
+  const [lastIdentity, setLastIdentity] = useState<IdentityMarker | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     freshInstallReady()
-      .then(() => loadTokens())
-      .then((saved) => {
+      .then(() => Promise.all([loadTokens(), loadIdentityMarker()]))
+      .then(([saved, identity]) => {
         setTokens(saved);
+        setLastIdentity(identity);
         // Sesión ya guardada: el token de push puede haber cambiado o no haberse
         // registrado nunca (el permiso se pide la primera vez que se llega aquí).
         if (saved) void registerPushToken(saved.accessToken);
@@ -64,6 +77,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await saveTokens(next);
     setTokens(next);
     void registerPushToken(next.accessToken);
+    const identity = userFromTokens(next);
+    if (identity) {
+      const marker = { name: identity.name, email: identity.email };
+      await saveIdentityMarker(marker);
+      setLastIdentity(marker);
+    }
   }, []);
 
   const login = useCallback(
@@ -87,7 +106,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (tokens) await unregisterCurrentPushToken(tokens.accessToken);
     await clearTokens();
     setTokens(null);
+    // Un logout manual siempre debe caer en el login en blanco, no en el
+    // saludo personalizado (ese es solo para cuando se reinstala la app).
+    await clearIdentityMarker();
+    setLastIdentity(null);
   }, [tokens]);
+
+  const forgetIdentity = useCallback(async () => {
+    await clearIdentityMarker();
+    setLastIdentity(null);
+  }, []);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -98,8 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       logout,
       applyTokens,
+      lastIdentity,
+      forgetIdentity,
     }),
-    [tokens, isLoading, login, register, logout, applyTokens],
+    [tokens, lastIdentity, isLoading, login, register, logout, applyTokens, forgetIdentity],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
