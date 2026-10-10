@@ -63,16 +63,26 @@ function buildInfoLabel() {
 // al servidor (y por qué falla si no) exigía sacar logs del sistema del
 // dispositivo (Console.app en Mac) — con este botón el resultado/error real
 // se ve directo en pantalla, en cualquier iPhone.
-async function checkForUpdateNow(): Promise<{ message: string; readyToApply: boolean }> {
+//
+// Nota: NO se llama a Updates.reloadAsync() aquí. Un crash reproducido en
+// TestFlight (2026-10-10, reporte nativo: SIGABRT dentro de
+// expo-updates/ErrorRecovery.crash(), sin ninguna línea de JS en el stack)
+// confirma que el reinicio en caliente de expo-updates es frágil en esta
+// versión del SDK. La única forma segura de aplicar la actualización ya
+// descargada es un reinicio real del proceso (cerrar la app del todo).
+async function checkForUpdateNow(): Promise<{ message: string }> {
   const result = await Updates.checkForUpdateAsync();
   if (!result.isAvailable) {
-    return { message: 'No hay ninguna actualización disponible en este momento.', readyToApply: false };
+    return { message: 'No hay ninguna actualización disponible en este momento.' };
   }
   const fetchResult = await Updates.fetchUpdateAsync();
   if (!fetchResult.isNew) {
-    return { message: 'Se encontró una actualización pero no es nueva.', readyToApply: false };
+    return { message: 'Se encontró una actualización pero no es nueva.' };
   }
-  return { message: 'Actualización descargada. Toca "Aplicar ahora" para reiniciar la app con ella.', readyToApply: true };
+  return {
+    message:
+      'Actualización descargada. Para aplicarla, cierra la app por completo (deslízala hacia arriba en el selector de apps) y vuelve a abrirla. No la reinicies desde aquí: puede causar un cierre inesperado.',
+  };
 }
 
 export default function PerfilScreen() {
@@ -85,17 +95,8 @@ export default function PerfilScreen() {
   const onCheckUpdate = async () => {
     setCheckingUpdate(true);
     try {
-      const { message, readyToApply } = await checkForUpdateNow();
-      Alert.alert(
-        'Verificar actualización',
-        message,
-        readyToApply
-          ? [
-              { text: 'Ahora no', style: 'cancel' },
-              { text: 'Aplicar ahora', onPress: () => Updates.reloadAsync().catch(() => {}) },
-            ]
-          : [{ text: 'Aceptar' }],
-      );
+      const { message } = await checkForUpdateNow();
+      Alert.alert('Verificar actualización', message, [{ text: 'Aceptar' }]);
     } catch (err) {
       const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
       Alert.alert('Error al verificar actualización', detail);
