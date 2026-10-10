@@ -50,6 +50,10 @@ export default function LoginScreen() {
         placeholder="••••••••"
       />
 
+      <Link href="/(auth)/olvide-contrasena" className="mb-4 self-end text-sm font-body-bold" style={{ color: colors.primary }}>
+        ¿Olvidaste tu contraseña?
+      </Link>
+
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 
       <Button label="Iniciar sesión" onPress={onSubmit} loading={loading} disabled={!email || !password} />

@@ -24,6 +24,7 @@ import { NotificationsModule } from './notifications/notifications.module.js';
 import { SupportModule } from './support/support.module.js';
 import { ReferralsModule } from './referrals/referrals.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
+import { AccountRecoveryModule } from './account-recovery/account-recovery.module.js';
 
 @Module({
   imports: [
@@ -63,6 +64,7 @@ import { OrganizationsModule } from './organizations/organizations.module.js';
     SupportModule,
     ReferralsModule,
     OrganizationsModule,
+    AccountRecoveryModule,
   ],
 })
 export class AppModule {}

@@ -154,7 +154,40 @@ model User {
   // sigue a la persona sin importar su Organization — ver FtGrantCronService).
   ftFreeGrantAt DateTime?
 
+  // Recuperar contraseña sin sesión (AuthService.forgotPassword/resetPassword):
+  // código de un solo uso, expira a los 30 min. passwordChangedAt es la hora
+  // de corte: cualquier access/refresh token firmado ANTES de esa hora deja de
+  // servir (JwtStrategy.validate y AuthService.refresh comparan contra el
+  // `iat` del token), así cambiar la contraseña cierra sesión en todos los
+  // dispositivos sin necesitar una tabla de sesiones.
+  passwordResetToken          String?   @unique
+  passwordResetTokenExpiresAt DateTime?
+  passwordChangedAt           DateTime?
+  passwordChangeLogs          PasswordChangeLog[]
+
   @@map("users")
+}
+
+// Auditoría de seguridad (plan de Ajustes, ampliado para "recuperar
+// contraseña"): no se guarda la contraseña anterior ni la nueva (sería un
+// riesgo si la base de datos se filtra); solo cuándo, cómo y desde qué
+// IP/dispositivo cambió, para poder investigar un robo de cuenta.
+model PasswordChangeLog {
+  id        String               @id @default(cuid())
+  userId    String
+  user      User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  method    PasswordChangeMethod
+  ip        String?
+  userAgent String?
+  createdAt DateTime             @default(now())
+
+  @@index([userId, createdAt])
+  @@map("password_change_logs")
+}
+
+enum PasswordChangeMethod {
+  SELF_CHANGE // desde Ajustes, con la contraseña actual
+  FORGOT_PASSWORD_RESET // flujo de "olvidé mi contraseña", sin sesión
 }
 
 enum ReferralSource {

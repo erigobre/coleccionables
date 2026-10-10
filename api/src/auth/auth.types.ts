@@ -16,4 +16,8 @@ export interface JwtPayload {
   username: string | null;
   role: UserRole;
   organizationId: string;
+  // No se firma a mano; lo agrega jsonwebtoken al emitir el token. Se usa para
+  // invalidar tokens emitidos antes de un cambio de contraseña (ver
+  // AuthService.refresh y JwtStrategy.validate).
+  iat?: number;
 }

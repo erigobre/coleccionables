@@ -32,8 +32,13 @@ export class EmailService {
 
   // Aviso de seguridad (plan de Ajustes §"Backend: Ajustes y seguridad de
   // cuenta"): se manda siempre que cambia la contraseña, para que la persona
-  // note un cambio que no hizo.
+  // note un cambio que no hizo. El botón manda a una página web (no a la
+  // app) a propósito: quien recibe este correo por un robo de cuenta puede
+  // no tener la app a la mano, o puede ser justo quien se la robó quien sí
+  // la tiene.
   async sendPasswordChangedEmail({ toEmail, userName }: { toEmail: string; userName: string }) {
+    const apiUrl = process.env.PUBLIC_BASE_URL?.replace(/\/+$/, '') ?? 'https://frikidex.com';
+    const recoveryUrl = `${apiUrl}/recuperar-cuenta?email=${encodeURIComponent(toEmail)}`;
     await this.send({
       toEmail,
       fromAddress: 'noreply',
@@ -42,10 +47,34 @@ export class EmailService {
         heading: 'Tu contraseña cambió',
         bodyHtml: `
           <p>Hola ${escapeHtml(userName)},</p>
-          <p>Tu contraseña de Frikidex se actualizó correctamente. Si no fuiste tú, cambia tu contraseña de inmediato y contacta a soporte.</p>
+          <p>Tu contraseña de Frikidex se actualizó correctamente.</p>
+          <p>¿No fuiste tú? Recupera tu cuenta de inmediato:</p>
+          ${button('No fui yo, recuperar mi cuenta', recoveryUrl)}
         `,
       }),
       logContext: `aviso de cambio de contraseña a ${toEmail}`,
+    });
+  }
+
+  // Código de un solo uso para AuthService.forgotPassword — pensado para
+  // teclearse a mano en la app (no es un enlace), por eso el número grande.
+  async sendPasswordResetCodeEmail({ toEmail, userName, code }: { toEmail: string; userName: string; code: string }) {
+    await this.send({
+      toEmail,
+      fromAddress: 'noreply',
+      subject: `${code} es tu código para recuperar tu contraseña`,
+      html: buildSimpleEmailHtml({
+        heading: 'Recupera tu contraseña',
+        bodyHtml: `
+          <p>Hola ${escapeHtml(userName)},</p>
+          <p>Usa este código en la app para poner una contraseña nueva. Vence en 30 minutos.</p>
+          <p style="text-align: center; margin: 28px 0;">
+            <span style="display: inline-block; font-size: 32px; font-weight: bold; letter-spacing: 6px; color: ${NOCHE};">${escapeHtml(code)}</span>
+          </p>
+          <p>Si no pediste este código, ignora este correo — tu contraseña sigue igual.</p>
+        `,
+      }),
+      logContext: `código de recuperación a ${toEmail}`,
     });
   }
 

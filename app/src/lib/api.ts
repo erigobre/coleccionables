@@ -172,3 +172,13 @@ export function loginRequest(dto: { email: string; password: string }) {
 export function refreshRequest(refreshToken: string) {
   return apiFetch<AuthTokens>('/auth/refresh', { method: 'POST', body: { refreshToken } });
 }
+
+// Siempre responde { sent: true } exista o no la cuenta (AuthService.forgotPassword
+// nunca revela si un correo está registrado).
+export function forgotPasswordRequest(email: string) {
+  return apiFetch<{ sent: true }>('/auth/forgot-password', { method: 'POST', body: { email } });
+}
+
+export function resetPasswordRequest(dto: { token: string; newPassword: string }) {
+  return apiFetch<AuthTokens>('/auth/reset-password', { method: 'POST', body: dto });
+}

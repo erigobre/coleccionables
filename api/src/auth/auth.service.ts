@@ -1,11 +1,13 @@
-import { ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
+import { BadRequestException, ConflictException, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
 import { FtService } from '../ft/ft.service.js';
 import { ReferralsService } from '../referrals/referrals.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
+import { EmailService } from '../email/email.service.js';
 import { isUsernameProfane } from './profanity/username-filter.js';
 import { PRIVACY_POLICY_VERSION } from '../legal/privacy-policy.page.js';
 import { TERMS_OF_USE_VERSION } from '../legal/terms-of-use.page.js';
@@ -16,6 +18,7 @@ import type { JwtPayload } from './auth.types.js';
 const SALT_ROUNDS = 10;
 const SIGNUP_FREE_FT_FALLBACK = 20;
 const FREE_FT_LOT_DAYS = 30;
+const PASSWORD_RESET_CODE_MINUTES = 30;
 
 export interface Tokens {
   accessToken: string;
@@ -32,6 +35,7 @@ export class AuthService {
     private readonly ftService: FtService,
     private readonly referralsService: ReferralsService,
     private readonly notifications: NotificationsService,
+    private readonly emailService: EmailService,
   ) {}
 
   // Chequeo en vivo desde el registro (plan: bloquear el alta hasta que el
@@ -265,6 +269,75 @@ export class AuthService {
     if (user.status === 'PENDING_DELETION') {
       throw new UnauthorizedException('Tu cuenta está programada para eliminarse. Inicia sesión con tu contraseña para reactivarla.');
     }
+    // Mismo corte que JwtStrategy.validate para el access token: un refresh
+    // token firmado antes del último cambio de contraseña no debe poder
+    // renovar nada (si no, cambiar la contraseña no cerraría sesión en los
+    // demás dispositivos, solo la tumbaría 15 min hasta el próximo refresh).
+    if (payload.iat && user.passwordChangedAt && payload.iat * 1000 < user.passwordChangedAt.getTime()) {
+      throw new UnauthorizedException('Tu contraseña cambió. Inicia sesión de nuevo.');
+    }
+
+    return this.issueTokens({
+      sub: user.id,
+      email: user.email,
+      name: user.name,
+      username: user.username,
+      role: user.role,
+      organizationId: user.organizationId,
+    });
+  }
+
+  // "Olvidé mi contraseña", sin sesión. Por seguridad nunca revela si el
+  // correo existe o no (mismo mensaje/forma de respuesta en ambos casos) —
+  // así no sirve para confirmar qué correos tienen cuenta en Frikidex.
+  async forgotPassword(email: string): Promise<{ sent: true }> {
+    const user = await this.prisma.user.findUnique({ where: { email } });
+    if (user) {
+      // Código de 6 dígitos (no un UUID): hay que poder teclearlo a mano en
+      // la app, igual que pidió el dueño del producto.
+      const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
+      const expiresAt = new Date();
+      expiresAt.setMinutes(expiresAt.getMinutes() + PASSWORD_RESET_CODE_MINUTES);
+
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordResetToken: code, passwordResetTokenExpiresAt: expiresAt },
+      });
+
+      await this.emailService.sendPasswordResetCodeEmail({ toEmail: user.email, userName: user.name, code });
+    }
+
+    return { sent: true };
+  }
+
+  // Confirma el código y pone la nueva contraseña. Cierra todas las sesiones
+  // existentes (passwordChangedAt) y deja entrar de una vez con tokens
+  // nuevos, para no obligar a capturar el correo/contraseña otra vez justo
+  // después de haberlos cambiado.
+  async resetPassword(token: string, newPassword: string, ip?: string, userAgent?: string): Promise<Tokens> {
+    const user = await this.prisma.user.findUnique({ where: { passwordResetToken: token } });
+    if (!user || !user.passwordResetTokenExpiresAt || user.passwordResetTokenExpiresAt < new Date()) {
+      throw new BadRequestException('Este código no es válido o ya venció');
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, SALT_ROUNDS);
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: {
+          passwordHash,
+          passwordChangedAt: now,
+          passwordResetToken: null,
+          passwordResetTokenExpiresAt: null,
+        },
+      }),
+      this.prisma.passwordChangeLog.create({
+        data: { userId: user.id, method: 'FORGOT_PASSWORD_RESET', ip: ip ?? null, userAgent: userAgent ?? null },
+      }),
+    ]);
+
+    this.emailService.sendPasswordChangedEmail({ toEmail: user.email, userName: user.name }).catch(() => {});
 
     return this.issueTokens({
       sub: user.id,

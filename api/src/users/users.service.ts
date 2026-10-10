@@ -96,7 +96,7 @@ export class UsersService {
     return this.reissueTokensFor(user);
   }
 
-  async changePassword(userId: string, dto: ChangePasswordDto) {
+  async changePassword(userId: string, dto: ChangePasswordDto, ip?: string, userAgent?: string) {
     const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId } });
 
     const matches = await bcrypt.compare(dto.currentPassword, user.passwordHash);
@@ -105,7 +105,13 @@ export class UsersService {
     }
 
     const passwordHash = await bcrypt.hash(dto.newPassword, SALT_ROUNDS);
-    await this.prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    const now = new Date();
+    await this.prisma.$transaction([
+      this.prisma.user.update({ where: { id: userId }, data: { passwordHash, passwordChangedAt: now } }),
+      this.prisma.passwordChangeLog.create({
+        data: { userId, method: 'SELF_CHANGE', ip: ip ?? null, userAgent: userAgent ?? null },
+      }),
+    ]);
 
     this.emailService.sendPasswordChangedEmail({ toEmail: user.email, userName: user.name }).catch(() => {});
 
