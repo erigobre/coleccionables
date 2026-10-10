@@ -52,7 +52,7 @@ export default function LoginScreen() {
           </>
         ) : (
           <>
-            <Text className="font-display text-[28px] uppercase tracking-wide text-text">Bienvenido de vuelta</Text>
+            <Text className="font-display text-[28px] uppercase tracking-wide text-text">Bienvenido</Text>
             <Text className="mt-1 text-sm text-textMuted">Inicia sesión para ver tu colección</Text>
           </>
         )}

@@ -7,7 +7,7 @@ import { freshInstallReady } from '../lib/fresh-install';
 import { PinPad } from './PinPad';
 
 export function AppLockGate({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth();
   const [locked, setLocked] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const appState = useRef(AppState.currentState);
@@ -20,14 +20,25 @@ export function AppLockGate({ children }: { children: ReactNode }) {
   // por el usuario 2026-10-02: se desbloqueaba y ~1.5s después se bloqueaba
   // otra vez, una y otra vez).
   const authenticating = useRef(false);
+  // El listener de AppState se suscribe una sola vez (ver abajo); sin un ref
+  // quedaría cerrado sobre el `user` de ese primer render (siempre null,
+  // porque isLoading arranca en true) y nunca vería una sesión iniciada después.
+  const userRef = useRef(user);
+  userRef.current = user;
 
+  // Sin sesión no hay nada que proteger: si el chequeo corriera igual tras un
+  // cierre de sesión, pediría biométrico/PIN para de todos modos acabar en
+  // login (Stack.Protected ya redirige ahí sin `user`) — pedía una
+  // autenticación que no llevaba a ningún lado (reportado por el usuario
+  // 2026-10-10).
   useEffect(() => {
+    if (isLoading || !user) return;
     freshInstallReady()
       .then(() => hasPin())
       .then((has) => {
         if (has) setLocked(true);
       });
-  }, []);
+  }, [isLoading, user]);
 
   useEffect(() => {
     const sub = AppState.addEventListener('change', async (next) => {
@@ -37,7 +48,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       // pasa por "inactive" y regresa a "active", y no debe contar como regreso
       // de segundo plano (ahí estaba el loop: el guard por tiempo fallaba si el
       // evento llegaba después de los 500 ms).
-      if (next === 'active' && prev === 'background' && !authenticating.current) {
+      if (next === 'active' && prev === 'background' && !authenticating.current && userRef.current) {
         const has = await hasPin();
         if (has) {
           biometricTried.current = false;
