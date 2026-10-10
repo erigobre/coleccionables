@@ -3,7 +3,7 @@ import Constants from 'expo-constants';
 import { Link } from 'expo-router';
 import * as Updates from 'expo-updates';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { FtCoin } from '../../../components/ui/FtCoin';
 import { Screen } from '../../../components/ui/Screen';
@@ -59,11 +59,50 @@ function buildInfoLabel() {
   return `${base} · OTA ${date} (${shortId}) · ${Updates.channel ?? '?'}`;
 }
 
+// Diagnóstico manual de OTA: sin esto, saber si expo-updates logra contactar
+// al servidor (y por qué falla si no) exigía sacar logs del sistema del
+// dispositivo (Console.app en Mac) — con este botón el resultado/error real
+// se ve directo en pantalla, en cualquier iPhone.
+async function checkForUpdateNow(): Promise<{ message: string; readyToApply: boolean }> {
+  const result = await Updates.checkForUpdateAsync();
+  if (!result.isAvailable) {
+    return { message: 'No hay ninguna actualización disponible en este momento.', readyToApply: false };
+  }
+  const fetchResult = await Updates.fetchUpdateAsync();
+  if (!fetchResult.isNew) {
+    return { message: 'Se encontró una actualización pero no es nueva.', readyToApply: false };
+  }
+  return { message: 'Actualización descargada. Toca "Aplicar ahora" para reiniciar la app con ella.', readyToApply: true };
+}
+
 export default function PerfilScreen() {
   const { user, logout, accessToken } = useAuth();
   const { balance } = useFt();
   const [canInvite, setCanInvite] = useState(false);
   const [lastFatalError, setLastFatalError] = useState<string | null>(null);
+  const [checkingUpdate, setCheckingUpdate] = useState(false);
+
+  const onCheckUpdate = async () => {
+    setCheckingUpdate(true);
+    try {
+      const { message, readyToApply } = await checkForUpdateNow();
+      Alert.alert(
+        'Verificar actualización',
+        message,
+        readyToApply
+          ? [
+              { text: 'Ahora no', style: 'cancel' },
+              { text: 'Aplicar ahora', onPress: () => Updates.reloadAsync().catch(() => {}) },
+            ]
+          : [{ text: 'Aceptar' }],
+      );
+    } catch (err) {
+      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+      Alert.alert('Error al verificar actualización', detail);
+    } finally {
+      setCheckingUpdate(false);
+    }
+  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -123,6 +162,12 @@ export default function PerfilScreen() {
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
 
       <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()}</Text>
+
+      <Pressable onPress={onCheckUpdate} disabled={checkingUpdate} className="mt-2">
+        <Text className="text-center text-[11px] font-body-bold" style={{ color: colors.primary }}>
+          {checkingUpdate ? 'Verificando…' : 'Verificar actualización ahora'}
+        </Text>
+      </Pressable>
 
       {lastFatalError ? (
         <Pressable
