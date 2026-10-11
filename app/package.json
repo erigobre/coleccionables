@@ -8,6 +8,7 @@
     "@expo/vector-icons": "^15.0.2",
     "@react-native-community/datetimepicker": "9.1.0",
     "expo": "~57.0.24",
+    "expo-application": "~57.0.3",
     "expo-blur": "~57.0.3",
     "expo-camera": "~57.0.5",
     "expo-clipboard": "~57.0.2",

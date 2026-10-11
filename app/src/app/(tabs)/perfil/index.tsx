@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Application from 'expo-application';
 import Constants from 'expo-constants';
 import { Link } from 'expo-router';
 import * as Updates from 'expo-updates';
@@ -47,8 +48,8 @@ function MenuRow({
 // actualización llegó o no (sin esto, no había forma de saber qué versión
 // corría cada iPhone sin conectarlo a una Mac).
 function buildInfoLabel() {
-  const appVersion = Constants.expoConfig?.version ?? Constants.nativeAppVersion ?? '?';
-  const nativeBuild = Constants.nativeBuildVersion ?? '?';
+  const appVersion = Constants.expoConfig?.version ?? Application.nativeApplicationVersion ?? '?';
+  const nativeBuild = Application.nativeBuildVersion ?? '?';
   const base = `v${appVersion} (build ${nativeBuild})`;
 
   if (Updates.isEmbeddedLaunch) {

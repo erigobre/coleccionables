@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import { File, Paths } from 'expo-file-system';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
@@ -26,7 +27,7 @@ export function installGlobalErrorHandler() {
         isFatal: !!isFatal,
         timestamp: new Date().toISOString(),
         appVersion: Constants.expoConfig?.version ?? null,
-        buildVersion: Constants.nativeBuildVersion ?? null,
+        buildVersion: Application.nativeBuildVersion ?? null,
         updateId: Updates.updateId ?? null,
         isEmbeddedLaunch: Updates.isEmbeddedLaunch,
       };

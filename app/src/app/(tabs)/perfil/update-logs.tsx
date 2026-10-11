@@ -1,4 +1,4 @@
-import Constants from 'expo-constants';
+import * as Application from 'expo-application';
 import * as Updates from 'expo-updates';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
@@ -43,7 +43,7 @@ export default function UpdateLogsScreen() {
     `channel: ${Updates.channel ?? '(ninguno)'}`,
     `runtimeVersion: ${Updates.runtimeVersion ?? '(ninguno)'}`,
     `createdAt: ${Updates.createdAt ? Updates.createdAt.toISOString() : '(ninguno)'}`,
-    `appVersion nativo: ${Constants.nativeAppVersion ?? '?'} (build ${Constants.nativeBuildVersion ?? '?'})`,
+    `appVersion nativo: ${Application.nativeApplicationVersion ?? '?'} (build ${Application.nativeBuildVersion ?? '?'})`,
   ].join('\n');
 
   return (
