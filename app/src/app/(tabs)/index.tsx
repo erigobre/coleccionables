@@ -5,6 +5,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'rea
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
 import { FtCoin } from '../../components/ui/FtCoin';
+import { LogoHorizontal } from '../../components/ui/LogoHorizontal';
 import { Screen } from '../../components/ui/Screen';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
 import { useFt } from '../../context/ft-context';
@@ -104,18 +105,7 @@ export default function HomeScreen() {
     <View style={{ flex: 1 }}>
       <Screen>
       <View className="flex-row items-center justify-between">
-        <View className="flex-row items-center gap-2.5">
-          <Image
-            source={require('../../../assets/icon.png')}
-            style={{ width: 30, height: 30, borderRadius: 7 }}
-          />
-          <View>
-            <Text className="font-display text-lg text-text">
-              FRIKI<Text className="text-primary">DEX</Text>
-            </Text>
-            <Text className="text-[9px] uppercase tracking-widest text-textMuted">La dex de tus coleccionables</Text>
-          </View>
-        </View>
+        <LogoHorizontal />
 
         <Pressable
           onPress={() => router.push('/notificaciones')}

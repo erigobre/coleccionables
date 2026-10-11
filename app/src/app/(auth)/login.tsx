@@ -2,6 +2,7 @@ import { Link } from 'expo-router';
 import { useState } from 'react';
 import { Text, View } from 'react-native';
 import { Button } from '../../components/ui/Button';
+import { LogoHorizontal } from '../../components/ui/LogoHorizontal';
 import { Screen } from '../../components/ui/Screen';
 import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
@@ -43,6 +44,9 @@ export default function LoginScreen() {
   return (
     <Screen>
       <View className="mb-10 mt-16">
+        <View className="mb-6">
+          <LogoHorizontal />
+        </View>
         {returning ? (
           <>
             <Text className="font-display text-[28px] uppercase tracking-wide text-text">

@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Image, Linking, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
+import { FloatingParticles } from '../../components/ui/FloatingParticles';
 import { useAuth } from '../../context/auth-context';
 import { API_BASE_URL } from '../../lib/api';
 import { colors } from '../../theme/tokens';
@@ -27,6 +28,7 @@ export default function BienvenidaScreen() {
       locations={[0, 0.6, 1]}
       style={{ flex: 1 }}
     >
+      <FloatingParticles />
       <View
         className="flex-1 justify-between px-6"
         style={{ paddingTop: insets.top + 64, paddingBottom: insets.bottom + 32 }}

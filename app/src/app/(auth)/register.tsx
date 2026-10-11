@@ -3,6 +3,7 @@ import { Link } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, Text, TextInput, View } from 'react-native';
 import { Button } from '../../components/ui/Button';
+import { LogoHorizontal } from '../../components/ui/LogoHorizontal';
 import { Screen } from '../../components/ui/Screen';
 import { TextField } from '../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
@@ -93,6 +94,9 @@ export default function RegisterScreen() {
   return (
     <Screen>
       <View className="mb-10 mt-16">
+        <View className="mb-6">
+          <LogoHorizontal />
+        </View>
         <Text className="font-display text-[28px] uppercase tracking-wide text-text">Crea tu cuenta</Text>
         <Text className="mt-1 text-sm text-textMuted">Empieza a organizar tu colección</Text>
       </View>
