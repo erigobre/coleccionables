@@ -30,6 +30,7 @@ export default function PerfilStackLayout() {
       <Stack.Screen name="wallet/familiares" options={{ title: 'Familiares' }} />
       <Stack.Screen name="wallet/invitaciones" options={{ title: 'Invitaciones' }} />
       <Stack.Screen name="wallet/historial" options={{ title: 'Historial' }} />
+      <Stack.Screen name="update-logs" options={{ title: 'Diagnóstico OTA' }} />
     </Stack>
   );
 }

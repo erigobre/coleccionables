@@ -170,6 +170,10 @@ export default function PerfilScreen() {
         </Text>
       </Pressable>
 
+      <Link href="/(tabs)/perfil/update-logs" className="mt-2 text-center text-[11px] text-textMuted">
+        Ver registro nativo de actualizaciones (diagnóstico)
+      </Link>
+
       {lastFatalError ? (
         <Pressable
           onPress={() => {
