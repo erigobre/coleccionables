@@ -54,4 +54,22 @@ export class FtPublicController {
     });
     return { services };
   }
+
+  // La app (pantalla "Información de la app") compara esto contra su propio
+  // build number para saber si hay una versión nativa más nueva en
+  // TestFlight/App Store/Play, sin depender de ninguna API de Apple/Google
+  // (que no reflejan betas de TestFlight). Los fallbacks deben coincidir con
+  // LATEST_IOS_BUILD_NUMBER/LATEST_ANDROID_BUILD_NUMBER en admin.service.ts;
+  // se actualizan a mano desde Superadmin tras cada build nuevo.
+  @Get('app-version')
+  async getAppVersion() {
+    const rows = await this.prisma.ftConfig.findMany({
+      where: { key: { in: ['LATEST_IOS_BUILD_NUMBER', 'LATEST_ANDROID_BUILD_NUMBER'] } },
+    });
+    const byKey = new Map(rows.map((row) => [row.key, row.value]));
+    return {
+      iosBuildNumber: byKey.get('LATEST_IOS_BUILD_NUMBER') ?? 18,
+      androidBuildNumber: byKey.get('LATEST_ANDROID_BUILD_NUMBER') ?? 11,
+    };
+  }
 }

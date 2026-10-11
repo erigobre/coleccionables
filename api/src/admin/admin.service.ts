@@ -29,6 +29,8 @@ const FT_CONFIG_CATALOG: { key: string; label: string; fallback: number }[] = [
   { key: 'REFERRAL_LIFETIME_LIMIT', label: 'Tope de invitaciones exitosas de por vida', fallback: 20 },
   { key: 'REFERRAL_FEATURE_ENABLED', label: 'Programa de invitaciones activo (1 = sí, 0 = no)', fallback: 1 },
   { key: 'MAX_MEMBERS_PER_SHARED_COLLECTION', label: 'Máximo de miembros por colección compartida', fallback: 5 },
+  { key: 'LATEST_IOS_BUILD_NUMBER', label: 'Último build number de iOS publicado (TestFlight/App Store)', fallback: 18 },
+  { key: 'LATEST_ANDROID_BUILD_NUMBER', label: 'Último build number (versionCode) de Android publicado', fallback: 11 },
 ];
 
 @Injectable()

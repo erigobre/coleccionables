@@ -1,18 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
-import * as Application from 'expo-application';
-import Constants from 'expo-constants';
 import { Link } from 'expo-router';
-import * as Updates from 'expo-updates';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Alert, Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
-import { CopyToast } from '../../../components/ui/CopyToast';
 import { FtCoin } from '../../../components/ui/FtCoin';
 import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
 import { useAuth } from '../../../context/auth-context';
 import { useFt } from '../../../context/ft-context';
-import { useCopyFeedback } from '../../../lib/clipboard';
 import { clearLastFatalError, readLastFatalError } from '../../../lib/crash-log';
 import { fetchMyReferralInfo } from '../../../lib/referrals';
 
@@ -44,70 +39,11 @@ function MenuRow({
   );
 }
 
-// Identificador de build/OTA, para diagnosticar desde el dispositivo si una
-// actualización llegó o no (sin esto, no había forma de saber qué versión
-// corría cada iPhone sin conectarlo a una Mac).
-function buildInfoLabel() {
-  const appVersion = Constants.expoConfig?.version ?? Application.nativeApplicationVersion ?? '?';
-  const nativeBuild = Application.nativeBuildVersion ?? '?';
-  const base = `v${appVersion} (build ${nativeBuild})`;
-
-  if (Updates.isEmbeddedLaunch) {
-    return `${base} · sin OTA aplicada`;
-  }
-  const shortId = Updates.updateId ? Updates.updateId.slice(0, 8) : '?';
-  const date = Updates.createdAt
-    ? Updates.createdAt.toLocaleString('es-MX', { dateStyle: 'short', timeStyle: 'short' })
-    : '?';
-  return `${base} · OTA ${date} (${shortId}) · ${Updates.channel ?? '?'}`;
-}
-
-// Diagnóstico manual de OTA: sin esto, saber si expo-updates logra contactar
-// al servidor (y por qué falla si no) exigía sacar logs del sistema del
-// dispositivo (Console.app en Mac) — con este botón el resultado/error real
-// se ve directo en pantalla, en cualquier iPhone.
-//
-// Nota: NO se llama a Updates.reloadAsync() aquí. Un crash reproducido en
-// TestFlight (2026-10-10, reporte nativo: SIGABRT dentro de
-// expo-updates/ErrorRecovery.crash(), sin ninguna línea de JS en el stack)
-// confirma que el reinicio en caliente de expo-updates es frágil en esta
-// versión del SDK. La única forma segura de aplicar la actualización ya
-// descargada es un reinicio real del proceso (cerrar la app del todo).
-async function checkForUpdateNow(): Promise<{ message: string }> {
-  const result = await Updates.checkForUpdateAsync();
-  if (!result.isAvailable) {
-    return { message: 'No hay ninguna actualización disponible en este momento.' };
-  }
-  const fetchResult = await Updates.fetchUpdateAsync();
-  if (!fetchResult.isNew) {
-    return { message: 'Se encontró una actualización pero no es nueva.' };
-  }
-  return {
-    message:
-      'Actualización descargada. Para aplicarla, cierra la app por completo (deslízala hacia arriba en el selector de apps) y vuelve a abrirla. No la reinicies desde aquí: puede causar un cierre inesperado.',
-  };
-}
-
 export default function PerfilScreen() {
   const { user, logout, accessToken } = useAuth();
   const { balance } = useFt();
   const [canInvite, setCanInvite] = useState(false);
   const [lastFatalError, setLastFatalError] = useState<string | null>(null);
-  const [checkingUpdate, setCheckingUpdate] = useState(false);
-  const { toast, copy } = useCopyFeedback();
-
-  const onCheckUpdate = async () => {
-    setCheckingUpdate(true);
-    try {
-      const { message } = await checkForUpdateNow();
-      Alert.alert('Verificar actualización', message, [{ text: 'Aceptar' }]);
-    } catch (err) {
-      const detail = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
-      Alert.alert('Error al verificar actualización', detail);
-    } finally {
-      setCheckingUpdate(false);
-    }
-  };
 
   useEffect(() => {
     if (!accessToken) return;
@@ -163,23 +99,10 @@ export default function PerfilScreen() {
           }
         />
         <MenuRow icon="settings-outline" label="Ajustes" href="/(tabs)/perfil/ajustes" />
+        <MenuRow icon="information-circle-outline" label="Información de la App" href="/(tabs)/perfil/info" />
       </View>
 
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
-
-      <Pressable onPress={() => copy(buildInfoLabel())}>
-        <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()} · toca para copiar</Text>
-      </Pressable>
-
-      <Pressable onPress={onCheckUpdate} disabled={checkingUpdate} className="mt-2">
-        <Text className="text-center text-[11px] font-body-bold" style={{ color: colors.primary }}>
-          {checkingUpdate ? 'Verificando…' : 'Verificar actualización ahora'}
-        </Text>
-      </Pressable>
-
-      <Link href="/(tabs)/perfil/update-logs" className="mt-2 text-center text-[11px] text-textMuted">
-        Ver registro nativo de actualizaciones (diagnóstico)
-      </Link>
 
       {lastFatalError ? (
         <Pressable
@@ -195,8 +118,6 @@ export default function PerfilScreen() {
         </Pressable>
       ) : null}
     </Screen>
-
-    <CopyToast message={toast} />
     </View>
   );
 }
