@@ -5,11 +5,13 @@ import * as Updates from 'expo-updates';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
+import { CopyToast } from '../../../components/ui/CopyToast';
 import { FtCoin } from '../../../components/ui/FtCoin';
 import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
 import { useAuth } from '../../../context/auth-context';
 import { useFt } from '../../../context/ft-context';
+import { useCopyFeedback } from '../../../lib/clipboard';
 import { clearLastFatalError, readLastFatalError } from '../../../lib/crash-log';
 import { fetchMyReferralInfo } from '../../../lib/referrals';
 
@@ -91,6 +93,7 @@ export default function PerfilScreen() {
   const [canInvite, setCanInvite] = useState(false);
   const [lastFatalError, setLastFatalError] = useState<string | null>(null);
   const [checkingUpdate, setCheckingUpdate] = useState(false);
+  const { toast, copy } = useCopyFeedback();
 
   const onCheckUpdate = async () => {
     setCheckingUpdate(true);
@@ -117,6 +120,7 @@ export default function PerfilScreen() {
   }, []);
 
   return (
+    <View style={{ flex: 1 }}>
     <Screen>
       <View className="mb-8 items-center">
         <View className="mb-3 h-20 w-20 items-center justify-center rounded-full bg-surfaceElevated">
@@ -162,7 +166,9 @@ export default function PerfilScreen() {
 
       <Button label="Cerrar sesión" variant="ghost" onPress={logout} />
 
-      <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()}</Text>
+      <Pressable onPress={() => copy(buildInfoLabel())}>
+        <Text className="mt-4 text-center text-[11px] text-textMuted">{buildInfoLabel()} · toca para copiar</Text>
+      </Pressable>
 
       <Pressable onPress={onCheckUpdate} disabled={checkingUpdate} className="mt-2">
         <Text className="text-center text-[11px] font-body-bold" style={{ color: colors.primary }}>
@@ -188,5 +194,8 @@ export default function PerfilScreen() {
         </Pressable>
       ) : null}
     </Screen>
+
+    <CopyToast message={toast} />
+    </View>
   );
 }
