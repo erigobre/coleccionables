@@ -18,7 +18,7 @@ import { normalizeCameraOrientation } from '../lib/image';
 import { usageLabel } from '../lib/item-enums';
 import { identifyItemPhotos, uploadItemPhotos, type IdentifyResult, type ItemMatch } from '../lib/items';
 import { useAiProcessing } from '../lib/use-ai-processing';
-import { createWishlistItem } from '../lib/wishlist';
+import { createWishlistItem, wishlistFieldsFromExtracted } from '../lib/wishlist';
 import { colors } from '../theme/tokens';
 
 const MAX_PHOTOS = 3;
@@ -184,6 +184,7 @@ export default function YaLoTengoScreen() {
         name: result.extracted.name?.trim() || 'Objeto sin nombre',
         category: result.extracted.category,
         photoUrl,
+        ...wishlistFieldsFromExtracted(result.extracted),
       });
       router.replace('/(tabs)/wishlist');
     } catch (err) {

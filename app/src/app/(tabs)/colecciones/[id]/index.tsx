@@ -14,6 +14,7 @@ import {
   type Collection,
 } from '../../../../lib/collections';
 import { fetchItems, type Item } from '../../../../lib/items';
+import { fetchCollectionSeasonAssignments, type CollectionSeasonAssignment } from '../../../../lib/seasons';
 import { colors } from '../../../../theme/tokens';
 
 const GRID_GAP = 3;
@@ -80,6 +81,7 @@ export default function CollectionDetailScreen() {
 
   const [collection, setCollection] = useState<Omit<Collection, 'itemCount'> | null>(null);
   const [items, setItems] = useState<Item[] | null>(null);
+  const [seasonAssignments, setSeasonAssignments] = useState<CollectionSeasonAssignment[]>([]);
   const [shared, setShared] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -88,14 +90,16 @@ export default function CollectionDetailScreen() {
     if (!accessToken || !id) return;
     try {
       setError(null);
-      const [found, list, share] = await Promise.all([
+      const [found, list, share, assignments] = await Promise.all([
         fetchCollection(accessToken, id),
         fetchItems(accessToken, { collectionId: id }),
         fetchCollectionShare(accessToken, id).catch(() => ({ shared: false, url: null })),
+        fetchCollectionSeasonAssignments(accessToken, id).catch(() => []),
       ]);
       setCollection(found);
       setItems(list);
       setShared(share.shared);
+      setSeasonAssignments(assignments);
     } catch (err) {
       setError(authErrorMessage(err));
     }
@@ -162,6 +166,21 @@ export default function CollectionDetailScreen() {
   const tileSize = Math.floor((width - SIDE_PADDING * 2 - GRID_GAP * (COLUMNS - 1)) / COLUMNS);
   const showReturn = isWholeCollectionTemporary(items);
 
+  // Mover: solo mientras la temporada está activa y todavía hay objetos sin mover.
+  // Regresar: en cuanto queden objetos sin devolver, sin importar si ya empezó la
+  // siguiente ocurrencia (evita que se quede "atorado" esperando a que vuelva a tocar).
+  const seasonBanners = seasonAssignments
+    .map((assignment) => {
+      if (assignment.phase === 'ACTIVE' && assignment.pendingStartCount > 0) {
+        return { assignment, direction: 'start' as const };
+      }
+      if (assignment.pendingEndCount > 0) {
+        return { assignment, direction: 'end' as const };
+      }
+      return null;
+    })
+    .filter((v): v is { assignment: CollectionSeasonAssignment; direction: 'start' | 'end' } => v !== null);
+
   return (
     <View className="flex-1 bg-background">
     <ScrollView
@@ -191,12 +210,42 @@ export default function CollectionDetailScreen() {
         </View>
       )}
 
+      {seasonBanners.map(({ assignment, direction }) => (
+        <Pressable
+          key={`${assignment.id}-${direction}`}
+          onPress={() =>
+            router.push(
+              `/(tabs)/colecciones/${collection.id}/temporada-checklist?assignmentId=${assignment.id}&direction=${direction}`,
+            )
+          }
+          className="mb-4 flex-row items-center gap-3 rounded-lg border border-primary bg-surfaceElevated px-4 py-3 active:opacity-80"
+        >
+          <Ionicons name="calendar" size={20} color={colors.primary} />
+          <View className="flex-1">
+            <Text className="font-body-bold text-sm text-text">
+              {direction === 'start' ? `"${assignment.season.name}" empezó` : `"${assignment.season.name}" terminó`}
+            </Text>
+            <Text className="text-xs text-textMuted">
+              {direction === 'start'
+                ? `Mueve ${assignment.pendingStartCount === 1 ? '1 objeto' : `${assignment.pendingStartCount} objetos`} a "${assignment.destinationLocation.name}"`
+                : `Regresa ${assignment.pendingEndCount === 1 ? '1 objeto' : `${assignment.pendingEndCount} objetos`} a su ubicación principal`}
+            </Text>
+          </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.primary} />
+        </Pressable>
+      ))}
+
       <View className="gap-3">
         <Button
           label="Reubicar colección"
           variant="secondary"
           onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/ubicacion`)}
           disabled={items.length === 0}
+        />
+        <Button
+          label="Temporadas de esta colección"
+          variant="ghost"
+          onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/temporadas`)}
         />
         {showReturn ? (
           <Button

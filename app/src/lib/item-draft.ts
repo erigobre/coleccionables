@@ -21,6 +21,10 @@ export interface ItemDraft {
   // Si analyzeItemPhotos detectó una posible persona real: el objeto se debe
   // crear retenido (ver CreateItemDto.moderationFlagId).
   moderationFlagId?: string;
+  // Si el draft viene de "Traspasar a objetos" en la wishlist: una vez que el
+  // objeto se guarda con éxito, "Nuevo objeto" borra este item de wishlist. Se
+  // deja intacto si el usuario cancela el alta, para no perder el dato.
+  wishlistItemId?: string;
 }
 
 let current: ItemDraft | null = null;

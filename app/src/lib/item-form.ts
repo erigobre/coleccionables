@@ -9,6 +9,7 @@ import {
   type UsageState,
 } from './item-enums';
 import type { CreateItemDto, ExtractedItemData, Item, UpdateItemDto } from './items';
+import type { WishlistItem } from './wishlist';
 
 // Campos escalares compartidos por alta y edición manual (plan §6). Ubicación,
 // colecciones, tags y fotos se gestionan aparte porque el backend los expone
@@ -137,6 +138,37 @@ export function itemFormFromExtracted(extracted: ExtractedItemData): ItemFormVal
     comicInker: extracted.comicInker ?? '',
     comicColorist: extracted.comicColorist ?? '',
     comicPublisher: extracted.comicPublisher ?? '',
+  };
+}
+
+// Prellenado al traspasar un item de wishlist a "Objetos". foundAt/price de la
+// wishlist son conceptualmente parecidos a purchaseLocationText/purchasePrice
+// del objeto (dónde lo vio / precio visto) aunque no sean exactamente lo mismo
+// (dónde lo compró / precio de compra) — se usan como punto de partida editable.
+export function itemFormFromWishlistItem(item: WishlistItem): ItemFormValues {
+  return {
+    ...EMPTY_ITEM_FORM,
+    name: item.name,
+    category: item.category ?? 'OTRO',
+    conservationState: item.conservationState,
+    brand: item.brand ?? '',
+    toyLine: item.toyLine ?? '',
+    edition: item.edition ?? '',
+    scale: item.scale ?? '',
+    designer: item.designer ?? '',
+    releaseYear: item.releaseYear ? String(item.releaseYear) : '',
+    originalSetNumber: item.originalSetNumber ?? '',
+    uniqueIdentifier: item.uniqueIdentifier ?? '',
+    purchasePrice: item.price ?? '',
+    purchaseLocationText: item.foundAt ?? '',
+    notes: item.notes ?? '',
+    comicCoverNumber: item.comicCoverNumber ?? '',
+    comicIssueNumber: item.comicIssueNumber ?? '',
+    comicWriter: item.comicWriter ?? '',
+    comicPenciler: item.comicPenciler ?? '',
+    comicInker: item.comicInker ?? '',
+    comicColorist: item.comicColorist ?? '',
+    comicPublisher: item.comicPublisher ?? '',
   };
 }
 

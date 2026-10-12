@@ -13,6 +13,7 @@ import { fetchActiveCollections, type Collection } from '../lib/collections';
 import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../lib/locations';
 import { createItem } from '../lib/items';
 import { findOrCreateTag, searchTags, type Tag } from '../lib/tags';
+import { deleteWishlistItem } from '../lib/wishlist';
 import { colors } from '../theme/tokens';
 
 function LocationChipList({
@@ -177,6 +178,11 @@ export default function NewItemScreen() {
         moderationFlagId: draft?.moderationFlagId,
       });
       const item = await createItem(accessToken, dto);
+      if (draft?.wishlistItemId) {
+        // Solo se borra tras guardar con éxito, nunca antes: si el usuario
+        // abandona el formulario, el item de wishlist se queda intacto.
+        deleteWishlistItem(accessToken, draft.wishlistItemId).catch(() => {});
+      }
       // `new` vive fuera de los tabs (ver root _layout.tsx), así que un simple
       // replace hacia una ruta anidada en (tabs) rompe el historial interno de
       // Objetos y el "atrás" cae fuera de los tabs. dismissTo primero vuelve a

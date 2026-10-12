@@ -1,16 +1,4 @@
-import { IsDateString, IsOptional, IsString, MinLength } from 'class-validator';
+import { PartialType } from '@nestjs/mapped-types';
+import { CreateSeasonDto } from './create-season.dto.js';
 
-export class UpdateSeasonDto {
-  @IsOptional()
-  @IsString()
-  @MinLength(1)
-  name?: string;
-
-  @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
-}
+export class UpdateSeasonDto extends PartialType(CreateSeasonDto) {}

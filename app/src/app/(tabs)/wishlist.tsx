@@ -16,10 +16,19 @@ import { authErrorMessage, useAuth } from '../../context/auth-context';
 import { useFt } from '../../context/ft-context';
 import { ApiError, resolvePhotoUrl } from '../../lib/api';
 import { normalizeCameraOrientation } from '../../lib/image';
+import { setItemDraft } from '../../lib/item-draft';
 import { CATEGORY_OPTIONS, categoryLabel, type ItemCategory } from '../../lib/item-enums';
-import { identifyItemPhotos, uploadItemPhotos } from '../../lib/items';
+import { itemFormFromWishlistItem } from '../../lib/item-form';
+import { identifyItemPhotos, uploadItemPhotos, type ExtractedItemData } from '../../lib/items';
 import { useAiProcessing } from '../../lib/use-ai-processing';
-import { createWishlistItem, deleteWishlistItem, fetchWishlist, updateWishlistItem, type WishlistItem } from '../../lib/wishlist';
+import {
+  createWishlistItem,
+  deleteWishlistItem,
+  fetchWishlist,
+  updateWishlistItem,
+  wishlistFieldsFromExtracted,
+  type WishlistItem,
+} from '../../lib/wishlist';
 import { colors } from '../../theme/tokens';
 
 const AUTOFILL_STEPS = ['Analizando el objeto...', 'Extrayendo los datos...', 'Puliendo resultados...'];
@@ -72,6 +81,7 @@ interface EditModalProps {
 // Plan §5.4.3: de la wishlist solo se editan "dónde lo viste", precio y notas.
 function EditModal({ item, onClose, onSaved, onDeleted }: EditModalProps) {
   const { accessToken } = useAuth();
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const [foundAt, setFoundAt] = useState('');
   const [price, setPrice] = useState('');
@@ -111,6 +121,20 @@ function EditModal({ item, onClose, onSaved, onDeleted }: EditModalProps) {
     } finally {
       setBusy(null);
     }
+  };
+
+  const onTransferToItems = () => {
+    if (!item) return;
+    setItemDraft({
+      values: itemFormFromWishlistItem(item),
+      photoUrls: item.photoUrl ? [item.photoUrl] : [],
+      suggestedTags: item.suggestedTags ?? [],
+      notice: 'Prellenado desde tu wishlist. Revisa y completa lo que falte.',
+      source: 'manual',
+      wishlistItemId: item.id,
+    });
+    onClose();
+    router.push('/new');
   };
 
   const onDelete = () => {
@@ -157,8 +181,13 @@ function EditModal({ item, onClose, onSaved, onDeleted }: EditModalProps) {
           {error ? <Text className="mb-3 text-sm text-danger">{error}</Text> : null}
           <View className="gap-3">
             <Button label="Guardar" onPress={onSave} loading={busy === 'save'} disabled={busy === 'delete'} />
-            <Button label="Quitar de la wishlist" variant="destructive" onPress={onDelete} loading={busy === 'delete'} disabled={busy === 'save'} />
+            <Button label="Traspasar a objetos" variant="secondary" onPress={onTransferToItems} disabled={busy !== null} />
           </View>
+          <Pressable onPress={onDelete} disabled={busy !== null} className="mt-4 items-center">
+            <Text className="text-sm text-textMuted underline">
+              {busy === 'delete' ? 'Quitando…' : 'Quitar de la wishlist'}
+            </Text>
+          </Pressable>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -196,6 +225,9 @@ function AddModal({
   const [busy, setBusy] = useState<'save' | 'autofill' | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noFtVisible, setNoFtVisible] = useState(false);
+  // Info extendida detectada por la IA (no visible aquí, solo se guarda junto
+  // con el item para poder prellenar el alta si luego se traspasa a "Objetos").
+  const [extracted, setExtracted] = useState<ExtractedItemData | null>(null);
   const searching = useAiProcessing();
 
   // Si se quitó la única foto desde el preview, no queda nada que previsualizar.
@@ -212,6 +244,7 @@ function AddModal({
     setPrice('');
     setNotes('');
     setError(null);
+    setExtracted(null);
   };
 
   const closeModal = () => {
@@ -248,6 +281,7 @@ function AddModal({
       refreshFt();
       setName(result.extracted.name?.trim() ?? '');
       setCategory(result.extracted.category ?? null);
+      setExtracted(result.extracted);
       setStep('form');
     } catch (err) {
       if (err instanceof ApiError && err.status === 402) {
@@ -282,6 +316,7 @@ function AddModal({
         foundAt: foundAt.trim() || undefined,
         price: amount,
         notes: notes.trim() || undefined,
+        ...(extracted ? wishlistFieldsFromExtracted(extracted) : {}),
       });
       onCreated(created);
       reset();

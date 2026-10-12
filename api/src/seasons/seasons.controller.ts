@@ -26,11 +26,6 @@ export class SeasonsController {
     return this.seasonsService.findOne(user.id, id);
   }
 
-  @Get(':id/items')
-  findItemsInSeason(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.seasonsService.findItemsInSeason(user.id, id);
-  }
-
   @Patch(':id')
   update(
     @CurrentUser() user: AuthenticatedUser,

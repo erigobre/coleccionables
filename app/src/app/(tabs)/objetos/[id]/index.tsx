@@ -390,13 +390,24 @@ export default function ItemDetailScreen() {
           </Pressable>
         ) : null}
 
+        {item.currentLocation || item.permanentLocation ? (
+          <View className="mb-5 flex-row flex-wrap gap-2">
+            {item.currentLocation ? (
+              <View className="flex-row items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5">
+                <Ionicons name="location" size={12} color={colors.white} />
+                <Text className="text-xs font-medium text-white">Actual: {item.currentLocation.name}</Text>
+              </View>
+            ) : null}
+            {item.permanentLocation ? (
+              <View className="flex-row items-center gap-1.5 rounded-full bg-primary px-3 py-1.5">
+                <Ionicons name="home" size={12} color={colors.primaryText} />
+                <Text className="text-xs font-medium text-primaryText">Principal: {item.permanentLocation.name}</Text>
+              </View>
+            ) : null}
+          </View>
+        ) : null}
+
         <View className="my-5 rounded-lg border border-border bg-surface p-4">
-          {item.locationAssignment === 'TEMPORAL' ? (
-            <>
-              <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
-              <InfoRow label="Ubicación principal" value={item.permanentLocation?.name ?? 'Sin asignar'} />
-            </>
-          ) : null}
           <InfoRow label="Empaque" value={packagingLabel(item.packagingCondition)} />
           <InfoRow label="Estado" value={usageLabel(item.usageState)} />
           <InfoRow label="Conservación" value={item.conservationState ? conservationLabel(item.conservationState) : null} />
@@ -407,9 +418,6 @@ export default function ItemDetailScreen() {
           <InfoRow label="Año de lanzamiento" value={item.releaseYear ? String(item.releaseYear) : null} />
           <InfoRow label="Precio de compra" value={item.purchasePrice ? `${item.purchasePrice} ${item.currency}` : null} />
           <InfoRow label="Cantidad" value={String(item.quantity)} />
-          {item.locationAssignment !== 'TEMPORAL' ? (
-            <InfoRow label="Ubicación actual" value={item.currentLocation?.name ?? 'Sin ubicación'} />
-          ) : null}
           {item.currentSeason ? <InfoRow label="Temporada" value={item.currentSeason.name} /> : null}
           {item.notes ? <InfoRow label="Notas" value={item.notes} /> : null}
         </View>

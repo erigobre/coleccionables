@@ -597,27 +597,89 @@ model Location {
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 
-  members          LocationMember[]
-  itemsAsCurrent   Item[]           @relation("ItemCurrentLocation")
-  itemsAsPermanent Item[]           @relation("ItemPermanentLocation")
+  members                     LocationMember[]
+  itemsAsCurrent               Item[]                       @relation("ItemCurrentLocation")
+  itemsAsPermanent             Item[]                       @relation("ItemPermanentLocation")
+  seasonAssignmentDestinations CollectionSeasonAssignment[]
 
   @@map("locations")
 }
 
-model Season {
-  id             String    @id @default(cuid())
-  ownerId        String
-  owner          User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
-  name           String // Halloween, Navidad, Pascua, etc.
-  startDate      DateTime
-  endDate        DateTime
-  createdAt      DateTime  @default(now())
-  // Evita reenviar el push de "temporada por terminar" más de una vez.
-  reminderSentAt DateTime?
+// Única ocasión: startDate/endDate fijos, con año. Las recurrentes (semanal/
+// mensual/anual) NUNCA guardan año — se calculan en vivo (ver
+// api/src/seasons/season-occurrence.util.ts) para repetirse indefinidamente
+// hasta que se quite la asignación de la colección, sin tener que tocar la
+// temporada cada ciclo.
+enum SeasonRecurrence {
+  ONE_TIME
+  WEEKLY
+  MONTHLY
+  YEARLY
+}
 
-  items Item[]
+model Season {
+  id         String           @id @default(cuid())
+  ownerId    String
+  owner      User             @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  name       String // Halloween, Navidad, Pascua, etc.
+  recurrence SeasonRecurrence @default(ONE_TIME)
+
+  // ONE_TIME
+  startDate DateTime?
+  endDate   DateTime?
+
+  // WEEKLY (0 = domingo … 6 = sábado, igual que Date#getDay)
+  startWeekday Int?
+  endWeekday   Int?
+
+  // MONTHLY (1-31; se recorta al último día del mes si el mes es más corto)
+  startDayOfMonth Int?
+  endDayOfMonth   Int?
+
+  // YEARLY (mes 1-12, día 1-31; 29 feb se recorta a 28 feb en años no bisiestos)
+  startMonth Int?
+  startDay   Int?
+  endMonth   Int?
+  endDay     Int?
+
+  // null = sin recordatorio. 1-10 = días antes de cada ocurrencia (inicio Y fin)
+  // en que se avisa a los miembros de las colecciones asignadas.
+  reminderDaysBefore Int?
+
+  createdAt DateTime @default(now())
+
+  items       Item[]
+  assignments CollectionSeasonAssignment[]
 
   @@map("seasons")
+}
+
+// Asigna una temporada/evento a una colección de forma no destructiva: solo
+// guarda la intención (a qué ubicación debe moverse y de regreso) y el
+// progreso de la ocurrencia actual. El movimiento real de objetos lo dispara
+// el checklist (ver CollectionLocationService), nunca esta tabla por sí sola.
+model CollectionSeasonAssignment {
+  id        String @id @default(cuid())
+  seasonId  String
+  season    Season @relation(fields: [seasonId], references: [id], onDelete: Cascade)
+
+  collectionId String
+  collection   Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  destinationLocationId String
+  destinationLocation   Location @relation(fields: [destinationLocationId], references: [id], onDelete: Cascade)
+
+  // Inicio (fecha, sin hora) de la ocurrencia ya movida/regresada — evita
+  // repetir el movimiento o el push de recordatorio más de una vez por ciclo.
+  lastMovedOccurrenceStart    DateTime?
+  lastReturnedOccurrenceStart DateTime?
+  startReminderSentFor        DateTime?
+  endReminderSentFor          DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([collectionId, seasonId])
+  @@map("collection_season_assignments")
 }
 
 // Token de push de Expo por dispositivo. Un mismo dispositivo puede terminar
@@ -662,6 +724,7 @@ model Collection {
   shareLink             CollectionShareLink?
   groupRemovalTransfers Transfer[]
   invites               CollectionInvite[]
+  seasonAssignments     CollectionSeasonAssignment[]
 
   @@map("collections")
 }
@@ -1005,6 +1068,29 @@ model WishlistItem {
   currency  String        @default("MXN")
   notes     String?       @db.Text
   createdAt DateTime      @default(now())
+
+  // Info extendida detectada por la IA al buscar el artículo (plan: "traspasar a
+  // objetos"). No se muestra en la UI de wishlist; solo se guarda para prellenar
+  // el formulario de alta si el usuario decide traspasarlo. Espejo de los campos
+  // equivalentes en Item.
+  conservationState ConservationState?
+  brand             String?
+  toyLine           String?
+  edition           String?
+  scale             String?
+  designer          String?
+  releaseYear       Int?
+  originalSetNumber String?
+  uniqueIdentifier  String?
+  comicCoverNumber  String?
+  comicIssueNumber  String?
+  comicWriter       String?
+  comicPenciler     String?
+  comicInker        String?
+  comicColorist     String?
+  comicPublisher    String?
+  suggestedTags     Json?
+  avatarUrl         String?
 
   @@map("wishlist_items")
 }
