@@ -2,13 +2,14 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AppState, StyleSheet, View } from 'react-native';
 import { useAuth } from '../context/auth-context';
-import { hasPin, isBiometricEnabled, verifyPin } from '../lib/app-lock';
+import { getPinMode, hasPin, isBiometricEnabled, verifyPin, type PinMode } from '../lib/app-lock';
 import { freshInstallReady } from '../lib/fresh-install';
-import { PinPad } from './PinPad';
+import { PasscodeEntry } from './PasscodeEntry';
 
 export function AppLockGate({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
   const [locked, setLocked] = useState(false);
+  const [pinMode, setPinMode] = useState<PinMode>('6');
   const [error, setError] = useState<string | null>(null);
   const appState = useRef(AppState.currentState);
   const biometricTried = useRef(false);
@@ -34,9 +35,12 @@ export function AppLockGate({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (isLoading || !user) return;
     freshInstallReady()
-      .then(() => hasPin())
-      .then((has) => {
-        if (has) setLocked(true);
+      .then(() => Promise.all([hasPin(), getPinMode()]))
+      .then(([has, mode]) => {
+        if (has) {
+          setPinMode(mode);
+          setLocked(true);
+        }
       });
   }, [isLoading, user]);
 
@@ -51,6 +55,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       if (next === 'active' && prev === 'background' && !authenticating.current && userRef.current) {
         const has = await hasPin();
         if (has) {
+          setPinMode(await getPinMode());
           biometricTried.current = false;
           setLocked(true);
         }
@@ -92,7 +97,7 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       setError(null);
       setLocked(false);
     } else {
-      setError('PIN incorrecto');
+      setError('Código incorrecto');
     }
   };
 
@@ -101,12 +106,13 @@ export function AppLockGate({ children }: { children: ReactNode }) {
       {children}
       {locked ? (
         <View style={StyleSheet.absoluteFill}>
-          <PinPad
+          <PasscodeEntry
             title="App bloqueada"
-            subtitle="Ingresa tu PIN para continuar"
+            subtitle="Ingresa tu código para continuar"
+            mode={pinMode}
             error={error}
             onSubmit={onSubmitPin}
-            extraKey={{ icon: 'finger-print-outline', onPress: tryBiometric }}
+            onBiometricPress={tryBiometric}
           />
         </View>
       ) : null}
