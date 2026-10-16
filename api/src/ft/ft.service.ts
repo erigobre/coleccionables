@@ -222,6 +222,9 @@ export class FtService {
         status: 'CONFIRMED',
         confirmedAt: new Date(),
         realCostUsd: params.realCostUsd,
+        promptTokens: params.promptTokens,
+        candidatesTokens: params.candidatesTokens,
+        totalTokens: params.totalTokens,
       },
     });
 
@@ -264,7 +267,17 @@ export class FtService {
   // llamar charge/confirm/release a mano.
   async runChargedAction<T>(
     params: ChargeParams,
-    action: () => Promise<{ data: T; realCostUsd?: number; usageEventType?: ConfirmParams['usageEventType']; usageEventMetadata?: ConfirmParams['usageEventMetadata'] }>,
+    action: () => Promise<
+      {
+        data: T;
+        realCostUsd?: number;
+        promptTokens?: number;
+        candidatesTokens?: number;
+        totalTokens?: number;
+        usageEventType?: ConfirmParams['usageEventType'];
+        usageEventMetadata?: ConfirmParams['usageEventMetadata'];
+      }
+    >,
   ): Promise<T> {
     const { transaction, alreadyProcessed } = await this.charge(params);
     if (alreadyProcessed) {
@@ -278,8 +291,16 @@ export class FtService {
     }
 
     try {
-      const { data, realCostUsd, usageEventType, usageEventMetadata } = await action();
-      await this.confirm(transaction.id, { realCostUsd, usageEventType, usageEventMetadata });
+      const { data, realCostUsd, promptTokens, candidatesTokens, totalTokens, usageEventType, usageEventMetadata } =
+        await action();
+      await this.confirm(transaction.id, {
+        realCostUsd,
+        promptTokens,
+        candidatesTokens,
+        totalTokens,
+        usageEventType,
+        usageEventMetadata,
+      });
       return data;
     } catch (error) {
       await this.release(transaction.id).catch((releaseError) => {

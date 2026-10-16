@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  BarChart3,
   Building2,
   Coins,
   CreditCard,
@@ -21,6 +22,7 @@ export const NAV_ITEMS: { href: string; label: string; icon: LucideIcon }[] = [
   { href: '/usuarios', label: 'Usuarios', icon: Users },
   { href: '/organizaciones', label: 'Organizaciones', icon: Building2 },
   { href: '/frikitokens', label: 'FrikiTokens', icon: Coins },
+  { href: '/costos-ia', label: 'Costos de IA', icon: BarChart3 },
   { href: '/pagos', label: 'Pagos', icon: CreditCard },
   { href: '/moderacion', label: 'Moderación', icon: ShieldAlert },
   { href: '/actividad', label: 'Actividad', icon: Activity },

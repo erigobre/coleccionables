@@ -1,4 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
+import type { FtServiceKey } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -78,6 +79,23 @@ export class AdminController {
   @Get('stats/timeseries')
   getStatsTimeseries(@Query('months') months?: string) {
     return this.adminService.getStatsTimeseries(months ? Number(months) : undefined);
+  }
+
+  // Reporte de costo real de IA por usuario/servicio (pedido 2026-10-16).
+  // `from`/`to` en formato YYYY-MM-DD (opcionales, filtran por createdAt).
+  @Get('ft-cost-report')
+  getFtCostReport(
+    @Query('from') from?: string,
+    @Query('to') to?: string,
+    @Query('userId') userId?: string,
+    @Query('service') service?: FtServiceKey,
+  ) {
+    return this.adminService.getFtCostReport({
+      from: from ? new Date(from) : undefined,
+      to: to ? new Date(to) : undefined,
+      userId,
+      service,
+    });
   }
 
   @Get('audit-logs')

@@ -6,7 +6,7 @@ import { LocationsService } from '../locations/locations.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { GeminiService } from '../ai/gemini.service.js';
 import { FtService } from '../ft/ft.service.js';
-import type { ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
+import type { GeminiUsage, ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
 import type { CreateItemDto } from './dto/create-item.dto.js';
 import type { UpdateItemDto } from './dto/update-item.dto.js';
 import type { SetSaleDto } from './dto/set-sale.dto.js';
@@ -541,7 +541,7 @@ export class ItemsService {
           tags: extracted.suggestedTags,
         });
 
-        const { matches, hasMatch, visualCostUsd } = await this.applyVisualRerank(
+        const { matches, hasMatch, visualCostUsd, visualUsage } = await this.applyVisualRerank(
           files[0],
           boundingBox,
           matchResult.matches,
@@ -551,6 +551,9 @@ export class ItemsService {
         return {
           data: { extracted, ...matchResult, matches, hasMatch },
           realCostUsd: GeminiService.estimateCostUsd(usage) + visualCostUsd,
+          promptTokens: usage.promptTokens + visualUsage.promptTokens,
+          candidatesTokens: usage.candidatesTokens + visualUsage.candidatesTokens,
+          totalTokens: usage.totalTokens + visualUsage.totalTokens,
           usageEventType: 'AI_SCAN' as const,
         };
       },
@@ -568,10 +571,16 @@ export class ItemsService {
     boundingBox: import('../ai/ai.types.js').BoundingBox | undefined,
     matches: M[],
     fallbackHasMatch: boolean,
-  ): Promise<{ matches: (M & { visualScore?: number })[]; hasMatch: boolean; visualCostUsd: number }> {
+  ): Promise<{
+    matches: (M & { visualScore?: number })[];
+    hasMatch: boolean;
+    visualCostUsd: number;
+    visualUsage: GeminiUsage;
+  }> {
+    const zeroUsage: GeminiUsage = { promptTokens: 0, candidatesTokens: 0, totalTokens: 0 };
     const topCandidates = matches.slice(0, 3);
     if (topCandidates.length === 0) {
-      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0 };
+      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0, visualUsage: zeroUsage };
     }
 
     const labels = ['A', 'B', 'C'];
@@ -585,7 +594,7 @@ export class ItemsService {
     const candidates = resolved.filter((c): c is { label: string; image: ImageInput; match: M } => c !== null);
 
     if (candidates.length === 0) {
-      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0 };
+      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0, visualUsage: zeroUsage };
     }
 
     const queryImage = await this.storageService.cropToAvatar(queryFile, boundingBox);
@@ -614,7 +623,7 @@ export class ItemsService {
         ]
       : scoredMatches;
 
-    return { matches: reordered, hasMatch: !!confirmed, visualCostUsd: GeminiService.estimateCostUsd(usage) };
+    return { matches: reordered, hasMatch: !!confirmed, visualCostUsd: GeminiService.estimateCostUsd(usage), visualUsage: usage };
   }
 
   // Antes de cobrar nada: le dice a la app si ya hay un precio de mercado
@@ -750,6 +759,9 @@ export class ItemsService {
             fromCache: false,
           },
           realCostUsd: GeminiService.estimateCostUsd(usage),
+          promptTokens: usage.promptTokens,
+          candidatesTokens: usage.candidatesTokens,
+          totalTokens: usage.totalTokens,
           usageEventType: 'MARKET_PRICE_LOOKUP' as const,
           usageEventMetadata: { itemId: id, fromCache: false },
         };
@@ -786,6 +798,9 @@ export class ItemsService {
         return {
           data: { extracted, photoUrls, avatarUrl, moderationFlagId },
           realCostUsd: GeminiService.estimateCostUsd(usage),
+          promptTokens: usage.promptTokens,
+          candidatesTokens: usage.candidatesTokens,
+          totalTokens: usage.totalTokens,
           usageEventType: 'AI_SCAN' as const,
         };
       },
@@ -894,6 +909,9 @@ export class ItemsService {
         return {
           data: result,
           realCostUsd: GeminiService.estimateCostUsd(usage),
+          promptTokens: usage.promptTokens,
+          candidatesTokens: usage.candidatesTokens,
+          totalTokens: usage.totalTokens,
           usageEventType: 'AI_SCAN' as const,
         };
       },

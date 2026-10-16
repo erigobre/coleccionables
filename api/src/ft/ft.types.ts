@@ -12,6 +12,12 @@ export interface ChargeParams {
 
 export interface ConfirmParams {
   realCostUsd?: number;
+  // Desglose crudo de tokens de la llamada a Gemini que generó el cargo
+  // (reporte de costos por servicio, Oct 2026) — ausente cuando el servicio
+  // no llama a Gemini (ej. MARKET_PRICE_CACHED).
+  promptTokens?: number;
+  candidatesTokens?: number;
+  totalTokens?: number;
   // Si se manda, además de confirmar el cobro se registra un UsageEvent —
   // así el panel Superadmin (admin.service.ts getStats()) sigue funcionando
   // sin tener que leer la tabla de FrikiTokens.

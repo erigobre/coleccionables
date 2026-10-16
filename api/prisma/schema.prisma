@@ -397,20 +397,26 @@ enum FtTransactionStatus {
 // `realCostUsd` (calculado del usageMetadata real de Gemini) sirve para medir
 // el margen real entre lo cobrado en FT y lo que cuesta la IA de verdad.
 model FtTransaction {
-  id             String              @id @default(cuid())
-  organizationId String
-  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  userId         String? // null en regalos automáticos (regalo mensual, sin usuario que lo dispare)
-  user           User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
-  type           FtTransactionType
-  service        FtServiceKey?
-  status         FtTransactionStatus @default(HELD)
-  ftAmount       Int // siempre positivo; el signo lo da `type`
-  idempotencyKey String              @unique
-  realCostUsd    Decimal?            @db.Decimal(10, 6)
-  metadata       Json?
-  createdAt      DateTime            @default(now())
-  confirmedAt    DateTime?
+  id               String              @id @default(cuid())
+  organizationId   String
+  organization     Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId           String? // null en regalos automáticos (regalo mensual, sin usuario que lo dispare)
+  user             User?               @relation(fields: [userId], references: [id], onDelete: SetNull)
+  type             FtTransactionType
+  service          FtServiceKey?
+  status           FtTransactionStatus @default(HELD)
+  ftAmount         Int // siempre positivo; el signo lo da `type`
+  idempotencyKey   String              @unique
+  realCostUsd      Decimal?            @db.Decimal(10, 6)
+  // Desglose de tokens de la llamada a Gemini que generó este cargo (reporte
+  // de costos reales por servicio, Oct 2026) — null cuando el servicio no
+  // llama a Gemini (ej. MARKET_PRICE_CACHED) o en regalos/reembolsos.
+  promptTokens     Int?
+  candidatesTokens Int?
+  totalTokens      Int?
+  metadata         Json?
+  createdAt        DateTime            @default(now())
+  confirmedAt      DateTime?
 
   @@index([organizationId, createdAt])
   @@map("ft_transactions")

@@ -246,6 +246,79 @@ export class AdminService {
     }));
   }
 
+  // Reporte de costo real por usuario/servicio (pedido 2026-10-16): cruza lo
+  // cobrado en FrikiTokens contra el costo real de Gemini (tokens y USD) para
+  // poder ajustar las tarifas de ft_service_configs con datos reales en vez
+  // de estimaciones. Solo cuenta cargos ya CONFIRMED (un HELD/RELEASED nunca
+  // llegó a costar nada real). `MARKET_PRICE_CACHED` no llama a Gemini, así
+  // que sus filas siempre salen con tokens/USD en 0 — es el comportamiento
+  // esperado, no un hueco de datos.
+  async getFtCostReport(params: { from?: Date; to?: Date; userId?: string; service?: FtServiceKey }) {
+    const { from, to, userId, service } = params;
+    const where: Prisma.FtTransactionWhereInput = {
+      type: 'CHARGE',
+      status: 'CONFIRMED',
+      ...(from || to ? { createdAt: { gte: from, lt: to } } : {}),
+      ...(userId ? { userId } : {}),
+      ...(service ? { service } : {}),
+    };
+
+    const [groups, catalog] = await Promise.all([
+      this.prisma.ftTransaction.groupBy({
+        by: ['userId', 'service'],
+        where,
+        _count: { _all: true },
+        _sum: { ftAmount: true, realCostUsd: true, promptTokens: true, candidatesTokens: true, totalTokens: true },
+      }),
+      this.ftService.getCatalog(),
+    ]);
+
+    const userIds = [...new Set(groups.map((g) => g.userId).filter((id): id is string => id !== null))];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: userIds } },
+      select: { id: true, name: true, username: true, email: true },
+    });
+    const userById = new Map(users.map((u) => [u.id, u]));
+    const labelByService = new Map(catalog.map((c) => [c.key, c.label]));
+
+    const rows = groups.map((g) => {
+      const calls = g._count._all;
+      const ftAmount = g._sum.ftAmount ?? 0;
+      const realCostUsd = Number(g._sum.realCostUsd ?? 0);
+      const totalTokens = g._sum.totalTokens ?? 0;
+      return {
+        userId: g.userId,
+        user: g.userId ? userById.get(g.userId) ?? null : null,
+        service: g.service,
+        serviceLabel: g.service ? labelByService.get(g.service) ?? g.service : '—',
+        calls,
+        ftAmount,
+        promptTokens: g._sum.promptTokens ?? 0,
+        candidatesTokens: g._sum.candidatesTokens ?? 0,
+        totalTokens,
+        realCostUsd,
+        avgRealCostUsdPerCall: calls > 0 ? realCostUsd / calls : 0,
+        // FT cobrados por cada $1 de costo real: entre más alto, más margen
+        // tiene esa tarifa sobre lo que de verdad cuesta en Gemini.
+        ftPerUsd: realCostUsd > 0 ? ftAmount / realCostUsd : null,
+      };
+    });
+
+    rows.sort((a, b) => b.realCostUsd - a.realCostUsd);
+
+    const totals = rows.reduce(
+      (acc, r) => ({
+        calls: acc.calls + r.calls,
+        ftAmount: acc.ftAmount + r.ftAmount,
+        totalTokens: acc.totalTokens + r.totalTokens,
+        realCostUsd: acc.realCostUsd + r.realCostUsd,
+      }),
+      { calls: 0, ftAmount: 0, totalTokens: 0, realCostUsd: 0 },
+    );
+
+    return { rows, totals };
+  }
+
   // Bitácora del panel: más reciente primero.
   findAuditLogs() {
     return this.prisma.adminAuditLog.findMany({
