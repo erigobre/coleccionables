@@ -124,13 +124,30 @@ export class ItemsService {
   // Vista principal de Objetos: los vendidos desaparecen (plan §5.3.9.4) y los
   // retenidos en moderación tampoco se listan (solo viven en Moderación hasta
   // que un superadmin los revise, ver ItemsService.create).
-  findAll(ownerId: string, filters: { collectionId?: string; favoritesOnly?: boolean } = {}) {
+  //
+  // Con collectionId: la colección puede ser compartida (grupo familiar), así
+  // que se valida membresía (findOne ya acepta OWNER real o CollectionMember)
+  // y se listan los objetos de TODOS los miembros vinculados a ella, no solo
+  // los del que llama — igual que ya hace CollectionLocationService.moveAll.
+  async findAll(ownerId: string, filters: { collectionId?: string; favoritesOnly?: boolean } = {}) {
+    if (filters.collectionId) {
+      await this.collectionsService.findOne(ownerId, filters.collectionId);
+      return this.prisma.item.findMany({
+        where: {
+          status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
+          isFavorite: filters.favoritesOnly ? true : undefined,
+          collections: { some: { collectionId: filters.collectionId } },
+        },
+        include: ITEM_INCLUDE,
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
     return this.prisma.item.findMany({
       where: {
         ownerId,
         status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
         isFavorite: filters.favoritesOnly ? true : undefined,
-        collections: filters.collectionId ? { some: { collectionId: filters.collectionId } } : undefined,
       },
       include: ITEM_INCLUDE,
       orderBy: { createdAt: 'desc' },
