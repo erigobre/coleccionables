@@ -13,6 +13,7 @@ import { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.
 import { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
 import { GrantFtDto } from './dto/grant-ft.dto.js';
 import { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
+import { UpdateFtServiceConfigDto } from './dto/update-ft-service-config.dto.js';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, RolesGuard)
@@ -178,5 +179,21 @@ export class AdminController {
     @Body() dto: UpdateFtConfigDto,
   ) {
     return this.adminService.updateFtConfig(admin, key, dto);
+  }
+
+  // Costo en FT de cada servicio de IA (análisis, "¿ya lo tengo?", precio de
+  // mercado, etc.) — pedido 2026-10-15 para poder ajustarlos sin deploy.
+  @Get('ft-service-config')
+  findFtServiceConfig() {
+    return this.adminService.findFtServiceConfig();
+  }
+
+  @Patch('ft-service-config/:key')
+  updateFtServiceConfig(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('key') key: string,
+    @Body() dto: UpdateFtServiceConfigDto,
+  ) {
+    return this.adminService.updateFtServiceConfig(admin, key, dto);
   }
 }

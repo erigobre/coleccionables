@@ -13,6 +13,8 @@ import type { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-pac
 import type { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
 import type { GrantFtDto } from './dto/grant-ft.dto.js';
 import type { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
+import type { UpdateFtServiceConfigDto } from './dto/update-ft-service-config.dto.js';
+import type { FtServiceKey } from '@prisma/client';
 
 const ACTIVE_WINDOW_DAYS = 30;
 const TIMESERIES_MAX_MONTHS = 12;
@@ -508,6 +510,30 @@ export class AdminService {
       label: entry.label,
       value: byKey.get(entry.key) ?? entry.fallback,
     }));
+  }
+
+  // Costo en FT de cada servicio de IA (`FtServiceConfig`, usado por
+  // `FtService.charge`) — antes solo editable a mano con una migración SQL.
+  // Expuesto aquí para poder ajustarlo sin deploy, mismo patrón que
+  // `findFtConfig`/`updateFtConfig` de arriba, pero sobre esa otra tabla.
+  async findFtServiceConfig() {
+    return this.prisma.ftServiceConfig.findMany({ orderBy: { key: 'asc' } });
+  }
+
+  async updateFtServiceConfig(admin: { id: string; email: string }, key: string, dto: UpdateFtServiceConfigDto) {
+    const existing = await this.prisma.ftServiceConfig.findUnique({ where: { key: key as FtServiceKey } });
+    if (!existing) {
+      throw new NotFoundException('Ese servicio no existe');
+    }
+    const updated = await this.prisma.ftServiceConfig.update({
+      where: { key: key as FtServiceKey },
+      data: { ftCost: dto.ftCost, ...(dto.active === undefined ? {} : { active: dto.active }) },
+    });
+    await this.logAction(admin, 'ftServiceConfig.update', 'FtServiceConfig', key, {
+      ftCost: dto.ftCost,
+      active: dto.active,
+    });
+    return updated;
   }
 
   async updateFtConfig(admin: { id: string; email: string }, key: string, dto: UpdateFtConfigDto) {
