@@ -204,7 +204,11 @@ export default function CollectionDetailScreen() {
               key={item.id}
               item={item}
               size={tileSize}
-              onOpen={() => router.push(`/(tabs)/objetos/${item.id}`)}
+              // Hermano de (tabs) en el stack raíz (no /(tabs)/objetos/...): empuja
+              // al detalle cruzando de pestaña deja "atrás" trabado en Objetos y
+              // termina cayendo a Home (bug reportado 2026-10-16) — mismo arreglo
+              // que ya usa (tabs)/index.tsx para sus favoritos.
+              onOpen={() => router.push(`/objeto/${item.id}`)}
             />
           ))}
         </View>

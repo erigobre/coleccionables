@@ -82,7 +82,10 @@ export default function EscanearUbicacionScreen() {
           return (
             <Pressable
               key={item.id}
-              onPress={() => router.push(`/(tabs)/objetos/${item.id}`)}
+              // Hermano de (tabs) en el stack raíz: evita cruzar de pestaña y que
+              // "atrás" quede trabado en Objetos (mismo bug y arreglo que en
+              // colecciones/[id]/index.tsx).
+              onPress={() => router.push(`/objeto/${item.id}`)}
               className="mb-3 flex-row items-center overflow-hidden rounded-xl bg-surface"
             >
               {photo ? (
