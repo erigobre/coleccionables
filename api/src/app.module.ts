@@ -13,6 +13,7 @@ import { TagsModule } from './tags/tags.module.js';
 import { StorageModule } from './storage/storage.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { ItemsModule } from './items/items.module.js';
+import { ItemActionRequestsModule } from './items/item-action-requests.module.js';
 import { TransfersModule } from './transfers/transfers.module.js';
 import { WishlistModule } from './wishlist/wishlist.module.js';
 import { ShareModule } from './share/share.module.js';
@@ -53,6 +54,7 @@ import { AccountRecoveryModule } from './account-recovery/account-recovery.modul
     StorageModule,
     AiModule,
     ItemsModule,
+    ItemActionRequestsModule,
     TransfersModule,
     WishlistModule,
     ShareModule,

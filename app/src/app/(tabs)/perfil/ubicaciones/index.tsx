@@ -37,7 +37,14 @@ function LocationRow({
           size={18}
           color={colors.textMuted}
         />
-        <Text className="flex-1 text-base text-text">{node.name}</Text>
+        <View className="flex-1">
+          <Text className="text-base text-text">{node.name}</Text>
+          {node.isShared ? (
+            <Text className="text-xs text-textMuted">
+              Compartido por {node.sharedByName} · {node.myRole === 'EDITOR' ? 'Puede agregar objetos' : 'Solo ver'}
+            </Text>
+          ) : null}
+        </View>
         {node.isPermanentDefault ? (
           <Text className="text-xs text-textMuted">Permanente</Text>
         ) : null}

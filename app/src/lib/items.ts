@@ -93,7 +93,15 @@ export interface Item {
   currentSeason: ItemSeasonRef | null;
   // Solo viene cuando status = PENDING_MODERATION (ver ItemsService.submitModerationAppeal).
   moderationFlag: { id: string; userAppeal: string | null; userAppealAt: string | null } | null;
+  // Resumen del dueño real — permite mostrar "Propietario: @fulano" cuando
+  // quien ve/edita el objeto es un miembro compartido distinto del dueño.
+  owner: { id: string; name: string; username: string | null };
+  // Solo viene de fetchItem (findOne): acciones (TRANSFER/SELL/DELETE) que ya
+  // tengo pedidas y pendientes de autorización sobre este objeto.
+  myPendingActionRequests?: ItemActionType[];
 }
+
+export type ItemActionType = 'TRANSFER' | 'SELL' | 'DELETE';
 
 // Un objeto está "fuera de su lugar" si su ubicación actual no es la permanente o
 // está ligado a una temporada. Mismo criterio que el backend (regreso en bloque de una colección).

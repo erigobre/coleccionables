@@ -104,6 +104,9 @@ model User {
   receivedOrganizationInvites OrganizationInvite[] @relation("OrganizationInviteTarget")
   sentCollectionInvites       CollectionInvite[]   @relation("CollectionInviteSentBy")
   receivedCollectionInvites   CollectionInvite[]   @relation("CollectionInviteTarget")
+  requestedItemActions        ItemActionRequest[]  @relation("ItemActionRequestedBy")
+  ownedItemActionRequests     ItemActionRequest[]  @relation("ItemActionRequestOwner")
+  favoriteItems               ItemFavorite[]
 
   // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
   // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
@@ -841,7 +844,6 @@ model Item {
   acquisitionDate      DateTime?
   quantity             Int                @default(1)
   isGift               Boolean            @default(false)
-  isFavorite           Boolean            @default(false)
   notes                String?            @db.Text
 
   // Solo aplica si category = COMIC (o LIBRO)
@@ -893,9 +895,25 @@ model Item {
   shareLink         ShareLink?
   marketPriceChecks MarketPriceCheck[]
   moderationFlag    ModerationFlag?
+  favoritedBy       ItemFavorite[]
+  actionRequests    ItemActionRequest[]
 
   @@index([ownerId, status])
   @@map("items")
+}
+
+// Favoritos por persona (antes era una columna booleana de Item, compartida
+// por error entre todos los miembros de una colección compartida — cada quien
+// favoritea para sí mismo, invisible para los demás).
+model ItemFavorite {
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId    String
+  item      Item     @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([userId, itemId])
+  @@map("item_favorites")
 }
 
 // Historial de cada consulta de "precio de mercado" (plan FrikiTokens §5.3.9.10):
@@ -1050,6 +1068,57 @@ model OrganizationInvite {
   @@index([targetUserId, status])
   @@index([organizationId, status])
   @@map("organization_invites")
+}
+
+// ---------------------------------------------------------------------------
+// Autorización del dueño para transferir/vender/eliminar un objeto compartido
+// (plan "Acceso compartido a objetos", Oct 2026). Mismo espíritu que
+// CollectionInvite/OrganizationInvite (invitación simple, un solo decisor) —
+// no el de Transfer, que ya mueve ownership por sí mismo. Un EDITOR (no el
+// dueño real) la crea; solo el dueño real (ownerId) puede aceptar/rechazar.
+// Expira a las 48h (no las 7 días que usan Transfer/CollectionInvite — ver
+// ItemActionRequestsCronService), decisión confirmada con el owner.
+// ---------------------------------------------------------------------------
+
+enum ItemActionRequestType {
+  TRANSFER
+  SELL
+  DELETE
+}
+
+enum ItemActionRequestStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+model ItemActionRequest {
+  id     String @id @default(cuid())
+  itemId String
+  item   Item   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  requestedByUserId String
+  requestedByUser   User   @relation("ItemActionRequestedBy", fields: [requestedByUserId], references: [id], onDelete: Cascade)
+  ownerId           String
+  owner             User   @relation("ItemActionRequestOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  action ItemActionRequestType
+
+  // Solo TRANSFER: correo del destinatario final (mismo campo libre que
+  // Transfer.toEmail). Solo SELL: precio pedido (Item.setSale lo exige junto
+  // con el estado FOR_SALE).
+  toEmail String?
+  price   Decimal? @db.Decimal(10, 2)
+
+  status      ItemActionRequestStatus @default(PENDING)
+  createdAt   DateTime                @default(now())
+  respondedAt DateTime?
+  expiresAt   DateTime // createdAt + 48 horas
+
+  @@index([ownerId, status])
+  @@index([itemId, action, status])
+  @@map("item_action_requests")
 }
 
 // ---------------------------------------------------------------------------

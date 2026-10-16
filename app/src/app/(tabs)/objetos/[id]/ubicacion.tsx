@@ -22,10 +22,12 @@ type Step = 'destination' | 'assignment' | 'season';
 function SquareTile({
   name,
   icon,
+  subtitle,
   onPress,
 }: {
   name: string;
   icon?: ComponentProps<typeof Ionicons>['name'];
+  subtitle?: string;
   onPress: () => void;
 }) {
   const initial = name.trim().charAt(0).toUpperCase() || '?';
@@ -45,6 +47,11 @@ function SquareTile({
       <Text className="text-center text-sm text-text" numberOfLines={2}>
         {name}
       </Text>
+      {subtitle ? (
+        <Text className="text-center text-[10px] text-textMuted" numberOfLines={1}>
+          {subtitle}
+        </Text>
+      ) : null}
     </Pressable>
   );
 }
@@ -134,17 +141,21 @@ export default function ChangeLocationScreen() {
           <View>
             <Text className="mb-4 text-sm text-textMuted">¿A dónde quieres mover este objeto?</Text>
             <View className="flex-row flex-wrap justify-between gap-3">
-              {flattenLocationTree(locations).map(({ node }) => (
-                <SquareTile
-                  key={node.id}
-                  name={node.name}
-                  icon={(node.icon as LocationIconKey | null) ?? DEFAULT_LOCATION_ICON}
-                  onPress={() => {
-                    setLocationId(node.id);
-                    setStep('assignment');
-                  }}
-                />
-              ))}
+              {flattenLocationTree(locations)
+                // Una ubicación compartida en modo "Solo ver" no admite mover objetos ahí.
+                .filter(({ node }) => !node.isShared || node.myRole === 'EDITOR')
+                .map(({ node }) => (
+                  <SquareTile
+                    key={node.id}
+                    name={node.name}
+                    icon={(node.icon as LocationIconKey | null) ?? DEFAULT_LOCATION_ICON}
+                    subtitle={node.isShared ? `Compartido por ${node.sharedByName}` : undefined}
+                    onPress={() => {
+                      setLocationId(node.id);
+                      setStep('assignment');
+                    }}
+                  />
+                ))}
             </View>
           </View>
         ) : null}

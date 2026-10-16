@@ -29,11 +29,51 @@ export interface LocationNode {
   parentId: string | null;
   isPermanentDefault: boolean;
   qrToken: string;
+  // Presente solo en ubicaciones ajenas vistas por LocationMember (heredado de
+  // una colección compartida, o compartido a mano desde "Compartir con...").
+  isShared?: boolean;
+  sharedByUserId?: string;
+  sharedByName?: string;
+  myRole?: 'VIEWER' | 'EDITOR';
   children: LocationNode[];
 }
 
 export function fetchLocationTree(accessToken: string) {
   return apiFetch<LocationNode[]>('/locations', { accessToken });
+}
+
+export interface LocationShare {
+  userId: string;
+  role: 'VIEWER' | 'EDITOR';
+  user: { id: string; name: string; username: string | null };
+}
+
+export interface ShareCandidate {
+  id: string;
+  name: string;
+  username: string | null;
+}
+
+// Compartir manual de una ubicación propia (caso "vivimos juntos"): solo
+// hacia alguien con quien ya se comparte al menos una colección.
+export function fetchShareCandidates(accessToken: string) {
+  return apiFetch<ShareCandidate[]>('/locations/share-candidates', { accessToken });
+}
+
+export function fetchLocationShares(accessToken: string, locationId: string) {
+  return apiFetch<LocationShare[]>(`/locations/${locationId}/share`, { accessToken });
+}
+
+export function shareLocation(
+  accessToken: string,
+  locationId: string,
+  dto: { userId: string; role: 'VIEWER' | 'EDITOR' },
+) {
+  return apiFetch<LocationShare>(`/locations/${locationId}/share`, { method: 'POST', body: dto, accessToken });
+}
+
+export function revokeLocationShare(accessToken: string, locationId: string, userId: string) {
+  return apiFetch<void>(`/locations/${locationId}/share/${userId}`, { method: 'DELETE', accessToken });
 }
 
 export function createLocation(

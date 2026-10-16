@@ -25,11 +25,13 @@ import {
   unshareItem,
   updateItem,
   type Item,
+  type ItemActionType,
   type MarketPricePeek,
   type MarketPriceResult,
 } from '../../../../lib/items';
 import { findOrCreateTag, type Tag } from '../../../../lib/tags';
 import { formatSalePrice, SaleModal } from '../../../../components/items/SaleModal';
+import { RequestAuthorizationModal } from '../../../../components/items/RequestAuthorizationModal';
 import { TagAutocomplete } from '../../../../components/items/TagAutocomplete';
 import { AIProcessingOverlay } from '../../../../components/ui/AIProcessingOverlay';
 import { NoFtModal } from '../../../../components/ui/NoFtModal';
@@ -60,7 +62,7 @@ function InfoRow({ label, value }: { label: string; value: string | null }) {
 
 export default function ItemDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
   const { refresh: refreshFt } = useFt();
   const router = useRouter();
   const { width: screenWidth } = useWindowDimensions();
@@ -82,6 +84,7 @@ export default function ItemDetailScreen() {
   const [loadingMarketPrice, setLoadingMarketPrice] = useState<'cached' | 'fresh' | null>(null);
   const [applyingNotes, setApplyingNotes] = useState(false);
   const [saleVisible, setSaleVisible] = useState(false);
+  const [requestAction, setRequestAction] = useState<ItemActionType | null>(null);
   const [appealMessage, setAppealMessage] = useState('');
   const [submittingAppeal, setSubmittingAppeal] = useState(false);
   const [appealError, setAppealError] = useState<string | null>(null);
@@ -117,6 +120,8 @@ export default function ItemDetailScreen() {
   );
 
   const editable = item?.status === 'ACTIVE';
+  const isRealOwner = !!item && !!user && item.ownerId === user.sub;
+  const pendingActions = item?.myPendingActionRequests ?? [];
 
   // Sugerir consultar el precio de mercado solo si no se ha hecho en los últimos 7 días.
   const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -372,6 +377,14 @@ export default function ItemDetailScreen() {
         className="-mt-6 rounded-t-3xl bg-background px-5 pt-6"
       >
         <Text className="font-body-bold text-2xl text-text">{item.name}</Text>
+        {!isRealOwner ? (
+          <View className="mt-2 flex-row items-center gap-1.5 self-start rounded-full bg-surfaceElevated px-3 py-1">
+            <Ionicons name="person-circle-outline" size={14} color={colors.textMuted} />
+            <Text className="text-xs text-textMuted">
+              Propietario: {item.owner.username ? `@${item.owner.username}` : item.owner.name}
+            </Text>
+          </View>
+        ) : null}
         {statusLabel ? (
           <View className="mt-2 self-start rounded-full bg-danger px-3 py-1">
             <Text className="text-xs text-dangerText">{statusLabel}</Text>
@@ -616,11 +629,20 @@ export default function ItemDetailScreen() {
         {editable ? (
           <View className="gap-3">
             <Button label="Cambiar ubicación" variant="secondary" onPress={() => router.push(`/(tabs)/objetos/${item.id}/ubicacion`)} />
-            <Button
-              label={item.saleStatus ? 'Administrar venta' : 'Colocar en venta'}
-              variant="sale"
-              onPress={() => setSaleVisible(true)}
-            />
+            {isRealOwner ? (
+              <Button
+                label={item.saleStatus ? 'Administrar venta' : 'Colocar en venta'}
+                variant="sale"
+                onPress={() => setSaleVisible(true)}
+              />
+            ) : !item.saleStatus ? (
+              <Button
+                label={pendingActions.includes('SELL') ? 'Solicitud de venta enviada' : 'Solicitar venta'}
+                variant="sale"
+                onPress={() => setRequestAction('SELL')}
+                disabled={pendingActions.includes('SELL')}
+              />
+            ) : null}
             <Pressable onPress={onUnshare} className="items-center py-2">
               <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
             </Pressable>
@@ -640,7 +662,7 @@ export default function ItemDetailScreen() {
             disabled={sharing}
             accessibilityLabel="Compartir objeto"
             className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
-            style={{ right: 20, bottom: insets.bottom + (item.saleStatus ? 300 : 232) }}
+            style={{ right: 20, bottom: insets.bottom + (item.saleStatus && isRealOwner ? 300 : 232) }}
           >
             {sharing ? (
               <ActivityIndicator color={colors.white} />
@@ -648,7 +670,7 @@ export default function ItemDetailScreen() {
               <Ionicons name="share-social" size={24} color={colors.white} />
             )}
           </Pressable>
-          {item.saleStatus ? (
+          {item.saleStatus && isRealOwner ? (
             <Pressable
               onPress={() => setSaleVisible(true)}
               accessibilityLabel="Venta del objeto"
@@ -659,11 +681,20 @@ export default function ItemDetailScreen() {
             </Pressable>
           ) : null}
           <Pressable
-            onPress={() => router.push(`/(tabs)/objetos/${item.id}/vender`)}
+            onPress={() =>
+              isRealOwner
+                ? router.push(`/(tabs)/objetos/${item.id}/vender`)
+                : setRequestAction('TRANSFER')
+            }
+            accessibilityLabel={isRealOwner ? 'Transferir objeto' : 'Solicitar transferencia'}
             className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
             style={{ right: 20, bottom: insets.bottom + 164 }}
           >
-            <Ionicons name="swap-horizontal" size={24} color={colors.white} />
+            <Ionicons
+              name={!isRealOwner && pendingActions.includes('TRANSFER') ? 'time-outline' : 'swap-horizontal'}
+              size={24}
+              color={colors.white}
+            />
           </Pressable>
           <Pressable
             onPress={() => router.push(`/(tabs)/objetos/${item.id}/edit`)}
@@ -694,6 +725,16 @@ export default function ItemDetailScreen() {
           // en ese momento se ignora, así que se espera a que termine.
           onLookupMarketPrice={() => setTimeout(() => onLookupMarketPrice('fresh'), 400)}
           onTransfer={() => setTimeout(() => router.push(`/(tabs)/objetos/${item.id}/vender`), 400)}
+        />
+      ) : null}
+      {accessToken && requestAction ? (
+        <RequestAuthorizationModal
+          visible
+          action={requestAction}
+          item={item}
+          accessToken={accessToken}
+          onClose={() => setRequestAction(null)}
+          onSent={load}
         />
       ) : null}
     </View>

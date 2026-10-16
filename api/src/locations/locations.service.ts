@@ -16,8 +16,16 @@ export interface LocationNode {
   parentId: string | null;
   isPermanentDefault: boolean;
   qrToken: string;
+  // Presente solo en ubicaciones ajenas vistas por LocationMember (heredado de
+  // una colección compartida, o compartido a mano — ver shareLocation).
+  isShared?: boolean;
+  sharedByUserId?: string;
+  sharedByName?: string;
+  myRole?: 'VIEWER' | 'EDITOR';
   children: LocationNode[];
 }
+
+type MinLocationRole = 'VIEWER' | 'EDITOR';
 
 @Injectable()
 export class LocationsService {
@@ -33,11 +41,18 @@ export class LocationsService {
     });
   }
 
+  // Incluye, además del árbol propio, las ubicaciones ajenas donde el usuario
+  // tiene LocationMember (heredado de una colección compartida, o compartido
+  // a mano con shareLocation) — sin esto el picker de ubicación de un editor
+  // nunca podría mostrar/elegir una ubicación ya compartida con el dueño real.
   async findTree(ownerId: string): Promise<LocationNode[]> {
-    const locations = await this.prisma.location.findMany({
-      where: { ownerId },
-      orderBy: { name: 'asc' },
-    });
+    const [locations, sharedMemberships] = await Promise.all([
+      this.prisma.location.findMany({ where: { ownerId }, orderBy: { name: 'asc' } }),
+      this.prisma.locationMember.findMany({
+        where: { userId: ownerId },
+        include: { location: true },
+      }),
+    ]);
 
     const nodesById = new Map<string, LocationNode>(
       locations.map((location) => [
@@ -60,6 +75,31 @@ export class LocationsService {
         nodesById.get(node.parentId)!.children.push(node);
       } else {
         roots.push(node);
+      }
+    }
+
+    if (sharedMemberships.length) {
+      const ownerIds = [...new Set(sharedMemberships.map((m) => m.location.ownerId))];
+      const owners = await this.prisma.user.findMany({
+        where: { id: { in: ownerIds } },
+        select: { id: true, name: true, username: true },
+      });
+      const ownerById = new Map(owners.map((o) => [o.id, o]));
+      for (const membership of sharedMemberships) {
+        const owner = ownerById.get(membership.location.ownerId);
+        roots.push({
+          id: membership.location.id,
+          name: membership.location.name,
+          icon: membership.location.icon,
+          parentId: null,
+          isPermanentDefault: false,
+          qrToken: membership.location.qrToken,
+          isShared: true,
+          sharedByUserId: membership.location.ownerId,
+          sharedByName: owner?.username ? `@${owner.username}` : owner?.name ?? 'otro usuario',
+          myRole: membership.role as MinLocationRole,
+          children: [],
+        });
       }
     }
 
@@ -144,13 +184,8 @@ export class LocationsService {
     if (!location) {
       throw new NotFoundException('Código QR no reconocido');
     }
-    if (location.ownerId !== requestingUserId) {
-      const member = await this.prisma.locationMember.findUnique({
-        where: { locationId_userId: { locationId: location.id, userId: requestingUserId } },
-      });
-      if (!member) {
-        throw new ForbiddenException('No tienes acceso a esta ubicación');
-      }
+    if (!(await this.hasLocationAccess(requestingUserId, location, 'VIEWER'))) {
+      throw new ForbiddenException('No tienes acceso a esta ubicación');
     }
 
     const descendantIds = await this.collectDescendantIds(location.ownerId, location.id);
@@ -183,6 +218,90 @@ export class LocationsService {
     return location;
   }
 
+  private static readonly ROLE_RANK: Record<string, number> = { VIEWER: 0, EDITOR: 1, OWNER: 2 };
+
+  private async hasLocationAccess(
+    userId: string,
+    location: { id: string; ownerId: string },
+    minRole: MinLocationRole,
+  ): Promise<boolean> {
+    if (location.ownerId === userId) return true;
+    const member = await this.prisma.locationMember.findUnique({
+      where: { locationId_userId: { locationId: location.id, userId } },
+    });
+    return !!member && LocationsService.ROLE_RANK[member.role] >= LocationsService.ROLE_RANK[minRole];
+  }
+
+  // Generaliza el chequeo ad-hoc que antes vivía solo en resolveByToken: el
+  // dueño real siempre pasa; si no, exige un LocationMember con rol igual o
+  // por encima de minRole. Usado por ItemsService.changeLocation (un editor
+  // solo necesita poder acceder él mismo a la ubicación destino) y por el
+  // picker de ubicación de la app para validar antes de elegir.
+  async assertAccessible(userId: string, locationId: string, minRole: MinLocationRole = 'VIEWER') {
+    const location = await this.prisma.location.findUnique({ where: { id: locationId } });
+    if (!location) throw new NotFoundException('Ubicación no encontrada');
+    if (!(await this.hasLocationAccess(userId, location, minRole))) {
+      throw new NotFoundException('Ubicación no encontrada');
+    }
+    return location;
+  }
+
+  // Compartir manual de una ubicación propia (caso "vivimos juntos"): solo el
+  // dueño, y solo hacia alguien con quien ya comparte al menos una colección
+  // (no es un mecanismo para contactar a cualquier usuario del sistema).
+  // VIEWER: ve la ubicación y su contenido. EDITOR: además puede mover ahí sus
+  // propios objetos, estén o no en una colección compartida con el dueño — el
+  // acceso al objeto y el acceso a la ubicación son chequeos independientes.
+  async shareLocation(ownerId: string, locationId: string, targetUserId: string, role: MinLocationRole) {
+    await this.assertOwnedLocation(ownerId, locationId);
+    if (targetUserId === ownerId) {
+      throw new BadRequestException('No puedes compartir una ubicación contigo mismo');
+    }
+    const sharesCollection = await this.prisma.collectionMember.count({
+      where: { userId: ownerId, collection: { members: { some: { userId: targetUserId } } } },
+    });
+    if (sharesCollection === 0) {
+      throw new BadRequestException('Solo puedes compartir ubicaciones con alguien con quien ya compartes una colección');
+    }
+    return this.prisma.locationMember.upsert({
+      where: { locationId_userId: { locationId, userId: targetUserId } },
+      create: { locationId, userId: targetUserId, role, source: 'MANUAL' },
+      update: { role, source: 'MANUAL' },
+    });
+  }
+
+  async revokeLocationShare(ownerId: string, locationId: string, targetUserId: string) {
+    await this.assertOwnedLocation(ownerId, locationId);
+    await this.prisma.locationMember.deleteMany({
+      where: { locationId, userId: targetUserId, source: 'MANUAL' },
+    });
+  }
+
+  async listLocationShares(ownerId: string, locationId: string) {
+    await this.assertOwnedLocation(ownerId, locationId);
+    return this.prisma.locationMember.findMany({
+      where: { locationId, source: 'MANUAL' },
+      include: { user: { select: { id: true, name: true, username: true } } },
+    });
+  }
+
+  // Candidatos para compartir manualmente una ubicación: cualquiera con quien
+  // ownerId ya comparte al menos una colección (misma regla que valida
+  // shareLocation) — alimenta el picker de "Compartir con..." en la app.
+  async listShareCandidates(ownerId: string) {
+    const myCollectionIds = (
+      await this.prisma.collectionMember.findMany({ where: { userId: ownerId }, select: { collectionId: true } })
+    ).map((m) => m.collectionId);
+    if (myCollectionIds.length === 0) return [];
+
+    const members = await this.prisma.collectionMember.findMany({
+      where: { collectionId: { in: myCollectionIds }, userId: { not: ownerId } },
+      select: { user: { select: { id: true, name: true, username: true } } },
+      distinct: ['userId'],
+    });
+    return members.map((m) => m.user);
+  }
+
   // Tras vincular/desvincular un objeto de una colección, o cambiar su
   // ubicación (uno por uno o en bloque desde CollectionLocationService),
   // otorga/revoca accesos de solo lectura (LocationMember con source
@@ -197,54 +316,75 @@ export class LocationsService {
       where: { id: itemId },
       select: {
         ownerId: true,
-        currentLocationId: true,
-        permanentLocationId: true,
+        currentLocation: { select: { id: true, ownerId: true } },
+        permanentLocation: { select: { id: true, ownerId: true } },
         collections: { select: { collection: { select: { members: { select: { userId: true } } } } } },
       },
     });
     if (!item) return;
 
-    const memberIds = new Set<string>();
+    const sharedMemberIds = new Set<string>();
     for (const { collection } of item.collections) {
       if (collection.members.length <= 1) continue;
       for (const member of collection.members) {
-        if (member.userId !== item.ownerId) memberIds.add(member.userId);
+        if (member.userId !== item.ownerId) sharedMemberIds.add(member.userId);
       }
     }
 
-    const locationIds = [...new Set([item.currentLocationId, item.permanentLocationId].filter((v): v is string => v != null))];
+    const locations = [item.currentLocation, item.permanentLocation].filter(
+      (l): l is { id: string; ownerId: string } => l != null,
+    );
+    const uniqueLocations = [...new Map(locations.map((l) => [l.id, l])).values()];
 
-    if (memberIds.size > 0 && locationIds.length > 0) {
+    // Antes se asumía location.ownerId === item.ownerId siempre (cierto
+    // mientras solo el dueño podía mover objetos). Ahora un editor puede
+    // mover el objeto a una ubicación suya: se excluye al dueño REAL de esa
+    // ubicación (quien sea) del reparto, y se asegura que el dueño real del
+    // objeto reciba acceso si no es ya el dueño de la ubicación.
+    for (const location of uniqueLocations) {
+      const grantees = new Set<string>([item.ownerId, ...sharedMemberIds]);
+      grantees.delete(location.ownerId);
+      if (grantees.size === 0) continue;
       await Promise.all(
-        locationIds.flatMap((locationId) =>
-          [...memberIds].map((userId) =>
-            this.prisma.locationMember.upsert({
-              where: { locationId_userId: { locationId, userId } },
-              create: { locationId, userId, role: 'VIEWER', source: 'INHERITED_FROM_COLLECTION' },
-              update: {},
-            }),
-          ),
+        [...grantees].map((userId) =>
+          this.prisma.locationMember.upsert({
+            where: { locationId_userId: { locationId: location.id, userId } },
+            create: { locationId: location.id, userId, role: 'VIEWER', source: 'INHERITED_FROM_COLLECTION' },
+            update: {},
+          }),
         ),
       );
     }
 
-    await this.revokeStaleInheritedLocationAccess(item.ownerId);
+    await this.revokeStaleInheritedLocationAccess([item.ownerId, ...sharedMemberIds]);
   }
 
-  // Recorre las ubicaciones del owner que tengan algún acceso heredado y
-  // quita los que ya no correspondan: ningún objeto suyo en esa ubicación
-  // sigue vinculado a una colección compartida con ese miembro.
-  private async revokeStaleInheritedLocationAccess(ownerId: string) {
+  // Recorre las ubicaciones de cualquiera de los "candidatos" (el dueño real
+  // del objeto y sus compañeros de colección compartida) que tengan algún
+  // acceso heredado, y quita los que ya no correspondan — ya sea porque
+  // ningún objeto del dueño de esa ubicación sigue vinculado a una colección
+  // compartida con ese miembro, o porque el dueño real de un objeto ya no
+  // necesita ver una ubicación ajena donde ese objeto dejó de estar. No toca
+  // accesos MANUAL (compartir manual de ubicación, ver shareLocation).
+  private async revokeStaleInheritedLocationAccess(candidateOwnerIds: string[]) {
+    if (candidateOwnerIds.length === 0) return;
     const locations = await this.prisma.location.findMany({
-      where: { ownerId, members: { some: { source: 'INHERITED_FROM_COLLECTION' } } },
+      where: { ownerId: { in: candidateOwnerIds }, members: { some: { source: 'INHERITED_FROM_COLLECTION' } } },
       select: {
         id: true,
+        ownerId: true,
         members: { where: { source: 'INHERITED_FROM_COLLECTION' }, select: { userId: true } },
         itemsAsCurrent: {
-          select: { collections: { select: { collection: { select: { members: { select: { userId: true } } } } } } },
+          select: {
+            ownerId: true,
+            collections: { select: { collection: { select: { members: { select: { userId: true } } } } } },
+          },
         },
         itemsAsPermanent: {
-          select: { collections: { select: { collection: { select: { members: { select: { userId: true } } } } } } },
+          select: {
+            ownerId: true,
+            collections: { select: { collection: { select: { members: { select: { userId: true } } } } } },
+          },
         },
       },
     });
@@ -252,10 +392,11 @@ export class LocationsService {
     for (const location of locations) {
       const stillVisibleTo = new Set<string>();
       for (const item of [...location.itemsAsCurrent, ...location.itemsAsPermanent]) {
+        if (item.ownerId !== location.ownerId) stillVisibleTo.add(item.ownerId);
         for (const { collection } of item.collections) {
           if (collection.members.length <= 1) continue;
           for (const member of collection.members) {
-            if (member.userId !== ownerId) stillVisibleTo.add(member.userId);
+            if (member.userId !== location.ownerId) stillVisibleTo.add(member.userId);
           }
         }
       }

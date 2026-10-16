@@ -27,6 +27,10 @@ const ITEM_INCLUDE = {
   currentLocation: true,
   permanentLocation: true,
   currentSeason: true,
+  // Resumen ligero del dueño real: alimenta el banner "Propietario: @fulano"
+  // que la app muestra cuando quien ve/edita el objeto es un miembro
+  // compartido distinto del dueño (ver ItemsService.resolveItemAccess).
+  owner: { select: { id: true, name: true, username: true } },
   // Solo se llena cuando status = PENDING_MODERATION; expone el estado de la
   // aclaración al dueño del objeto (ver ItemsService.submitModerationAppeal).
   moderationFlag: { select: { id: true, userAppeal: true, userAppealAt: true } },
@@ -112,7 +116,8 @@ export class ItemsService {
       await this.locationsService.syncInheritedLocationAccess(item.id);
     }
 
-    return item;
+    // Un objeto recién creado nunca puede tener ya un ItemFavorite.
+    return { ...item, isFavorite: false };
   }
 
   private async buildFallbackAvatar(photoUrl: string): Promise<string | undefined> {
@@ -130,28 +135,39 @@ export class ItemsService {
   // y se listan los objetos de TODOS los miembros vinculados a ella, no solo
   // los del que llama — igual que ya hace CollectionLocationService.moveAll.
   async findAll(ownerId: string, filters: { collectionId?: string; favoritesOnly?: boolean } = {}) {
+    // Los favoritos ya no son una columna del Item (compartida con todos),
+    // sino una lista personal por usuario (ItemFavorite) — cada quien
+    // favoritea para sí mismo, sin afectar lo que ven los demás miembros.
+    let favoriteItemIds: string[] | undefined;
+    if (filters.favoritesOnly) {
+      const favs = await this.prisma.itemFavorite.findMany({ where: { userId: ownerId }, select: { itemId: true } });
+      favoriteItemIds = favs.map((f) => f.itemId);
+    }
+
     if (filters.collectionId) {
       await this.collectionsService.findOne(ownerId, filters.collectionId);
-      return this.prisma.item.findMany({
+      const items = await this.prisma.item.findMany({
         where: {
           status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
-          isFavorite: filters.favoritesOnly ? true : undefined,
+          id: favoriteItemIds ? { in: favoriteItemIds } : undefined,
           collections: { some: { collectionId: filters.collectionId } },
         },
         include: ITEM_INCLUDE,
         orderBy: { createdAt: 'desc' },
       });
+      return this.withFavorites(ownerId, items);
     }
 
-    return this.prisma.item.findMany({
+    const items = await this.prisma.item.findMany({
       where: {
         ownerId,
         status: { notIn: ['SOLD', 'PENDING_MODERATION'] },
-        isFavorite: filters.favoritesOnly ? true : undefined,
+        id: favoriteItemIds ? { in: favoriteItemIds } : undefined,
       },
       include: ITEM_INCLUDE,
       orderBy: { createdAt: 'desc' },
     });
+    return this.withFavorites(ownerId, items);
   }
 
   // Sección "Objetos vendidos que se relacionan con tu búsqueda" (plan §5.3.9.5).
@@ -159,7 +175,7 @@ export class ItemsService {
   async findSold(ownerId: string, search?: string) {
     const term = search?.trim();
     if (!term) return [];
-    return this.prisma.item.findMany({
+    const items = await this.prisma.item.findMany({
       where: {
         ownerId,
         status: 'SOLD',
@@ -176,15 +192,26 @@ export class ItemsService {
       orderBy: { updatedAt: 'desc' },
       take: 20,
     });
+    return this.withFavorites(ownerId, items);
   }
 
-  async findOne(ownerId: string, id: string) {
-    return this.assertOwnedItem(ownerId, id);
+  async findOne(actingUserId: string, id: string) {
+    const { item, role } = await this.resolveItemAccess(actingUserId, id);
+    const withFav = await this.withFavorite(actingUserId, item);
+    if (role === 'OWNER') return { ...withFav, myPendingActionRequests: [] as string[] };
+    // Para que la app muestre "Solicitud enviada, esperando autorización" en vez
+    // de dejar pedir de nuevo la misma acción mientras ya hay una pendiente.
+    const pending = await this.prisma.itemActionRequest.findMany({
+      where: { itemId: id, requestedByUserId: actingUserId, status: 'PENDING' },
+      select: { action: true },
+    });
+    return { ...withFav, myPendingActionRequests: pending.map((p) => p.action) };
   }
 
   // El dueño puede pedir una aclaración una sola vez mientras el objeto está
   // retenido (status PENDING_MODERATION); el superadmin la ve en Moderación
-  // al resolver el ModerationFlag (action ITEM_HELD) ligado.
+  // al resolver el ModerationFlag (action ITEM_HELD) ligado. Estrictamente del
+  // dueño: es un asunto de cuenta/legal, no se expande a miembros compartidos.
   async submitModerationAppeal(ownerId: string, id: string, message: string) {
     const item = await this.assertOwnedItem(ownerId, id);
     if (item.status !== 'PENDING_MODERATION' || !item.moderationFlag) {
@@ -197,12 +224,13 @@ export class ItemsService {
       where: { id: item.moderationFlag.id },
       data: { userAppeal: message, userAppealAt: new Date() },
     });
-    return this.assertOwnedItem(ownerId, id);
+    const updated = await this.assertOwnedItem(ownerId, id);
+    return this.withFavorite(ownerId, updated);
   }
 
-  async update(ownerId: string, id: string, dto: UpdateItemDto) {
-    await this.assertEditableItem(ownerId, id);
-    return this.prisma.item.update({
+  async update(actingUserId: string, id: string, dto: UpdateItemDto) {
+    await this.resolveEditableItem(actingUserId, id);
+    const updated = await this.prisma.item.update({
       where: { id },
       data: {
         ...dto,
@@ -210,6 +238,7 @@ export class ItemsService {
       },
       include: ITEM_INCLUDE,
     });
+    return this.withFavorite(actingUserId, updated);
   }
 
   async remove(ownerId: string, id: string) {
@@ -224,6 +253,8 @@ export class ItemsService {
   // "Objeto en venta": pone/actualiza el precio, o cambia entre en venta, apartado
   // y vendido. Mientras esté en venta o apartado pertenece a la colección
   // automática "En Venta"; al marcarlo vendido sale de ella (falta transferirlo).
+  // Estrictamente del dueño real: un editor debe pasar por ItemActionRequest
+  // (autorización) para poner en venta un objeto que no es suyo.
   async setSale(ownerId: string, id: string, dto: SetSaleDto) {
     const item = await this.assertEditableItem(ownerId, id);
 
@@ -242,27 +273,38 @@ export class ItemsService {
     } else {
       await this.collectionsService.addToSaleCollection(ownerId, id);
     }
-    return this.prisma.item.findUniqueOrThrow({ where: { id: updated.id }, include: ITEM_INCLUDE });
+    const final = await this.prisma.item.findUniqueOrThrow({ where: { id: updated.id }, include: ITEM_INCLUDE });
+    return this.withFavorite(ownerId, final);
   }
 
-  // Saca el objeto del sistema de ventas (precio incluido).
-  async clearSale(ownerId: string, id: string) {
-    await this.assertEditableItem(ownerId, id);
+  // Saca el objeto del sistema de ventas (precio incluido). A diferencia de
+  // ponerlo en venta, cualquier miembro con acceso puede hacerlo sin
+  // autorización: reducir exposición es más seguro que crearla.
+  async clearSale(actingUserId: string, id: string) {
+    await this.resolveEditableItem(actingUserId, id);
     await this.prisma.item.update({ where: { id }, data: { saleStatus: null, salePrice: null } });
-    await this.collectionsService.removeFromSaleCollection(ownerId, id);
-    return this.prisma.item.findUniqueOrThrow({ where: { id }, include: ITEM_INCLUDE });
+    await this.collectionsService.removeFromSaleCollection(actingUserId, id);
+    const final = await this.prisma.item.findUniqueOrThrow({ where: { id }, include: ITEM_INCLUDE });
+    return this.withFavorite(actingUserId, final);
   }
 
-  async toggleFavorite(ownerId: string, id: string) {
-    const item = await this.assertEditableItem(ownerId, id);
-    return this.prisma.item.update({
-      where: { id },
-      data: { isFavorite: !item.isFavorite },
-    });
+  // Favoritos: lista personal por usuario (ItemFavorite), no una propiedad
+  // compartida del objeto — cada quien favoritea para sí mismo sin afectar a
+  // los demás miembros que también tienen acceso.
+  async toggleFavorite(actingUserId: string, id: string) {
+    const { item } = await this.resolveItemAccess(actingUserId, id);
+    const key = { userId_itemId: { userId: actingUserId, itemId: id } };
+    const existing = await this.prisma.itemFavorite.findUnique({ where: key });
+    if (existing) {
+      await this.prisma.itemFavorite.delete({ where: key });
+    } else {
+      await this.prisma.itemFavorite.create({ data: { userId: actingUserId, itemId: id } });
+    }
+    return { ...item, isFavorite: !existing };
   }
 
-  async addPhoto(ownerId: string, id: string, url: string) {
-    await this.assertEditableItem(ownerId, id);
+  async addPhoto(actingUserId: string, id: string, url: string) {
+    await this.resolveEditableItem(actingUserId, id);
     // max+1 (no count): al quitar una foto intermedia, count repetiría un order existente.
     const last = await this.prisma.itemPhoto.aggregate({
       where: { itemId: id },
@@ -273,8 +315,8 @@ export class ItemsService {
     });
   }
 
-  async removePhoto(ownerId: string, id: string, photoId: string) {
-    await this.assertEditableItem(ownerId, id);
+  async removePhoto(actingUserId: string, id: string, photoId: string) {
+    await this.resolveEditableItem(actingUserId, id);
     const photo = await this.prisma.itemPhoto.findUnique({ where: { id: photoId } });
     if (!photo || photo.itemId !== id) {
       throw new NotFoundException('Foto no encontrada');
@@ -292,9 +334,9 @@ export class ItemsService {
     }
   }
 
-  async addToCollection(ownerId: string, id: string, collectionId: string) {
-    await this.assertEditableItem(ownerId, id);
-    await this.collectionsService.assertCanAddItems(ownerId, collectionId);
+  async addToCollection(actingUserId: string, id: string, collectionId: string) {
+    await this.resolveEditableItem(actingUserId, id);
+    await this.collectionsService.assertCanAddItems(actingUserId, collectionId);
     await this.prisma.itemCollection.upsert({
       where: { itemId_collectionId: { itemId: id, collectionId } },
       create: { itemId: id, collectionId },
@@ -303,16 +345,18 @@ export class ItemsService {
     await this.locationsService.syncInheritedLocationAccess(id);
   }
 
-  async removeFromCollection(ownerId: string, id: string, collectionId: string) {
-    await this.assertEditableItem(ownerId, id);
-    await this.collectionsService.assertCanRemoveItems(ownerId, collectionId);
+  async removeFromCollection(actingUserId: string, id: string, collectionId: string) {
+    await this.resolveEditableItem(actingUserId, id);
+    await this.collectionsService.assertCanRemoveItems(actingUserId, collectionId);
     await this.prisma.itemCollection.deleteMany({ where: { itemId: id, collectionId } });
     await this.locationsService.syncInheritedLocationAccess(id);
   }
 
-  async addTag(ownerId: string, id: string, tagId: string) {
-    await this.assertEditableItem(ownerId, id);
-    await this.assertOwnedTags(ownerId, [tagId]);
+  async addTag(actingUserId: string, id: string, tagId: string) {
+    await this.resolveEditableItem(actingUserId, id);
+    // El tag viene de la lista personal de quien edita, no del dueño real del
+    // objeto — un miembro compartido solo puede usar sus propios tags.
+    await this.assertOwnedTags(actingUserId, [tagId]);
     await this.prisma.itemTag.upsert({
       where: { itemId_tagId: { itemId: id, tagId } },
       create: { itemId: id, tagId },
@@ -320,27 +364,32 @@ export class ItemsService {
     });
   }
 
-  async removeTag(ownerId: string, id: string, tagId: string) {
-    await this.assertEditableItem(ownerId, id);
+  async removeTag(actingUserId: string, id: string, tagId: string) {
+    await this.resolveEditableItem(actingUserId, id);
     await this.prisma.itemTag.deleteMany({ where: { itemId: id, tagId } });
   }
 
   // Modal multi-paso de cambio de ubicación (plan §5.3.9.9). "Vendido" no se
   // maneja aquí: usa TransfersModule porque requiere un receptor y aceptación.
-  async changeLocation(ownerId: string, id: string, dto: ChangeLocationDto) {
-    await this.assertEditableItem(ownerId, id);
+  async changeLocation(actingUserId: string, id: string, dto: ChangeLocationDto) {
+    const item = await this.resolveEditableItem(actingUserId, id);
 
     if (dto.destination === LocationChangeDestination.DONATED) {
-      return this.prisma.item.update({ where: { id }, data: { status: 'DONATED' } });
+      const updated = await this.prisma.item.update({ where: { id }, data: { status: 'DONATED' } });
+      return this.withFavorite(actingUserId, updated);
     }
     if (dto.destination === LocationChangeDestination.LOST) {
-      return this.prisma.item.update({ where: { id }, data: { status: 'LOST' } });
+      const updated = await this.prisma.item.update({ where: { id }, data: { status: 'LOST' } });
+      return this.withFavorite(actingUserId, updated);
     }
 
     if (!dto.locationId || !dto.assignment) {
       throw new BadRequestException('Debes indicar la ubicación destino y si es indefinido o temporal');
     }
-    await this.locationsService.findOne(ownerId, dto.locationId);
+    // Quien mueve el objeto solo necesita poder acceder él mismo a la ubicación
+    // destino (suya, o ya compartida) — la visibilidad del dueño real se logra
+    // después, automáticamente, vía syncInheritedLocationAccess más abajo.
+    await this.locationsService.assertAccessible(actingUserId, dto.locationId, 'EDITOR');
 
     if (dto.assignment === LocationChangeAssignment.INDEFINIDO) {
       const updated = await this.prisma.item.update({
@@ -354,15 +403,16 @@ export class ItemsService {
         },
       });
       await this.locationsService.syncInheritedLocationAccess(id);
-      return updated;
+      return this.withFavorite(actingUserId, updated);
     }
 
     // Sin temporada ("No aplica"): solo cambia la ubicación actual, la principal
     // se queda como estaba y no hay temporada que dispare el regreso automático.
+    // La temporada es del dueño real del objeto, no de quien ejecuta el cambio.
     let currentSeasonId: string | null = null;
     if (dto.seasonId) {
       const season = await this.prisma.season.findUnique({ where: { id: dto.seasonId } });
-      if (!season || season.ownerId !== ownerId) {
+      if (!season || season.ownerId !== item.ownerId) {
         throw new NotFoundException('Temporada no encontrada');
       }
       currentSeasonId = dto.seasonId;
@@ -378,12 +428,12 @@ export class ItemsService {
       },
     });
     await this.locationsService.syncInheritedLocationAccess(id);
-    return updated;
+    return this.withFavorite(actingUserId, updated);
   }
 
   // Botón rápido de la vista de Temporadas (plan §5.5.8).
-  async returnToPermanentLocation(ownerId: string, id: string) {
-    const item = await this.assertEditableItem(ownerId, id);
+  async returnToPermanentLocation(actingUserId: string, id: string) {
+    const item = await this.resolveEditableItem(actingUserId, id);
     const updated = await this.prisma.item.update({
       where: { id: item.id },
       data: {
@@ -394,14 +444,14 @@ export class ItemsService {
       },
     });
     await this.locationsService.syncInheritedLocationAccess(id);
-    return updated;
+    return this.withFavorite(actingUserId, updated);
   }
 
   // "Objetos similares" del Home (plan §7.2).
-  async findSimilar(ownerId: string, id: string) {
-    const item = await this.assertOwnedItem(ownerId, id);
+  async findSimilar(actingUserId: string, id: string) {
+    const { item } = await this.resolveItemAccess(actingUserId, id);
     const candidates = await this.prisma.item.findMany({
-      where: { ownerId, status: { notIn: ['SOLD', 'PENDING_MODERATION'] }, id: { not: id } },
+      where: { ownerId: item.ownerId, status: { notIn: ['SOLD', 'PENDING_MODERATION'] }, id: { not: id } },
       include: { tags: { include: { tag: true } } },
     });
 
@@ -571,8 +621,8 @@ export class ItemsService {
   // guardado (y de cuándo) para poder ofrecer la elección "usar ese dato por
   // menos FT" vs "consultar uno nuevo por más FT" (plan FrikiTokens, decisión
   // confirmada con el owner 2026-09-22).
-  async peekMarketPrice(ownerId: string, id: string) {
-    const item = await this.assertOwnedItem(ownerId, id);
+  async peekMarketPrice(actingUserId: string, id: string) {
+    const { item } = await this.resolveItemAccess(actingUserId, id);
     const catalog = await this.ftService.getCatalog();
     const costOf = (key: string) => catalog.find((c) => c.key === key)?.ftCost ?? null;
     const history = await this.prisma.marketPriceCheck.findMany({
@@ -603,13 +653,13 @@ export class ItemsService {
   // `mode: 'cached'` reutiliza `lastMarketPriceResult` (barato); `mode: 'fresh'`
   // vuelve a preguntarle a Gemini y actualiza ese caché. Ambos cobran FT.
   async lookupMarketPrice(
-    ownerId: string,
+    actingUserId: string,
     organizationId: string,
     id: string,
     mode: 'cached' | 'fresh',
     idempotencyKey: string,
   ) {
-    const item = await this.assertOwnedItem(ownerId, id);
+    const { item } = await this.resolveItemAccess(actingUserId, id);
     const catalog = await this.ftService.getCatalog();
     const costOf = (key: string) => catalog.find((c) => c.key === key)?.ftCost ?? null;
 
@@ -618,7 +668,7 @@ export class ItemsService {
         throw new BadRequestException('Todavía no hay un precio de mercado guardado para este objeto');
       }
       return this.ftService.runChargedAction(
-        { organizationId, userId: ownerId, service: 'MARKET_PRICE_CACHED', idempotencyKey, metadata: { itemId: id } },
+        { organizationId, userId: actingUserId, service: 'MARKET_PRICE_CACHED', idempotencyKey, metadata: { itemId: id } },
         async () => {
           await this.prisma.marketPriceCheck.create({
             data: {
@@ -668,7 +718,7 @@ export class ItemsService {
       .join('\n');
 
     return this.ftService.runChargedAction(
-      { organizationId, userId: ownerId, service: 'MARKET_PRICE_FRESH', idempotencyKey, metadata: { itemId: id } },
+      { organizationId, userId: actingUserId, service: 'MARKET_PRICE_FRESH', idempotencyKey, metadata: { itemId: id } },
       async () => {
         const { result: marketPrice, usage } = await this.geminiService.lookupMarketPrice(
           description,
@@ -883,6 +933,9 @@ export class ItemsService {
     }
   }
 
+  // Estricto: solo el dueño real pasa. Sigue siendo la puerta de setSale,
+  // remove y submitModerationAppeal — un editor debe pasar por
+  // ItemActionRequest (autorización del dueño) para esas tres.
   private async assertOwnedItem(ownerId: string, id: string) {
     const item = await this.prisma.item.findUnique({ where: { id }, include: ITEM_INCLUDE });
     if (!item || item.ownerId !== ownerId) {
@@ -894,6 +947,7 @@ export class ItemsService {
   // Los objetos vendidos son completamente no editables (plan §5.3.9.5). En
   // transferencia también: si el receptor rechaza, el objeto vuelve a ACTIVE y
   // pisaría cualquier cambio de estado hecho mientras esperaba (p. ej. "Donado").
+  // Estricto (dueño real) — usado solo por setSale.
   private async assertEditableItem(ownerId: string, id: string) {
     const item = await this.assertOwnedItem(ownerId, id);
     if (item.status === 'SOLD') {
@@ -903,6 +957,58 @@ export class ItemsService {
       throw new BadRequestException('Un objeto en transferencia no se puede editar hasta que responda el receptor');
     }
     return item;
+  }
+
+  // Acceso compartido a objetos: el dueño real siempre puede, y también
+  // cualquiera que sea miembro de una colección compartida (>1 CollectionMember)
+  // a la que el objeto esté vinculado. Reemplaza a assertOwnedItem en los
+  // métodos de lectura/edición de info — ver plan "Acceso compartido a
+  // objetos + autorización del dueño".
+  async resolveItemAccess(userId: string, itemId: string) {
+    const item = await this.prisma.item.findUnique({ where: { id: itemId }, include: ITEM_INCLUDE });
+    if (!item) throw new NotFoundException('Objeto no encontrado');
+    if (item.ownerId === userId) return { item, role: 'OWNER' as const };
+    const sharedIds = await this.sharedCollectionIdsFor(userId);
+    if (sharedIds.length) {
+      const link = await this.prisma.itemCollection.findFirst({
+        where: { itemId, collectionId: { in: sharedIds } },
+      });
+      if (link) return { item, role: 'EDITOR' as const };
+    }
+    throw new NotFoundException('Objeto no encontrado');
+  }
+
+  // Igual que resolveItemAccess, pero además exige que el objeto esté en un
+  // estado editable (ni vendido ni en transferencia pendiente).
+  private async resolveEditableItem(userId: string, itemId: string) {
+    const { item } = await this.resolveItemAccess(userId, itemId);
+    if (item.status === 'SOLD') {
+      throw new BadRequestException('Un objeto vendido no se puede editar');
+    }
+    if (item.status === 'PENDING_TRANSFER') {
+      throw new BadRequestException('Un objeto en transferencia no se puede editar hasta que responda el receptor');
+    }
+    return item;
+  }
+
+  // isFavorite ya no es una columna de Item (compartida), sino una lista
+  // personal por usuario (ItemFavorite) — se resuelve por request según quién
+  // pide, sin cambiar la forma del contrato que ya espera el frontend.
+  private async withFavorite<T extends { id: string }>(actingUserId: string, item: T) {
+    const fav = await this.prisma.itemFavorite.findUnique({
+      where: { userId_itemId: { userId: actingUserId, itemId: item.id } },
+    });
+    return { ...item, isFavorite: !!fav };
+  }
+
+  private async withFavorites<T extends { id: string }>(actingUserId: string, items: T[]) {
+    if (items.length === 0) return [] as (T & { isFavorite: boolean })[];
+    const favs = await this.prisma.itemFavorite.findMany({
+      where: { userId: actingUserId, itemId: { in: items.map((i) => i.id) } },
+      select: { itemId: true },
+    });
+    const favoriteIds = new Set(favs.map((f) => f.itemId));
+    return items.map((item) => ({ ...item, isFavorite: favoriteIds.has(item.id) }));
   }
 
   // Colecciones compartidas (grupo familiar) donde userId es miembro junto con
