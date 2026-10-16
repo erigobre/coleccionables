@@ -1,9 +1,9 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import { ActivityIndicator, Text, TextInput, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { Screen } from '../../../../components/ui/Screen';
-import { TextField } from '../../../../components/ui/TextField';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { checkUsernameAvailability } from '../../../../lib/api';
 import { fetchMe, updateUsername, type Me } from '../../../../lib/users';
@@ -48,6 +48,11 @@ export default function UsernameScreen() {
   const remaining = daysLeft(me.usernameChangedAt);
   const blocked = remaining > 0;
 
+  const onUsernameChange = (text: string) => {
+    setUsername(text.toLowerCase().replace(/[^a-z0-9_]/g, ''));
+    setError(null);
+  };
+
   const onSave = async () => {
     if (!accessToken) return;
     const clean = username.trim().toLowerCase();
@@ -90,13 +95,33 @@ export default function UsernameScreen() {
         </Text>
       ) : (
         <>
-          <TextField
-            label="Nuevo @usuario"
-            value={username}
-            onChangeText={setUsername}
-            autoFocus
-            placeholder="minusculas_numeros"
-          />
+          <View className="mb-1">
+            <Text className="mb-1.5 text-sm font-medium text-textSecondary">Nuevo usuario</Text>
+            <View
+              className={`h-14 flex-row items-center rounded-md border bg-surfaceElevated pr-4 ${
+                error ? 'border-danger' : 'border-border'
+              }`}
+            >
+              <LinearGradient
+                colors={[colors.secondary, colors.primary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={{ width: 36, height: 36, borderRadius: 18, marginLeft: 8, alignItems: 'center', justifyContent: 'center' }}
+              >
+                <Text className="text-base font-body-bold text-white">@</Text>
+              </LinearGradient>
+              <TextInput
+                className="ml-3 h-full flex-1 text-base text-text"
+                value={username}
+                onChangeText={onUsernameChange}
+                autoFocus
+                placeholder="minusculas_numeros"
+                placeholderTextColor="#A79FC4"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
           {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
           <Button label="Guardar" onPress={onSave} loading={saving} disabled={username.trim().length < 3} />
         </>
