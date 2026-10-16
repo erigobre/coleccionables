@@ -156,7 +156,7 @@ export default function AjustesScreen() {
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 
       <View className="mb-8 rounded-lg border border-border bg-surface px-4">
-        <MenuRow icon="at-outline" label="@usuario" value={me.username ?? '—'} href="/(tabs)/perfil/ajustes/usuario" />
+        <MenuRow icon="at-outline" label="Usuario" value={me.username ?? '—'} href="/(tabs)/perfil/ajustes/usuario" />
         <MenuRow
           icon="mail-outline"
           label="Correo"

@@ -5,6 +5,7 @@ export default function PerfilStackLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: { backgroundColor: colors.background },
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTintColor: colors.text,
@@ -20,7 +21,7 @@ export default function PerfilStackLayout() {
       <Stack.Screen name="temporadas/[id]" options={{ title: 'Temporada' }} />
       <Stack.Screen name="invitar" options={{ title: 'Invitar amigos' }} />
       <Stack.Screen name="ajustes/index" options={{ title: 'Ajustes' }} />
-      <Stack.Screen name="ajustes/usuario" options={{ title: '@usuario' }} />
+      <Stack.Screen name="ajustes/usuario" options={{ title: 'Usuario' }} />
       <Stack.Screen name="ajustes/contrasena" options={{ title: 'Contraseña' }} />
       <Stack.Screen name="ajustes/correo" options={{ title: 'Correo' }} />
       <Stack.Screen name="ajustes/pin" options={{ title: 'PIN y bloqueo' }} />

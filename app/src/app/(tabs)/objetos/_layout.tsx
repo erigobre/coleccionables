@@ -14,6 +14,7 @@ export default function ObjetosStackLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: { backgroundColor: colors.background },
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTintColor: colors.text,

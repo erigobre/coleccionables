@@ -5,6 +5,7 @@ export default function ColeccionesStackLayout() {
   return (
     <Stack
       screenOptions={{
+        contentStyle: { backgroundColor: colors.background },
         headerStyle: { backgroundColor: colors.background },
         headerShadowVisible: false,
         headerTintColor: colors.text,
