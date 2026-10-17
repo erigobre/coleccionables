@@ -4,6 +4,8 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
+import { QuickActionSheet } from '../../../../components/ui/QuickActionSheet';
+import { useItemQuickActions } from '../../../../components/items/useItemQuickActions';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../../lib/api';
 import {
@@ -43,13 +45,24 @@ function isWholeCollectionTemporary(items: Item[]): boolean {
   );
 }
 
-function ItemTile({ item, size, onOpen }: { item: Item; size: number; onOpen: () => void }) {
+function ItemTile({
+  item,
+  size,
+  onOpen,
+  onLongPress,
+}: {
+  item: Item;
+  size: number;
+  onOpen: () => void;
+  onLongPress: () => void;
+}) {
   const photo = item.photos[0] ? resolvePhotoUrl(item.photos[0].url) : undefined;
   const tag = item.saleStatus === 'FOR_SALE' ? 'En venta' : item.saleStatus === 'RESERVED' ? 'Apartado' : STATUS_TAG[item.status];
 
   return (
     <Pressable
       onPress={onOpen}
+      onLongPress={onLongPress}
       accessibilityLabel={item.name}
       style={{ width: size, height: size }}
       className="overflow-hidden bg-surfaceElevated active:opacity-80"
@@ -72,6 +85,28 @@ function ItemTile({ item, size, onOpen }: { item: Item; size: number; onOpen: ()
   );
 }
 
+// Monta el hook de acciones rápidas solo para el objeto en long-press,
+// evitando llamarlo una vez por cada tile de la cuadrícula.
+function ActiveItemQuickActions({
+  item,
+  onClose,
+  onChanged,
+  onError,
+}: {
+  item: Item;
+  onClose: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}) {
+  const { allActions, modal } = useItemQuickActions(item, { onChanged, onError });
+  return (
+    <>
+      <QuickActionSheet visible title={item.name} actions={allActions} onClose={onClose} />
+      {modal}
+    </>
+  );
+}
+
 export default function CollectionDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { accessToken } = useAuth();
@@ -85,6 +120,7 @@ export default function CollectionDetailScreen() {
   const [shared, setShared] = useState(false);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [longPressedItem, setLongPressedItem] = useState<Item | null>(null);
 
   const load = useCallback(async () => {
     if (!accessToken || !id) return;
@@ -209,6 +245,7 @@ export default function CollectionDetailScreen() {
               // termina cayendo a Home (bug reportado 2026-10-16) — mismo arreglo
               // que ya usa (tabs)/index.tsx para sus favoritos.
               onOpen={() => router.push(`/objeto/${item.id}`)}
+              onLongPress={() => setLongPressedItem(item)}
             />
           ))}
         </View>
@@ -300,6 +337,14 @@ export default function CollectionDetailScreen() {
         >
           <Ionicons name="people" size={22} color={colors.text} />
         </Pressable>
+      ) : null}
+      {longPressedItem ? (
+        <ActiveItemQuickActions
+          item={longPressedItem}
+          onClose={() => setLongPressedItem(null)}
+          onChanged={load}
+          onError={setError}
+        />
       ) : null}
     </View>
   );

@@ -5,6 +5,8 @@ import { ActivityIndicator, Image, Pressable, ScrollView, Text, TextInput, View 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
+import { SwipeableRow } from '../../../components/ui/SwipeableRow';
+import { useItemQuickActions } from '../../../components/items/useItemQuickActions';
 import { authErrorMessage, useAuth } from '../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../lib/api';
 import { usageLabel } from '../../../lib/item-enums';
@@ -99,6 +101,28 @@ function ItemCard({ item, onToggleFavorite, onOpen, readOnly }: ItemCardProps) {
         </Pressable>
       </View>
     </View>
+  );
+}
+
+interface ItemRowProps {
+  item: Item;
+  onOpen: () => void;
+  onToggleFavorite: () => void;
+  onChanged: () => void;
+  onError: (message: string) => void;
+}
+
+// Envuelve cada tarjeta de la lista con el swipe de acciones rápidas
+// (Compartir/Clonar/Editar a la izquierda, Eliminar/Transferir a la derecha).
+function ItemRow({ item, onOpen, onToggleFavorite, onChanged, onError }: ItemRowProps) {
+  const { leftActions, rightActions, modal } = useItemQuickActions(item, { onChanged, onError });
+  return (
+    <>
+      <SwipeableRow leftActions={leftActions} rightActions={rightActions}>
+        <ItemCard item={item} onToggleFavorite={onToggleFavorite} onOpen={onOpen} />
+      </SwipeableRow>
+      {modal}
+    </>
   );
 }
 
@@ -255,11 +279,13 @@ export default function ObjetosScreen() {
           />
         ) : (
           visibleItems?.map((item) => (
-            <ItemCard
+            <ItemRow
               key={item.id}
               item={item}
               onToggleFavorite={() => onToggleFavorite(item)}
               onOpen={() => router.push(`/(tabs)/objetos/${item.id}`)}
+              onChanged={load}
+              onError={setError}
             />
           ))
         )}

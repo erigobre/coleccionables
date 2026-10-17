@@ -37,6 +37,13 @@ export const colors = {
   wishlist: '#FF4FA3',
   wishlistHover: '#FF7FBE',
 
+  // Azul cielo — solo para la función "Transferir objeto" (botón flotante y
+  // acciones rápidas de deslizar/mantener presionado): mismo patrón que
+  // `sale`/`wishlist`, elegido para quedar entre violeta y turquesa sin
+  // confundirse con ninguno de los dos.
+  transfer: '#3DA5FF',
+  transferHover: '#7CC5FF',
+
   danger: '#FF6B57', // Coral — SOLO uso funcional: "¡Ya lo tienes!", duplicados, errores, destructivo
   dangerText: '#16122B',
 

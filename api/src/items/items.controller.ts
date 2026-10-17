@@ -92,6 +92,11 @@ export class ItemsController {
     return this.itemsService.findOne(user.id, id);
   }
 
+  @Post(':id/clone')
+  clone(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.itemsService.clone(user.id, id);
+  }
+
   @Patch(':id')
   update(
     @CurrentUser() user: AuthenticatedUser,

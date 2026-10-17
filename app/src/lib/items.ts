@@ -196,6 +196,12 @@ export function deleteItem(accessToken: string, id: string) {
   return apiFetch<void>(`/items/${id}`, { method: 'DELETE', accessToken });
 }
 
+// Crea un objeto nuevo a partir de uno existente (nombre, fotos, características,
+// tags, ubicación y colecciones); el clon siempre queda a nombre de quien lo clona.
+export function cloneItem(accessToken: string, id: string) {
+  return apiFetch<Item>(`/items/${id}/clone`, { method: 'POST', accessToken });
+}
+
 // El backend hace un prisma.item.update sin `include`, así que devuelve solo
 // los campos escalares del Item (sin photos/collections/tags/location/season).
 export type ItemScalar = Omit<

@@ -14,6 +14,7 @@ import { conservationLabel, packagingLabel, usageLabel } from '../../../../lib/i
 import {
   addItemToCollection,
   addItemTag,
+  cloneItem,
   fetchItem,
   lookupMarketPrice,
   peekMarketPrice,
@@ -73,6 +74,7 @@ export default function ItemDetailScreen() {
   const [pendingTransfer, setPendingTransfer] = useState<OutgoingTransfer | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [cloning, setCloning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [item, setItem] = useState<Item | null | undefined>(undefined);
   const [collections, setCollections] = useState<Collection[] | null>(null);
@@ -228,6 +230,20 @@ export default function ItemDetailScreen() {
       setError(authErrorMessage(err));
     } finally {
       setSharing(false);
+    }
+  };
+
+  const onClone = async () => {
+    if (!accessToken || !item) return;
+    setCloning(true);
+    setError(null);
+    try {
+      const cloned = await cloneItem(accessToken, item.id);
+      router.push(`/objeto/${cloned.id}`);
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setCloning(false);
     }
   };
 
@@ -643,6 +659,7 @@ export default function ItemDetailScreen() {
                 disabled={pendingActions.includes('SELL')}
               />
             ) : null}
+            <Button label="Clonar objeto" variant="secondary" onPress={onClone} loading={cloning} />
             <Pressable onPress={onUnshare} className="items-center py-2">
               <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
             </Pressable>
@@ -687,13 +704,13 @@ export default function ItemDetailScreen() {
                 : setRequestAction('TRANSFER')
             }
             accessibilityLabel={isRealOwner ? 'Transferir objeto' : 'Solicitar transferencia'}
-            className="absolute h-14 w-14 items-center justify-center rounded-full bg-secondary shadow-lg"
+            className="absolute h-14 w-14 items-center justify-center rounded-full bg-transfer shadow-lg"
             style={{ right: 20, bottom: insets.bottom + 164 }}
           >
             <Ionicons
               name={!isRealOwner && pendingActions.includes('TRANSFER') ? 'time-outline' : 'swap-horizontal'}
               size={24}
-              color={colors.white}
+              color={colors.primaryText}
             />
           </Pressable>
           <Pressable
