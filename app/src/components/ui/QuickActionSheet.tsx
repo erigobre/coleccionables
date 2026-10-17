@@ -9,33 +9,55 @@ interface QuickActionSheetProps {
   onClose: () => void;
 }
 
+const COLUMNS = 3;
+const TILE_SIZE = 76;
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const rows: T[][] = [];
+  for (let i = 0; i < items.length; i += size) rows.push(items.slice(i, i + size));
+  return rows;
+}
+
 export function QuickActionSheet({ visible, title, actions, onClose }: QuickActionSheetProps) {
+  const rows = chunk(actions, COLUMNS);
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <Pressable className="flex-1 justify-end bg-black/60" onPress={onClose}>
-        <Pressable className="gap-2 rounded-t-2xl bg-surface px-4 pb-8 pt-4" onPress={() => {}}>
+        <Pressable className="rounded-t-2xl bg-surface px-5 pb-8 pt-4" onPress={() => {}}>
           {title ? (
-            <Text className="mb-1 text-center text-sm text-textMuted" numberOfLines={1}>
+            <Text className="mb-4 text-center text-sm text-textMuted" numberOfLines={1}>
               {title}
             </Text>
           ) : null}
-          {actions.map((action) => (
-            <Pressable
-              key={action.key}
-              onPress={() => {
-                onClose();
-                action.onPress();
-              }}
-              disabled={action.disabled}
-              className="flex-row items-center gap-3 rounded-xl px-4 py-3"
-              style={{ backgroundColor: action.background, opacity: action.disabled ? 0.5 : 1 }}
-            >
-              <Ionicons name={action.icon} size={20} color={action.iconColor} />
-              <Text style={{ color: action.iconColor }} className="font-body-medium text-sm">
-                {action.label}
-              </Text>
-            </Pressable>
-          ))}
+          <View style={{ gap: 20 }}>
+            {rows.map((row, rowIndex) => (
+              <View key={rowIndex} className="flex-row justify-center" style={{ gap: 20 }}>
+                {row.map((action) => (
+                  <Pressable
+                    key={action.key}
+                    onPress={() => {
+                      onClose();
+                      action.onPress();
+                    }}
+                    disabled={action.disabled}
+                    style={{ width: TILE_SIZE, opacity: action.disabled ? 0.5 : 1 }}
+                    className="items-center gap-1.5"
+                  >
+                    <View
+                      style={{ width: TILE_SIZE, height: TILE_SIZE, borderRadius: 18, backgroundColor: action.background }}
+                      className="items-center justify-center"
+                    >
+                      <Ionicons name={action.icon} size={26} color={action.iconColor} />
+                    </View>
+                    <Text className="text-center text-[11px] text-textSecondary" numberOfLines={2}>
+                      {action.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ))}
+          </View>
         </Pressable>
       </Pressable>
     </Modal>

@@ -55,7 +55,7 @@ function ItemCard({ item, onToggleFavorite, onOpen, readOnly }: ItemCardProps) {
   const locationName = item.currentLocation?.name ?? 'Sin ubicación';
 
   return (
-    <View className="mb-4 flex-row overflow-hidden rounded-xl bg-surface">
+    <View className="flex-row overflow-hidden rounded-xl bg-surface">
       <View className="relative" style={{ width: 90, aspectRatio: 9 / 16 }}>
         {photo ? (
           <Image source={{ uri: photo }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -118,9 +118,13 @@ function ItemRow({ item, onOpen, onToggleFavorite, onChanged, onError }: ItemRow
   const { leftActions, rightActions, modal } = useItemQuickActions(item, { onChanged, onError });
   return (
     <>
-      <SwipeableRow leftActions={leftActions} rightActions={rightActions}>
-        <ItemCard item={item} onToggleFavorite={onToggleFavorite} onOpen={onOpen} />
-      </SwipeableRow>
+      {/* El margen va aquí, no en ItemCard: si quedara dentro de SwipeableRow, el hueco del
+          margen agranda el contenedor que mide "absoluteFill" y las acciones se asoman debajo. */}
+      <View className="mb-4">
+        <SwipeableRow leftActions={leftActions} rightActions={rightActions}>
+          <ItemCard item={item} onToggleFavorite={onToggleFavorite} onOpen={onOpen} />
+        </SwipeableRow>
+      </View>
       {modal}
     </>
   );
@@ -296,7 +300,9 @@ export default function ObjetosScreen() {
               Objetos vendidos que se relacionan con tu búsqueda
             </Text>
             {soldItems.map((item) => (
-              <ItemCard key={item.id} item={item} readOnly onOpen={() => router.push(`/(tabs)/objetos/${item.id}`)} />
+              <View key={item.id} className="mb-4">
+                <ItemCard item={item} readOnly onOpen={() => router.push(`/(tabs)/objetos/${item.id}`)} />
+              </View>
             ))}
           </View>
         ) : null}
