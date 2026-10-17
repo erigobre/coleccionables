@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../../../components/ui/Button';
-import { CloseHeaderButton } from '../../../../components/CloseHeaderButton';
 import { QuickActionSheet } from '../../../../components/ui/QuickActionSheet';
 import { useItemQuickActions } from '../../../../components/items/useItemQuickActions';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
@@ -186,21 +185,13 @@ export default function CollectionDetailScreen() {
 
   // Fuera del if de abajo: se monta desde el primer render para no remontar
   // el Stack.Screen. El título por param (ver colecciones/index.tsx,
-  // invitacion.tsx) evita que cambie de valor tras el primer render en el
-  // caso normal, pero el parpadeo reportado 2026-10-17 resultó ser otra cosa:
-  // el botón "Atrás" NATIVO (headerBackTitle del _layout) tiene aquí un
-  // material "glass" que se recalcula cuando el contenido detrás cambia
-  // (las fotos del grid cargando), independiente del título. Por eso se
-  // reemplaza por un headerLeft propio, renderizado por JS (CloseHeaderButton),
-  // que no tiene ese material y no parpadea.
-  const headerTitle = (
-    <Stack.Screen
-      options={{
-        title: collection?.name ?? name ?? 'Colección',
-        headerLeft: () => <CloseHeaderButton variant="plain" label="Atrás" fallbackTo="/(tabs)/colecciones" />,
-      }}
-    />
-  );
+  // invitacion.tsx) evita que cambie de valor tras el primer render.
+  // Probado reemplazar el botón "Atrás" nativo por uno propio en JS (headerLeft
+  // con CloseHeaderButton) pensando que el material "glass" del nativo causaba
+  // el glitch reportado 2026-10-17 ("brillo" raro) — descartado 2026-10-17: el
+  // usuario confirmó en el dispositivo que el glitch sigue igual con el botón
+  // JS, así que el botón (nativo o no) no es la causa. Se revierte a nativo.
+  const headerTitle = <Stack.Screen options={{ title: collection?.name ?? name ?? 'Colección' }} />;
 
   if (collection === null || items === null) {
     if (error) {
