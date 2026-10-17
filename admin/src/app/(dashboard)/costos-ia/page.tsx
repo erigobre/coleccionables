@@ -15,17 +15,23 @@ interface FtCostReportRow {
   candidatesTokens: number;
   totalTokens: number;
   realCostUsd: number;
+  realCostMxn: number;
   avgRealCostUsdPerCall: number;
   ftPerUsd: number | null;
 }
 
 interface FtCostReport {
   rows: FtCostReportRow[];
-  totals: { calls: number; ftAmount: number; totalTokens: number; realCostUsd: number };
+  totals: { calls: number; ftAmount: number; totalTokens: number; realCostUsd: number; realCostMxn: number };
+  usdToMxnRate: number;
 }
 
 function usd(value: number) {
   return `$${value.toLocaleString('es-MX', { minimumFractionDigits: 4, maximumFractionDigits: 6 })}`;
+}
+
+function mxn(value: number) {
+  return `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} MXN`;
 }
 
 function num(value: number) {
@@ -110,8 +116,13 @@ export default async function CostosIaPage({
         <div className="rounded-xl border border-border p-4">
           <p className="text-xs text-muted-foreground">Costo real (Gemini)</p>
           <p className="text-2xl font-bold text-foreground">{usd(report.totals.realCostUsd)}</p>
+          <p className="text-xs text-muted-foreground">{mxn(report.totals.realCostMxn)}</p>
         </div>
       </div>
+      <p className="text-xs text-muted-foreground">
+        Tipo de cambio usado: ${report.usdToMxnRate.toLocaleString('es-MX', { maximumFractionDigits: 4 })} MXN por
+        USD (Frankfurter.app, actualizado cada 12h)
+      </p>
 
       <div className="overflow-hidden rounded-xl border border-border">
         <Table>
@@ -122,7 +133,8 @@ export default async function CostosIaPage({
               <TableHead className="text-right">Llamadas</TableHead>
               <TableHead className="text-right">FT cobrados</TableHead>
               <TableHead className="text-right">Tokens</TableHead>
-              <TableHead className="text-right">Costo real</TableHead>
+              <TableHead className="text-right">Costo real (USD)</TableHead>
+              <TableHead className="text-right">Costo real (MXN)</TableHead>
               <TableHead className="text-right">Promedio/llamada</TableHead>
               <TableHead className="text-right">FT por $1 real</TableHead>
             </TableRow>
@@ -138,6 +150,7 @@ export default async function CostosIaPage({
                 <TableCell className="text-right text-foreground">{num(row.ftAmount)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{num(row.totalTokens)}</TableCell>
                 <TableCell className="text-right text-foreground">{usd(row.realCostUsd)}</TableCell>
+                <TableCell className="text-right text-foreground">{mxn(row.realCostMxn)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{usd(row.avgRealCostUsdPerCall)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">
                   {row.ftPerUsd === null ? '—' : row.ftPerUsd.toLocaleString('es-MX', { maximumFractionDigits: 0 })}
@@ -146,7 +159,7 @@ export default async function CostosIaPage({
             ))}
             {report.rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
                   No hay cargos confirmados en este rango de fechas
                 </TableCell>
               </TableRow>

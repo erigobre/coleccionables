@@ -19,6 +19,34 @@ import type { FtServiceKey } from '@prisma/client';
 const ACTIVE_WINDOW_DAYS = 30;
 const TIMESERIES_MAX_MONTHS = 12;
 
+// Conversión USD→MXN para el reporte de "Costos de IA" (pedido 2026-10-16,
+// Gemini cobra en USD pero el equipo piensa en pesos). Frankfurter.app no
+// pide API key y no tiene límite de uso para este volumen de tráfico (un
+// panel de admin, no la app). Cache de 12h en memoria: el tipo de cambio no
+// necesita ser más fresco que eso para este reporte, y evita golpear la API
+// externa en cada carga de la página.
+const MXN_RATE_CACHE_MS = 12 * 60 * 60 * 1000;
+const FALLBACK_USD_TO_MXN_RATE = 18.5;
+let cachedMxnRate: { rate: number; fetchedAt: number } | null = null;
+
+async function getUsdToMxnRate(): Promise<number> {
+  if (cachedMxnRate && Date.now() - cachedMxnRate.fetchedAt < MXN_RATE_CACHE_MS) {
+    return cachedMxnRate.rate;
+  }
+  try {
+    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=MXN');
+    const data = (await res.json()) as { rates?: { MXN?: number } };
+    const rate = data.rates?.MXN;
+    if (typeof rate === 'number' && rate > 0) {
+      cachedMxnRate = { rate, fetchedAt: Date.now() };
+      return rate;
+    }
+  } catch {
+    // sin internet o Frankfurter caído: se cae al fallback de abajo.
+  }
+  return cachedMxnRate?.rate ?? FALLBACK_USD_TO_MXN_RATE;
+}
+
 // Catálogo fijo de "Regalos de FT" editables desde Superadmin (§6 del plan de
 // invitaciones). No hay UI para crear claves nuevas a mano: si se necesita
 // otra, se agrega aquí y en el fallback que ya lee el código que la consume.
@@ -263,7 +291,7 @@ export class AdminService {
       ...(service ? { service } : {}),
     };
 
-    const [groups, catalog] = await Promise.all([
+    const [groups, catalog, usdToMxnRate] = await Promise.all([
       this.prisma.ftTransaction.groupBy({
         by: ['userId', 'service'],
         where,
@@ -271,6 +299,7 @@ export class AdminService {
         _sum: { ftAmount: true, realCostUsd: true, promptTokens: true, candidatesTokens: true, totalTokens: true },
       }),
       this.ftService.getCatalog(),
+      getUsdToMxnRate(),
     ]);
 
     const userIds = [...new Set(groups.map((g) => g.userId).filter((id): id is string => id !== null))];
@@ -297,6 +326,7 @@ export class AdminService {
         candidatesTokens: g._sum.candidatesTokens ?? 0,
         totalTokens,
         realCostUsd,
+        realCostMxn: realCostUsd * usdToMxnRate,
         avgRealCostUsdPerCall: calls > 0 ? realCostUsd / calls : 0,
         // FT cobrados por cada $1 de costo real: entre más alto, más margen
         // tiene esa tarifa sobre lo que de verdad cuesta en Gemini.
@@ -312,11 +342,12 @@ export class AdminService {
         ftAmount: acc.ftAmount + r.ftAmount,
         totalTokens: acc.totalTokens + r.totalTokens,
         realCostUsd: acc.realCostUsd + r.realCostUsd,
+        realCostMxn: acc.realCostMxn + r.realCostMxn,
       }),
-      { calls: 0, ftAmount: 0, totalTokens: 0, realCostUsd: 0 },
+      { calls: 0, ftAmount: 0, totalTokens: 0, realCostUsd: 0, realCostMxn: 0 },
     );
 
-    return { rows, totals };
+    return { rows, totals, usdToMxnRate };
   }
 
   // Bitácora del panel: más reciente primero.
