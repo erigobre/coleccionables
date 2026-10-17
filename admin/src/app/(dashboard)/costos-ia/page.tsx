@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { backendFetch } from '@/lib/backend';
+import { DownloadCsvButton } from './download-csv-button';
 
 interface FtCostReportRow {
   userId: string | null;
@@ -107,6 +108,10 @@ export default async function CostosIaPage({
             Filtrar
           </Button>
         </form>
+      </div>
+
+      <div className="flex justify-end">
+        <DownloadCsvButton rows={report.rows} from={effectiveFrom} to={effectiveTo} />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
