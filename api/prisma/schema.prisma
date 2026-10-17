@@ -414,6 +414,11 @@ model FtTransaction {
   promptTokens     Int?
   candidatesTokens Int?
   totalTokens      Int?
+  // Búsquedas de "Grounding with Google Search" que Google facturó en esta
+  // llamada y qué build de Gemini la atendió (reporte de costos reales, Oct
+  // 2026) — null cuando el servicio no usa grounding o no llama a Gemini.
+  groundingRequests Int?
+  modelVersion      String?
   metadata         Json?
   createdAt        DateTime            @default(now())
   confirmedAt      DateTime?

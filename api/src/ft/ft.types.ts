@@ -18,6 +18,11 @@ export interface ConfirmParams {
   promptTokens?: number;
   candidatesTokens?: number;
   totalTokens?: number;
+  // Búsquedas de "Grounding with Google Search" reales que facturó Google en
+  // esta llamada, y qué build de Gemini la atendió (ver gemini.service.ts
+  // estimateCostUsd) — para poder auditar realCostUsd contra la factura real.
+  groundingRequests?: number;
+  modelVersion?: string;
   // Si se manda, además de confirmar el cobro se registra un UsageEvent —
   // así el panel Superadmin (admin.service.ts getStats()) sigue funcionando
   // sin tener que leer la tabla de FrikiTokens.

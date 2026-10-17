@@ -36,6 +36,23 @@ const MODEL = 'gemini-flash-latest';
 const USD_PER_1M_INPUT_TOKENS = 0.075;
 const USD_PER_1M_OUTPUT_TOKENS = 0.3;
 
+// Precios de "Grounding with Google Search" (ai.google.dev/gemini-api/docs/pricing,
+// verificado 2026-10-17) — Google cobra esto APARTE de los tokens y antes no se
+// contaba nada aquí, lo que subestimaba el costo real de analyzePhotos/
+// lookupBarcode/lookupMarketPrice (las 3 llamadas que usan `googleSearch`).
+// Dos esquemas distintos según la generación del modelo que de verdad atendió
+// la llamada (`response.modelVersion`, no el alias `gemini-flash-latest`):
+// - Gemini 3 y más nuevos: $14 por cada 1,000 búsquedas reales ejecutadas
+//   (puede haber varias por prompt) — se multiplica por `groundingQueries`.
+// - Gemini 2.5 y anteriores: $35 por cada 1,000 PROMPTS que buscaron algo
+//   (una sola búsqueda o diez cuestan igual) — cargo fijo si hubo grounding.
+// Ambos esquemas además tienen una cuota gratis mensual/diaria que aquí no se
+// resta (no se lleva la cuenta de cuánto de esa cuota ya se consumió a nivel
+// de cuenta de Google), así que esta estimación puede ser ligeramente más
+// alta que el costo real a bajo volumen — preferible a seguir subestimando.
+const USD_PER_1000_GROUNDING_QUERIES_GEMINI3 = 14;
+const USD_PER_GROUNDED_PROMPT_GEMINI25 = 35 / 1000;
+
 // Umbral bajo/medio deliberadamente estricto: falsos positivos aquí solo
 // cuestan un reintento ("sube otra foto"), pero un falso negativo en
 // contenido sexual es lo que este chequeo existe para evitar.
@@ -426,10 +443,13 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
   // respuesta al usuario.
   private extractUsage(response: GenerateContentResponse): GeminiUsage {
     const meta = response.usageMetadata;
+    const groundingQueries = response.candidates?.[0]?.groundingMetadata?.webSearchQueries?.length ?? 0;
     return {
       promptTokens: meta?.promptTokenCount ?? 0,
       candidatesTokens: meta?.candidatesTokenCount ?? 0,
       totalTokens: meta?.totalTokenCount ?? 0,
+      groundingQueries,
+      modelVersion: response.modelVersion,
     };
   }
 
@@ -438,8 +458,17 @@ Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown) con 
   static estimateCostUsd(usage: GeminiUsage): number {
     return (
       (usage.promptTokens / 1_000_000) * USD_PER_1M_INPUT_TOKENS +
-      (usage.candidatesTokens / 1_000_000) * USD_PER_1M_OUTPUT_TOKENS
+      (usage.candidatesTokens / 1_000_000) * USD_PER_1M_OUTPUT_TOKENS +
+      this.estimateGroundingCostUsd(usage)
     );
+  }
+
+  private static estimateGroundingCostUsd(usage: GeminiUsage): number {
+    if (!usage.groundingQueries) return 0;
+    const isGemini3OrNewer = /gemini-3/.test(usage.modelVersion ?? '');
+    return isGemini3OrNewer
+      ? (usage.groundingQueries / 1000) * USD_PER_1000_GROUNDING_QUERIES_GEMINI3
+      : USD_PER_GROUNDED_PROMPT_GEMINI25;
   }
 
   private parseMarketPriceResponse(text: string, currency: string): MarketPriceResult {

@@ -62,6 +62,17 @@ export interface GeminiUsage {
   promptTokens: number;
   candidatesTokens: number;
   totalTokens: number;
+  // Número de búsquedas web reales que Gemini ejecutó con la herramienta
+  // `googleSearch` (grounding) en esta llamada — viene de
+  // `groundingMetadata.webSearchQueries`, 0 si no buscó nada (o si la llamada
+  // no usa esa herramienta, ej. compareCandidates). Es la unidad de cobro de
+  // Google para modelos Gemini 3+; para Gemini 2.5 o anteriores, Google cobra
+  // por prompt que haya buscado algo, sin importar cuántas búsquedas hizo.
+  groundingQueries: number;
+  // `response.modelVersion`: qué build respondió realmente esta llamada (el
+  // alias `gemini-flash-latest` puede apuntar a distinta generación con el
+  // tiempo). Se guarda para saber qué fórmula de precio de grounding aplica.
+  modelVersion?: string;
 }
 
 // Señal de moderación de contenido para fotos subidas por el usuario (ver

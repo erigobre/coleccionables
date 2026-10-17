@@ -554,6 +554,8 @@ export class ItemsService {
           promptTokens: usage.promptTokens + visualUsage.promptTokens,
           candidatesTokens: usage.candidatesTokens + visualUsage.candidatesTokens,
           totalTokens: usage.totalTokens + visualUsage.totalTokens,
+          groundingRequests: usage.groundingQueries + visualUsage.groundingQueries,
+          modelVersion: usage.modelVersion,
           usageEventType: 'AI_SCAN' as const,
         };
       },
@@ -577,7 +579,7 @@ export class ItemsService {
     visualCostUsd: number;
     visualUsage: GeminiUsage;
   }> {
-    const zeroUsage: GeminiUsage = { promptTokens: 0, candidatesTokens: 0, totalTokens: 0 };
+    const zeroUsage: GeminiUsage = { promptTokens: 0, candidatesTokens: 0, totalTokens: 0, groundingQueries: 0 };
     const topCandidates = matches.slice(0, 3);
     if (topCandidates.length === 0) {
       return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0, visualUsage: zeroUsage };
@@ -762,6 +764,8 @@ export class ItemsService {
           promptTokens: usage.promptTokens,
           candidatesTokens: usage.candidatesTokens,
           totalTokens: usage.totalTokens,
+          groundingRequests: usage.groundingQueries,
+          modelVersion: usage.modelVersion,
           usageEventType: 'MARKET_PRICE_LOOKUP' as const,
           usageEventMetadata: { itemId: id, fromCache: false },
         };
@@ -801,6 +805,8 @@ export class ItemsService {
           promptTokens: usage.promptTokens,
           candidatesTokens: usage.candidatesTokens,
           totalTokens: usage.totalTokens,
+          groundingRequests: usage.groundingQueries,
+          modelVersion: usage.modelVersion,
           usageEventType: 'AI_SCAN' as const,
         };
       },
@@ -912,6 +918,8 @@ export class ItemsService {
           promptTokens: usage.promptTokens,
           candidatesTokens: usage.candidatesTokens,
           totalTokens: usage.totalTokens,
+          groundingRequests: usage.groundingQueries,
+          modelVersion: usage.modelVersion,
           usageEventType: 'AI_SCAN' as const,
         };
       },

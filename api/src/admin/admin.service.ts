@@ -291,12 +291,29 @@ export class AdminService {
       ...(service ? { service } : {}),
     };
 
-    const [groups, catalog, usdToMxnRate] = await Promise.all([
+    const [groups, modelVersionGroups, catalog, usdToMxnRate] = await Promise.all([
       this.prisma.ftTransaction.groupBy({
         by: ['userId', 'service'],
         where,
         _count: { _all: true },
-        _sum: { ftAmount: true, realCostUsd: true, promptTokens: true, candidatesTokens: true, totalTokens: true },
+        _sum: {
+          ftAmount: true,
+          realCostUsd: true,
+          promptTokens: true,
+          candidatesTokens: true,
+          totalTokens: true,
+          groundingRequests: true,
+        },
+      }),
+      // Qué build de Gemini respondió de verdad cada llamada (el alias
+      // `gemini-flash-latest` puede apuntar a otra generación con el tiempo,
+      // y de eso depende qué fórmula de precio de grounding aplica) — ver
+      // gemini.service.ts estimateCostUsd.
+      this.prisma.ftTransaction.groupBy({
+        by: ['modelVersion'],
+        where: { ...where, modelVersion: { not: null } },
+        _count: { _all: true },
+        _sum: { groundingRequests: true },
       }),
       this.ftService.getCatalog(),
       getUsdToMxnRate(),
@@ -325,6 +342,7 @@ export class AdminService {
         promptTokens: g._sum.promptTokens ?? 0,
         candidatesTokens: g._sum.candidatesTokens ?? 0,
         totalTokens,
+        groundingRequests: g._sum.groundingRequests ?? 0,
         realCostUsd,
         realCostMxn: realCostUsd * usdToMxnRate,
         avgRealCostUsdPerCall: calls > 0 ? realCostUsd / calls : 0,
@@ -341,13 +359,25 @@ export class AdminService {
         calls: acc.calls + r.calls,
         ftAmount: acc.ftAmount + r.ftAmount,
         totalTokens: acc.totalTokens + r.totalTokens,
+        groundingRequests: acc.groundingRequests + r.groundingRequests,
         realCostUsd: acc.realCostUsd + r.realCostUsd,
         realCostMxn: acc.realCostMxn + r.realCostMxn,
       }),
-      { calls: 0, ftAmount: 0, totalTokens: 0, realCostUsd: 0, realCostMxn: 0 },
+      { calls: 0, ftAmount: 0, totalTokens: 0, groundingRequests: 0, realCostUsd: 0, realCostMxn: 0 },
     );
 
-    return { rows, totals, usdToMxnRate };
+    // Qué build de Gemini atendió realmente las llamadas en este rango — para
+    // confirmar a qué generación apunta hoy el alias `gemini-flash-latest`
+    // (de eso depende la fórmula de precio de grounding que se usó arriba).
+    const modelVersions = modelVersionGroups
+      .map((g) => ({
+        modelVersion: g.modelVersion as string,
+        calls: g._count._all,
+        groundingRequests: g._sum.groundingRequests ?? 0,
+      }))
+      .sort((a, b) => b.calls - a.calls);
+
+    return { rows, totals, usdToMxnRate, modelVersions };
   }
 
   // Bitácora del panel: más reciente primero.

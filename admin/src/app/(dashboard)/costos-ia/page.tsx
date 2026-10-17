@@ -14,6 +14,7 @@ interface FtCostReportRow {
   promptTokens: number;
   candidatesTokens: number;
   totalTokens: number;
+  groundingRequests: number;
   realCostUsd: number;
   realCostMxn: number;
   avgRealCostUsdPerCall: number;
@@ -22,8 +23,16 @@ interface FtCostReportRow {
 
 interface FtCostReport {
   rows: FtCostReportRow[];
-  totals: { calls: number; ftAmount: number; totalTokens: number; realCostUsd: number; realCostMxn: number };
+  totals: {
+    calls: number;
+    ftAmount: number;
+    totalTokens: number;
+    groundingRequests: number;
+    realCostUsd: number;
+    realCostMxn: number;
+  };
   usdToMxnRate: number;
+  modelVersions: { modelVersion: string; calls: number; groundingRequests: number }[];
 }
 
 function usd(value: number) {
@@ -124,6 +133,22 @@ export default async function CostosIaPage({
         USD (Frankfurter.app, actualizado cada 12h)
       </p>
 
+      {report.modelVersions.length > 0 && (
+        <div className="rounded-xl border border-border p-4">
+          <p className="text-xs text-muted-foreground">
+            Build de Gemini que atendió las llamadas en este rango (el alias <code>gemini-flash-latest</code> puede
+            apuntar a otra generación con el tiempo — de eso depende la fórmula de precio de grounding usada arriba)
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {report.modelVersions.map((mv) => (
+              <Badge key={mv.modelVersion} variant="outline">
+                {mv.modelVersion}: {num(mv.calls)} llamadas, {num(mv.groundingRequests)} búsquedas grounding
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-xl border border-border">
         <Table>
           <TableHeader>
@@ -133,6 +158,7 @@ export default async function CostosIaPage({
               <TableHead className="text-right">Llamadas</TableHead>
               <TableHead className="text-right">FT cobrados</TableHead>
               <TableHead className="text-right">Tokens</TableHead>
+              <TableHead className="text-right">Búsquedas grounding</TableHead>
               <TableHead className="text-right">Costo real (USD)</TableHead>
               <TableHead className="text-right">Costo real (MXN)</TableHead>
               <TableHead className="text-right">Promedio/llamada</TableHead>
@@ -149,6 +175,7 @@ export default async function CostosIaPage({
                 <TableCell className="text-right text-foreground">{num(row.calls)}</TableCell>
                 <TableCell className="text-right text-foreground">{num(row.ftAmount)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{num(row.totalTokens)}</TableCell>
+                <TableCell className="text-right text-muted-foreground">{num(row.groundingRequests)}</TableCell>
                 <TableCell className="text-right text-foreground">{usd(row.realCostUsd)}</TableCell>
                 <TableCell className="text-right text-foreground">{mxn(row.realCostMxn)}</TableCell>
                 <TableCell className="text-right text-muted-foreground">{usd(row.avgRealCostUsdPerCall)}</TableCell>
@@ -159,7 +186,7 @@ export default async function CostosIaPage({
             ))}
             {report.rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={9} className="py-8 text-center text-muted-foreground">
+                <TableCell colSpan={10} className="py-8 text-center text-muted-foreground">
                   No hay cargos confirmados en este rango de fechas
                 </TableCell>
               </TableRow>

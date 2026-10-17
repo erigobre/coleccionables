@@ -225,6 +225,8 @@ export class FtService {
         promptTokens: params.promptTokens,
         candidatesTokens: params.candidatesTokens,
         totalTokens: params.totalTokens,
+        groundingRequests: params.groundingRequests,
+        modelVersion: params.modelVersion,
       },
     });
 
@@ -274,6 +276,8 @@ export class FtService {
         promptTokens?: number;
         candidatesTokens?: number;
         totalTokens?: number;
+        groundingRequests?: number;
+        modelVersion?: string;
         usageEventType?: ConfirmParams['usageEventType'];
         usageEventMetadata?: ConfirmParams['usageEventMetadata'];
       }
@@ -291,13 +295,24 @@ export class FtService {
     }
 
     try {
-      const { data, realCostUsd, promptTokens, candidatesTokens, totalTokens, usageEventType, usageEventMetadata } =
-        await action();
+      const {
+        data,
+        realCostUsd,
+        promptTokens,
+        candidatesTokens,
+        totalTokens,
+        groundingRequests,
+        modelVersion,
+        usageEventType,
+        usageEventMetadata,
+      } = await action();
       await this.confirm(transaction.id, {
         realCostUsd,
         promptTokens,
         candidatesTokens,
         totalTokens,
+        groundingRequests,
+        modelVersion,
         usageEventType,
         usageEventMetadata,
       });
