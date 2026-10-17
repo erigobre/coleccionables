@@ -228,8 +228,7 @@ export default function CollectionMembersScreen() {
       contentContainerStyle={{ paddingTop: 8, paddingBottom: 60, paddingHorizontal: 20 }}
     >
       <Text className="mb-4 text-sm text-textMuted">
-        Un objeto agregado por cualquier miembro se vuelve visible para todo el grupo (y su ubicación, de solo
-        lectura), pero siempre conserva a su dueño real.
+        ¡Invita a tus amigos y familia a tener una colección compartida!
       </Text>
 
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
