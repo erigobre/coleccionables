@@ -165,6 +165,24 @@ export class EmailService {
     });
   }
 
+  // Confirmación de alta en la lista de espera (landing, antes de que exista
+  // cuenta) — WaitlistService.join. Sin nombre: el formulario de la landing
+  // solo pide correo/interés, no identidad.
+  async sendWaitlistConfirmationEmail({ toEmail }: { toEmail: string }) {
+    await this.send({
+      toEmail,
+      fromAddress: 'noreply',
+      subject: 'Ya estás en la lista de espera de Frikidex',
+      html: buildSimpleEmailHtml({
+        heading: '¡Listo, ya estás en la lista!',
+        bodyHtml: `
+          <p>Gracias por tu interés en Frikidex. Te avisaremos a este correo en cuanto esté disponible para ti.</p>
+        `,
+      }),
+      logContext: `confirmación de lista de espera a ${toEmail}`,
+    });
+  }
+
   // Punto de entrada compartido para el resto de correos transaccionales
   // (no son invitaciones) — usan no-reply@frikidex.com por defecto.
   private async send({

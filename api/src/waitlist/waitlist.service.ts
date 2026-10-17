@@ -1,5 +1,6 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { EmailService } from '../email/email.service.js';
 import type { JoinWaitlistDto } from './dto/join-waitlist.dto.js';
 
 const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hora
@@ -11,7 +12,10 @@ export class WaitlistService {
   // Coolify. Si algún día se replica, mover esto a Redis o a una tabla.
   private readonly attemptsByIp = new Map<string, number[]>();
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly emailService: EmailService,
+  ) {}
 
   private isRateLimited(ip: string): boolean {
     const now = Date.now();
@@ -33,14 +37,19 @@ export class WaitlistService {
     }
 
     const email = dto.email.trim().toLowerCase();
+    const existing = await this.prisma.waitlist.findUnique({ where: { email } });
     await this.prisma.waitlist.upsert({
       where: { email },
       create: { email, interest: dto.interest, source: dto.source ?? 'landing', ip },
       update: { interest: dto.interest, source: dto.source ?? 'landing', ip },
     });
 
-    // TODO(email de confirmación): falta elegir proveedor de correo
-    // transaccional (Resend/SendGrid/SES) — hoy solo se guarda en BD.
+    // Solo se confirma la primera vez: si ya estaba en la lista y vuelve a
+    // mandar el formulario (p. ej. para actualizar su interés), no hace falta
+    // mandarle el mismo correo de nuevo.
+    if (!existing) {
+      await this.emailService.sendWaitlistConfirmationEmail({ toEmail: email });
+    }
 
     return { ok: true };
   }
