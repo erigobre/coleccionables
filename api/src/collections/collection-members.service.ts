@@ -1,5 +1,6 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { displayHandle } from '../common/user-display.util.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { FtService } from '../ft/ft.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -63,11 +64,14 @@ export class CollectionMembersService {
       data: { collectionId, invitedByUserId: ownerId, targetUserId: invitee.id },
     });
 
-    const inviter = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } });
+    const inviter = await this.prisma.user.findUniqueOrThrow({
+      where: { id: ownerId },
+      select: { name: true, username: true },
+    });
     this.notifications
       .sendPushToUser(invitee.id, {
         title: 'Invitación a colección compartida',
-        body: `${inviter.name} te invitó a unirte a "${collection.name}"`,
+        body: `${displayHandle(inviter)} te invitó a unirte a "${collection.name}"`,
         data: { type: 'collection_invite', collectionId, collectionName: collection.name, inviteId: invite.id },
       })
       .catch(() => {});
@@ -100,11 +104,14 @@ export class CollectionMembersService {
     });
 
     if (collection.ownerId !== userId) {
-      const joined = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { name: true } });
+      const joined = await this.prisma.user.findUniqueOrThrow({
+        where: { id: userId },
+        select: { name: true, username: true },
+      });
       this.notifications
         .sendPushToUser(collection.ownerId, {
           title: 'Invitación aceptada',
-          body: `${joined.name} se unió a "${collection.name}"`,
+          body: `${displayHandle(joined)} se unió a "${collection.name}"`,
           data: { type: 'collection_joined', collectionId },
         })
         .catch(() => {});
@@ -194,7 +201,10 @@ export class CollectionMembersService {
       throw new NotFoundException('Ese usuario no es miembro de esta colección');
     }
 
-    const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } });
+    const owner = await this.prisma.user.findUniqueOrThrow({
+      where: { id: ownerId },
+      select: { name: true, username: true },
+    });
 
     const links = await this.prisma.itemCollection.findMany({
       where: { collectionId, item: { ownerId: memberUserId } },
@@ -208,7 +218,7 @@ export class CollectionMembersService {
       this.notifications
         .sendPushToUser(memberUserId, {
           title: 'Saliste de una colección compartida',
-          body: `${owner.name} te sacó de "${collection.name}"${
+          body: `${displayHandle(owner)} te sacó de "${collection.name}"${
             links.length ? ` y ${links.length === 1 ? '1 objeto se desvinculó' : `${links.length} objetos se desvincularon`}` : ''
           }.`,
           data: { type: 'collection_removed', collectionId },
@@ -228,7 +238,10 @@ export class CollectionMembersService {
       throw new BadRequestException('El destinatario debe ser miembro de la colección');
     }
 
-    const memberUser = await this.prisma.user.findUniqueOrThrow({ where: { id: memberUserId }, select: { name: true } });
+    const memberUser = await this.prisma.user.findUniqueOrThrow({
+      where: { id: memberUserId },
+      select: { name: true, username: true },
+    });
     const transferableIds = links.filter((l) => l.item.status === 'ACTIVE').map((l) => l.itemId);
     // Lo que no esté ACTIVE (ya en otra transferencia, vendido, etc.) no se puede
     // ofrecer ahora mismo: se resuelve como expulsión simple para esos objetos.
@@ -237,7 +250,7 @@ export class CollectionMembersService {
     for (const itemId of transferableIds) {
       await this.transfersService.initiate(
         memberUserId,
-        memberUser.name,
+        displayHandle(memberUser),
         { itemId, toUserEmail: recipient.email },
         { initiatedByUserId: ownerId, initiatedFromCollectionId: collectionId },
       );
@@ -252,9 +265,9 @@ export class CollectionMembersService {
     this.notifications
       .sendPushToUser(memberUserId, {
         title: 'Saliste de una colección compartida',
-        body: `${owner.name} te sacó de "${collection.name}"${
+        body: `${displayHandle(owner)} te sacó de "${collection.name}"${
           transferableIds.length
-            ? `. Se solicitó transferir ${transferableIds.length === 1 ? '1 objeto' : `${transferableIds.length} objetos`} a ${recipient.name}`
+            ? `. Se solicitó transferir ${transferableIds.length === 1 ? '1 objeto' : `${transferableIds.length} objetos`} a ${displayHandle(recipient)}`
             : ''
         }.`,
         data: { type: 'collection_removed', collectionId },

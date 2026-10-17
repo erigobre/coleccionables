@@ -5,14 +5,23 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { EmptyState } from '../../../components/ui/EmptyState';
 import { Screen } from '../../../components/ui/Screen';
+import { MemberAvatarStack } from '../../../components/collections/MemberAvatarStack';
 import { authErrorMessage, useAuth } from '../../../context/auth-context';
 import { collectionIconName } from '../../../lib/collection-icons';
 import { fetchActiveCollections, type Collection } from '../../../lib/collections';
 import { colors } from '../../../theme/tokens';
 
-function CollectionCard({ collection, onOpen }: { collection: Collection; onOpen: () => void }) {
+function CollectionCard({
+  collection,
+  onOpen,
+  onOpenMembers,
+}: {
+  collection: Collection;
+  onOpen: () => void;
+  onOpenMembers: () => void;
+}) {
   return (
-    <Pressable onPress={onOpen} className="mb-4 w-[48%] rounded-xl bg-surface p-4 active:opacity-80">
+    <Pressable onPress={onOpen} className="relative mb-4 w-[48%] rounded-xl bg-surface p-4 active:opacity-80">
       <View className="mb-3 h-12 w-12 items-center justify-center rounded-full bg-secondary">
         <Ionicons name={collectionIconName(collection.icon)} size={22} color={colors.white} />
       </View>
@@ -22,6 +31,7 @@ function CollectionCard({ collection, onOpen }: { collection: Collection; onOpen
       <Text className="mt-1 text-xs text-textMuted">
         {collection.itemCount === 1 ? '1 objeto' : `${collection.itemCount} objetos`}
       </Text>
+      {collection.members ? <MemberAvatarStack members={collection.members} onPress={onOpenMembers} /> : null}
     </Pressable>
   );
 }
@@ -86,6 +96,9 @@ export default function ColeccionesScreen() {
               collection={collection}
               onOpen={() =>
                 router.push({ pathname: '/(tabs)/colecciones/[id]', params: { id: collection.id, name: collection.name } })
+              }
+              onOpenMembers={() =>
+                router.push({ pathname: '/(tabs)/colecciones/[id]/miembros', params: { id: collection.id } })
               }
             />
           ))}

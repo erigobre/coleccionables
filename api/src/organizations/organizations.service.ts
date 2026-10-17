@@ -3,6 +3,8 @@ import * as bcrypt from 'bcrypt';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { EmailService } from '../email/email.service.js';
+import { displayHandle } from '../common/user-display.util.js';
+import { generateUsernameFromName } from '../auth/username-generator.util.js';
 import type { InviteMemberDto } from '../auth/dto/invite-member.dto.js';
 
 const SALT_ROUNDS = 10;
@@ -89,12 +91,21 @@ export class OrganizationsService {
 
     if (!existing) {
       const passwordHash = await bcrypt.hash(dto.temporaryPassword, SALT_ROUNDS);
+      // @usuario obligatorio desde hoy para toda cuenta nueva (decisión del
+      // usuario 2026-10-17): este formulario no pide @usuario, así que se
+      // autogenera a partir del nombre con la misma "autopropuesta" que ya
+      // usa el registro normal.
+      const username = await generateUsernameFromName(
+        dto.name,
+        async (candidate) => !!(await this.prisma.user.findUnique({ where: { username: candidate } })),
+      );
       const created = await this.prisma.user.create({
         data: {
           organizationId: organization.id,
           email,
           passwordHash,
           name: dto.name,
+          username,
           role: 'MEMBER',
         },
       });
@@ -130,7 +141,7 @@ export class OrganizationsService {
     this.notifications
       .sendPushToUser(existing.id, {
         title: 'Invitación a familia de FrikiTokens',
-        body: `${owner.name} te invitó a compartir su suscripción en Frikidex`,
+        body: `${displayHandle(owner)} te invitó a compartir su suscripción en Frikidex`,
         data: { type: 'organization_invite', inviteId: invite.id },
       })
       .catch(() => {});
@@ -194,7 +205,7 @@ export class OrganizationsService {
     this.notifications
       .sendPushToUser(invite.invitedByUserId, {
         title: 'Invitación aceptada',
-        body: `${invitee.name} aceptó unirse a tu familia de FrikiTokens`,
+        body: `${displayHandle(invitee)} aceptó unirse a tu familia de FrikiTokens`,
         data: { type: 'organization_invite_accepted', inviteId },
       })
       .catch(() => {});
@@ -253,7 +264,7 @@ export class OrganizationsService {
     this.notifications
       .sendPushToUser(memberUserId, {
         title: 'Saliste de la familia de FrikiTokens',
-        body: `${owner.name} te quitó de su familia de FrikiTokens`,
+        body: `${displayHandle(owner)} te quitó de su familia de FrikiTokens`,
         data: { type: 'organization_member_removed' },
       })
       .catch(() => {});

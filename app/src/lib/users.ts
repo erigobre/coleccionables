@@ -21,6 +21,13 @@ export interface Me {
   };
 }
 
+// Para notificaciones: se prefiere el @usuario (identidad pública y estable)
+// sobre el nombre real. Cae al nombre solo para cuentas legacy sin @usuario
+// (decisión del usuario 2026-10-17). Espejo de api/src/common/user-display.util.ts.
+export function displayHandle(user: { name: string; username?: string | null }): string {
+  return user.username ? `@${user.username}` : user.name;
+}
+
 export function fetchMe(accessToken: string) {
   return apiFetch<Me>('/users/me', { accessToken });
 }

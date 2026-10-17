@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { ItemActionRequestType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { displayHandle } from '../common/user-display.util.js';
 import { ItemsService } from './items.service.js';
 import { TransfersService } from '../transfers/transfers.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -64,12 +65,12 @@ export class ItemActionRequestsService {
 
     const requester = await this.prisma.user.findUniqueOrThrow({
       where: { id: requestedByUserId },
-      select: { name: true },
+      select: { name: true, username: true },
     });
     this.notifications
       .sendPushToUser(item.ownerId, {
         title: 'Solicitud de autorización',
-        body: `${requester.name} quiere ${ACTION_LABELS[dto.action]} "${item.name}"`,
+        body: `${displayHandle(requester)} quiere ${ACTION_LABELS[dto.action]} "${item.name}"`,
         data: { type: `item_action_request_${dto.action.toLowerCase()}`, itemId, requestId: request.id },
       })
       .catch(() => {});
@@ -86,7 +87,10 @@ export class ItemActionRequestsService {
       throw new BadRequestException('Esta solicitud ya no está pendiente');
     }
 
-    const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } });
+    const owner = await this.prisma.user.findUniqueOrThrow({
+      where: { id: ownerId },
+      select: { name: true, username: true },
+    });
 
     // Se ejecuta la acción real como el dueño, reusando los métodos existentes
     // sin relajar sus checks estrictos — si el objeto ya no está en estado
@@ -95,7 +99,7 @@ export class ItemActionRequestsService {
     if (request.action === ItemActionRequestType.TRANSFER) {
       await this.transfersService.initiate(
         ownerId,
-        owner.name,
+        displayHandle(owner),
         { itemId: request.itemId, toUserEmail: request.toEmail! },
         { initiatedByUserId: request.requestedByUserId },
       );
@@ -116,7 +120,7 @@ export class ItemActionRequestsService {
     this.notifications
       .sendPushToUser(request.requestedByUserId, {
         title: 'Solicitud autorizada',
-        body: `${owner.name} autorizó ${ACTION_LABELS[request.action]} tu objeto`,
+        body: `${displayHandle(owner)} autorizó ${ACTION_LABELS[request.action]} tu objeto`,
         data: { type: 'item_action_request_accepted', itemId: request.itemId, requestId },
       })
       .catch(() => {});
@@ -138,12 +142,15 @@ export class ItemActionRequestsService {
       data: { status: 'REJECTED', respondedAt: new Date() },
     });
 
-    const owner = await this.prisma.user.findUniqueOrThrow({ where: { id: ownerId }, select: { name: true } });
+    const owner = await this.prisma.user.findUniqueOrThrow({
+      where: { id: ownerId },
+      select: { name: true, username: true },
+    });
     const item = await this.prisma.item.findUnique({ where: { id: request.itemId }, select: { name: true } });
     this.notifications
       .sendPushToUser(request.requestedByUserId, {
         title: 'Solicitud rechazada',
-        body: `${owner.name} rechazó tu solicitud para ${ACTION_LABELS[request.action]} "${item?.name ?? 'el objeto'}"`,
+        body: `${displayHandle(owner)} rechazó tu solicitud para ${ACTION_LABELS[request.action]} "${item?.name ?? 'el objeto'}"`,
         data: { type: 'item_action_request_rejected', itemId: request.itemId, requestId },
       })
       .catch(() => {});

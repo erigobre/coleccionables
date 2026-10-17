@@ -1,5 +1,12 @@
 import { apiFetch } from './api';
 
+export interface CollectionMemberAvatar {
+  id: string;
+  name: string;
+  username: string | null;
+  avatarUrl: string | null;
+}
+
 export interface Collection {
   id: string;
   ownerId: string;
@@ -11,6 +18,9 @@ export interface Collection {
   itemCount: number;
   createdAt: string;
   updatedAt: string;
+  // Solo viene en /collections (la lista de la pantalla Colecciones), no en
+  // /collections/manage. Más de 1 miembro = colección compartida.
+  members?: CollectionMemberAvatar[];
 }
 
 // Orden por relevancia (mayor cantidad de objetos) ya viene resuelto del backend.

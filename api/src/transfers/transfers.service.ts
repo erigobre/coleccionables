@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { displayHandle } from '../common/user-display.util.js';
 import { CollectionsService } from '../collections/collections.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -43,9 +44,11 @@ export class TransfersService {
   // propio dueño sino el OWNER de una colección compartida, al expulsarlo del
   // grupo y pedirle que ceda sus objetos a otro miembro (ver
   // CollectionMembersService.removeMember, modo TRANSFER).
+  // fromUserHandle: ya resuelto por el caller con displayHandle() — nunca pasar
+  // aquí un nombre real crudo (decisión del usuario 2026-10-17: @usuario, no nombre).
   async initiate(
     fromUserId: string,
-    fromUserName: string,
+    fromUserHandle: string,
     dto: InitiateTransferDto,
     options?: { initiatedByUserId?: string; initiatedFromCollectionId?: string },
   ) {
@@ -93,13 +96,13 @@ export class TransfersService {
       this.notifications
         .sendPushToUser(toUser.id, {
           title: 'Nueva transferencia',
-          body: `${fromUserName} te envió "${item.name}". Revisa tus transferencias.`,
+          body: `${fromUserHandle} te envió "${item.name}". Revisa tus transferencias.`,
           data: { type: 'transfer', transferId: transfer.id },
         })
         .catch(() => {});
     } else {
       this.emailService
-        .sendTransferInviteEmail({ toEmail: dto.toUserEmail, fromUserName, itemName: item.name })
+        .sendTransferInviteEmail({ toEmail: dto.toUserEmail, fromUserName: fromUserHandle, itemName: item.name })
         .catch(() => {});
     }
 
@@ -169,11 +172,14 @@ export class TransfersService {
     // que la pidió no es ninguna de las dos partes del Transfer (ni fromUser ni
     // toUser) y de otro modo nunca se entera de que se concretó.
     if (transfer.initiatedByUserId) {
-      const recipient = await this.prisma.user.findUniqueOrThrow({ where: { id: toUserId }, select: { name: true } });
+      const recipient = await this.prisma.user.findUniqueOrThrow({
+        where: { id: toUserId },
+        select: { name: true, username: true },
+      });
       this.notifications
         .sendPushToUser(transfer.initiatedByUserId, {
           title: 'Transferencia aceptada',
-          body: `${recipient.name} aceptó "${originalItem.name}"`,
+          body: `${displayHandle(recipient)} aceptó "${originalItem.name}"`,
           data: { type: 'transfer_accepted', transferId: transfer.id },
         })
         .catch(() => {});
@@ -220,7 +226,7 @@ export class TransfersService {
       where: { toUserId: userId, status: 'PENDING' },
       include: {
         item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } },
-        fromUser: { select: { id: true, name: true } },
+        fromUser: { select: { id: true, name: true, username: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -231,7 +237,7 @@ export class TransfersService {
       where: { fromUserId: userId },
       include: {
         item: { include: { photos: { orderBy: { order: 'asc' }, take: 1 } } },
-        toUser: { select: { id: true, name: true, email: true } },
+        toUser: { select: { id: true, name: true, username: true, email: true } },
       },
       orderBy: { createdAt: 'desc' },
     });

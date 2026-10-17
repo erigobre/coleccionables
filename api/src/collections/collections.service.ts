@@ -36,11 +36,24 @@ export class CollectionsService {
   async findAllActive(userId: string) {
     const collections = await this.prisma.collection.findMany({
       where: { status: 'ACTIVE', OR: [{ ownerId: userId }, { members: { some: { userId } } }] },
-      include: { _count: { select: { itemLinks: true } } },
+      include: {
+        _count: { select: { itemLinks: true } },
+        // Alimenta el avatar-stack de "colección compartida" en la lista
+        // (solo Colecciones, no en /manage): barato porque el tope de
+        // miembros ya está limitado a 5 (ver assertUnderMemberCap).
+        members: {
+          select: { user: { select: { id: true, name: true, username: true, avatarUrl: true } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
     });
 
     return collections
-      .map((c) => ({ ...c, itemCount: c._count.itemLinks }))
+      .map((c) => ({
+        ...c,
+        itemCount: c._count.itemLinks,
+        members: c.members.map((m) => m.user),
+      }))
       .sort((a, b) => b.itemCount - a.itemCount);
   }
 

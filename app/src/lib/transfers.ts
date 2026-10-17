@@ -17,13 +17,13 @@ interface TransferBase {
 
 // El receptor solo ve el nombre del remitente (nunca su correo).
 export interface IncomingTransfer extends TransferBase {
-  fromUser: { id: string; name: string };
+  fromUser: { id: string; name: string; username: string | null };
 }
 
 // toUser es null mientras el destinatario no tenga cuenta (la transferencia
 // se envió por invitación de correo); en ese caso el correo está en toEmail.
 export interface OutgoingTransfer extends TransferBase {
-  toUser: { id: string; name: string; email: string } | null;
+  toUser: { id: string; name: string; username: string | null; email: string } | null;
   toEmail: string;
 }
 

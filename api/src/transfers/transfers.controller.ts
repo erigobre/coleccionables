@@ -2,6 +2,7 @@ import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/co
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { CurrentUser } from '../common/decorators/current-user.decorator.js';
 import type { AuthenticatedUser } from '../auth/auth.types.js';
+import { displayHandle } from '../common/user-display.util.js';
 import { TransfersService } from './transfers.service.js';
 import { InitiateTransferDto } from './dto/initiate-transfer.dto.js';
 import { AcceptTransferDto } from './dto/accept-transfer.dto.js';
@@ -13,7 +14,7 @@ export class TransfersController {
 
   @Post()
   initiate(@CurrentUser() user: AuthenticatedUser, @Body() dto: InitiateTransferDto) {
-    return this.transfersService.initiate(user.id, user.name, dto);
+    return this.transfersService.initiate(user.id, displayHandle(user), dto);
   }
 
   @Get('validate-recipient')

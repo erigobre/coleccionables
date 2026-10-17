@@ -18,6 +18,7 @@ import {
   type OutgoingTransfer,
   type TransferStatus,
 } from '../../../lib/transfers';
+import { displayHandle } from '../../../lib/users';
 import { colors } from '../../../theme/tokens';
 
 const STATUS_LABEL: Record<TransferStatus, string> = {
@@ -137,7 +138,7 @@ export default function TransferenciasScreen() {
                     <Text className="font-body-bold text-base text-text" numberOfLines={2}>
                       {transfer.item.name}
                     </Text>
-                    <Text className="mt-0.5 text-xs text-textMuted">De {transfer.fromUser.name}</Text>
+                    <Text className="mt-0.5 text-xs text-textMuted">De {displayHandle(transfer.fromUser)}</Text>
                     <Text className="mt-0.5 text-xs text-textMuted">
                       Vence en {daysLeft(transfer.expiresAt)} día(s)
                     </Text>

@@ -12,6 +12,7 @@ import {
   type CollectionInvite,
 } from '../lib/collections';
 import { acceptInvite, fetchMyInvites, rejectInvite, type OrganizationInvite } from '../lib/organizations';
+import { displayHandle } from '../lib/users';
 import {
   acceptItemActionRequest,
   fetchIncomingItemActionRequests,
@@ -190,7 +191,7 @@ export default function NotificationsScreen() {
               <View className="mb-3 flex-row items-center gap-2">
                 <Ionicons name="albums-outline" size={18} color={colors.primary} />
                 <Text className="flex-1 text-sm text-text">
-                  <Text className="font-body-bold">{invite.invitedByUser.name}</Text> te invitó a la colección
+                  <Text className="font-body-bold">{displayHandle(invite.invitedByUser)}</Text> te invitó a la colección
                   compartida "{invite.collection.name}"
                 </Text>
               </View>
@@ -219,7 +220,7 @@ export default function NotificationsScreen() {
               <View className="mb-3 flex-row items-center gap-2">
                 <Ionicons name="people-outline" size={18} color={colors.primary} />
                 <Text className="flex-1 text-sm text-text">
-                  <Text className="font-body-bold">{invite.invitedByUser.name}</Text> te invitó a su familia de
+                  <Text className="font-body-bold">{displayHandle(invite.invitedByUser)}</Text> te invitó a su familia de
                   FrikiTokens ({invite.organization.name})
                 </Text>
               </View>
@@ -244,7 +245,7 @@ export default function NotificationsScreen() {
               <View className="mb-3 flex-row items-center gap-2">
                 <Ionicons name="key-outline" size={18} color={colors.primary} />
                 <Text className="flex-1 text-sm text-text">
-                  <Text className="font-body-bold">{request.requestedByUser.name}</Text> quiere{' '}
+                  <Text className="font-body-bold">{displayHandle(request.requestedByUser)}</Text> quiere{' '}
                   {ACTION_LABELS[request.action]} "{request.item.name}"
                 </Text>
               </View>

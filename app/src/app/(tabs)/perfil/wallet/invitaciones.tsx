@@ -11,6 +11,7 @@ import {
   rejectInvite,
   type OrganizationInvite,
 } from '../../../../lib/organizations';
+import { displayHandle } from '../../../../lib/users';
 import { colors } from '../../../../theme/tokens';
 
 export default function MyInvitesScreen() {
@@ -87,7 +88,7 @@ export default function MyInvitesScreen() {
               <View className="mb-3 flex-row items-center gap-2">
                 <Ionicons name="people-outline" size={18} color={colors.primary} />
                 <Text className="flex-1 text-sm text-text">
-                  <Text className="font-body-bold">{invite.invitedByUser.name}</Text> te invitó a su familia de
+                  <Text className="font-body-bold">{displayHandle(invite.invitedByUser)}</Text> te invitó a su familia de
                   FrikiTokens ({invite.organization.name})
                 </Text>
               </View>
