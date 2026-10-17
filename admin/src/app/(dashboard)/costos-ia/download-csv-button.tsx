@@ -29,11 +29,30 @@ function userLabel(user: FtCostReportRow['user']) {
   return user.username ? `@${user.username}` : user.name;
 }
 
+interface ModelVersionRow {
+  modelVersion: string;
+  calls: number;
+  groundingRequests: number;
+}
+
 // Botón para exportar la tabla ya cargada en la página a CSV sin pasar por el
 // backend (pedido 2026-10-17): genera el archivo en el navegador a partir de
 // las mismas filas que ya se renderizan, para poder compartir los datos del
-// reporte sin copiar/pegar a mano.
-export function DownloadCsvButton({ rows, from, to }: { rows: FtCostReportRow[]; from: string; to: string }) {
+// reporte sin copiar/pegar a mano. Incluye también el desglose por build de
+// Gemini (pedido 2026-10-17): sin saber qué versión atendió cada llamada no
+// se puede elegir la fórmula de precio de grounding correcta ($35/1000
+// prompts en 2.5 vs $14/1000 búsquedas en 3+).
+export function DownloadCsvButton({
+  rows,
+  modelVersions,
+  from,
+  to,
+}: {
+  rows: FtCostReportRow[];
+  modelVersions: ModelVersionRow[];
+  from: string;
+  to: string;
+}) {
   const handleDownload = () => {
     const headers = [
       'Usuario',
@@ -64,6 +83,13 @@ export function DownloadCsvButton({ rows, from, to }: { rows: FtCostReportRow[];
         ].join(','),
       );
     }
+
+    lines.push('');
+    lines.push('Build de Gemini,Llamadas,Búsquedas grounding');
+    for (const mv of modelVersions) {
+      lines.push([csvCell(mv.modelVersion), csvCell(mv.calls), csvCell(mv.groundingRequests)].join(','));
+    }
+
     const blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');

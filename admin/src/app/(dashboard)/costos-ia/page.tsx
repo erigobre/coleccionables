@@ -111,7 +111,12 @@ export default async function CostosIaPage({
       </div>
 
       <div className="flex justify-end">
-        <DownloadCsvButton rows={report.rows} from={effectiveFrom} to={effectiveTo} />
+        <DownloadCsvButton
+          rows={report.rows}
+          modelVersions={report.modelVersions}
+          from={effectiveFrom}
+          to={effectiveTo}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
