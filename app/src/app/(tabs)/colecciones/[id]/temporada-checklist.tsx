@@ -3,6 +3,7 @@ import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
+import { CloseHeaderButton } from '../../../../components/CloseHeaderButton';
 import { EmptyState } from '../../../../components/ui/EmptyState';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { resolvePhotoUrl } from '../../../../lib/api';
@@ -92,10 +93,20 @@ export default function SeasonChecklistScreen() {
 
   const title = direction === 'start' ? 'Mover a temporada' : 'Regresar de temporada';
   // No depende de `groups`: se monta desde el primer render para que el
-  // header nunca pase de un título a otro ya con la pantalla visible (esa
-  // transición nativa hacía parpadear el header, incluido el botón "Atrás",
-  // bug reportado 2026-10-17).
-  const headerTitle = <Stack.Screen options={{ title }} />;
+  // header nunca pase de un título a otro ya con la pantalla visible. El
+  // parpadeo reportado 2026-10-17 resultó venir del botón "Atrás" NATIVO
+  // (su material "glass" se recalcula cuando el contenido detrás cambia),
+  // no del título — se reemplaza por un headerLeft propio sin ese material.
+  const headerTitle = (
+    <Stack.Screen
+      options={{
+        title,
+        headerLeft: () => (
+          <CloseHeaderButton variant="plain" label="Atrás" fallbackTo={`/(tabs)/colecciones/${id}`} />
+        ),
+      }}
+    />
+  );
 
   if (groups === null) {
     if (error) {

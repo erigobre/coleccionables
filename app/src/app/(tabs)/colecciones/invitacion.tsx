@@ -23,7 +23,10 @@ export default function CollectionInviteScreen() {
     setError(null);
     try {
       await acceptCollectionInvite(accessToken, collectionId);
-      router.replace(`/(tabs)/colecciones/${collectionId}`);
+      router.replace({
+        pathname: '/(tabs)/colecciones/[id]',
+        params: { id: collectionId, ...(collectionName ? { name: collectionName } : {}) },
+      });
     } catch (err) {
       setError(authErrorMessage(err));
     } finally {

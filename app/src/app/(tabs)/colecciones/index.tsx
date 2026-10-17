@@ -84,7 +84,9 @@ export default function ColeccionesScreen() {
             <CollectionCard
               key={collection.id}
               collection={collection}
-              onOpen={() => router.push(`/(tabs)/colecciones/${collection.id}`)}
+              onOpen={() =>
+                router.push({ pathname: '/(tabs)/colecciones/[id]', params: { id: collection.id, name: collection.name } })
+              }
             />
           ))}
         </View>
