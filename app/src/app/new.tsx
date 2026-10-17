@@ -1,12 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { Button } from '../components/ui/Button';
+import { DraftPhotoManager } from '../components/items/DraftPhotoManager';
 import { ItemFormFields } from '../components/items/ItemFormFields';
 import { TagAutocomplete } from '../components/items/TagAutocomplete';
 import { authErrorMessage, useAuth } from '../context/auth-context';
-import { resolvePhotoUrl } from '../lib/api';
 import { getItemDraft } from '../lib/item-draft';
 import { EMPTY_ITEM_FORM, itemFormIsValid, itemFormToCreateDto, type ItemFormValues } from '../lib/item-form';
 import { fetchActiveCollections, type Collection } from '../lib/collections';
@@ -86,7 +86,7 @@ export default function NewItemScreen() {
   // Borrador que dejó la pantalla de captura (fotos + prellenado IA); vacío si
   // se llegó sin pasar por ella.
   const [draft] = useState(getItemDraft);
-  const photoUrls = draft?.photoUrls ?? [];
+  const [photoUrls, setPhotoUrls] = useState<string[]>(draft?.photoUrls ?? []);
 
   const [values, setValues] = useState<ItemFormValues>(draft?.values ?? EMPTY_ITEM_FORM);
   const [locationId, setLocationId] = useState<string | null>(draft?.locationId ?? null);
@@ -227,16 +227,8 @@ export default function NewItemScreen() {
       contentContainerStyle={{ paddingTop: 16, paddingBottom: 120, paddingHorizontal: 20 }}
       keyboardShouldPersistTaps="handled"
     >
-      {photoUrls.length > 0 ? (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-4 flex-grow-0">
-          {photoUrls.map((url) => (
-            <Image
-              key={url}
-              source={{ uri: resolvePhotoUrl(url) }}
-              style={{ width: 96, height: 96, borderRadius: 12, marginRight: 8 }}
-            />
-          ))}
-        </ScrollView>
+      {accessToken ? (
+        <DraftPhotoManager accessToken={accessToken} photoUrls={photoUrls} onChange={setPhotoUrls} />
       ) : null}
 
       <Text className="mb-4 text-sm text-textMuted">

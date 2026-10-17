@@ -8,7 +8,7 @@ import { addItemPhotos, removeItemPhoto, uploadItemPhotos, type ItemPhoto } from
 import { colors } from '../../theme/tokens';
 import { ImageCropper } from '../ui/ImageCropper';
 
-const MAX_PHOTOS = 8;
+export const MAX_PHOTOS = 8;
 
 interface PhotoManagerProps {
   accessToken: string;

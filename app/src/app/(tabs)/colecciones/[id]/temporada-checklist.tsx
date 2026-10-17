@@ -90,10 +90,18 @@ export default function SeasonChecklistScreen() {
     );
   };
 
+  const title = direction === 'start' ? 'Mover a temporada' : 'Regresar de temporada';
+  // No depende de `groups`: se monta desde el primer render para que el
+  // header nunca pase de un título a otro ya con la pantalla visible (esa
+  // transición nativa hacía parpadear el header, incluido el botón "Atrás",
+  // bug reportado 2026-10-17).
+  const headerTitle = <Stack.Screen options={{ title }} />;
+
   if (groups === null) {
     if (error) {
       return (
         <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+          {headerTitle}
           <Text className="text-center text-sm text-danger">{error}</Text>
           <Button label="Reintentar" onPress={load} />
         </View>
@@ -101,19 +109,18 @@ export default function SeasonChecklistScreen() {
     }
     return (
       <View className="flex-1 items-center justify-center bg-background">
+        {headerTitle}
         <ActivityIndicator color={colors.primary} />
       </View>
     );
   }
-
-  const title = direction === 'start' ? 'Mover a temporada' : 'Regresar de temporada';
 
   return (
     <ScrollView
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingTop: 8, paddingBottom: 120, paddingHorizontal: 20 }}
     >
-      <Stack.Screen options={{ title }} />
+      {headerTitle}
 
       {error ? <Text className="mb-4 text-sm text-danger">{error}</Text> : null}
 

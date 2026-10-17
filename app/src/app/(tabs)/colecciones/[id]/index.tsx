@@ -183,10 +183,18 @@ export default function CollectionDetailScreen() {
     ]);
   };
 
+  // Fuera del if de abajo y con un título de respaldo: si se monta solo tras
+  // cargar los datos, el header pasa de su título estático ("Colección", en
+  // el _layout) a uno dinámico por primera vez, y esa transición nativa hace
+  // que todo el header (incluido el botón "Atrás") parpadee una vez (bug
+  // reportado 2026-10-17). Montarlo desde el primer render evita el remount.
+  const headerTitle = <Stack.Screen options={{ title: collection?.name ?? 'Colección' }} />;
+
   if (collection === null || items === null) {
     if (error) {
       return (
         <View className="flex-1 items-center justify-center gap-4 bg-background px-8">
+          {headerTitle}
           <Text className="text-center text-sm text-danger">{error}</Text>
           <Button label="Reintentar" onPress={load} />
         </View>
@@ -194,6 +202,7 @@ export default function CollectionDetailScreen() {
     }
     return (
       <View className="flex-1 items-center justify-center bg-background">
+        {headerTitle}
         <ActivityIndicator color={colors.primary} />
       </View>
     );
@@ -223,7 +232,7 @@ export default function CollectionDetailScreen() {
       className="flex-1 bg-background"
       contentContainerStyle={{ paddingTop: 8, paddingBottom: 240, paddingHorizontal: SIDE_PADDING }}
     >
-      <Stack.Screen options={{ title: collection.name }} />
+      {headerTitle}
 
       <Text className="mb-4 text-sm text-textMuted">
         {items.length === 1 ? '1 objeto' : `${items.length} objetos`}
