@@ -3,6 +3,7 @@ import { useCallback } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { radius } from '../../theme/tokens';
 
 export interface SwipeAction {
   key: string;
@@ -78,7 +79,10 @@ export function SwipeableRow({ leftActions = [], rightActions = [], children }: 
   if (maxLeft === 0 && maxRight === 0) return <>{children}</>;
 
   return (
-    <View style={{ overflow: 'hidden', borderRadius: 12 }}>
+    // Debe calzar con el rounded-xl de ItemCard (radius.card = 24, el tema
+    // redefine la escala de Tailwind) — si no coinciden, las esquinas cuadradas
+    // de los botones de abajo se asoman en las esquinas redondeadas de la card.
+    <View style={{ overflow: 'hidden', borderRadius: radius.card }}>
       {maxLeft > 0 ? (
         <View style={[StyleSheet.absoluteFill, { flexDirection: 'row', justifyContent: 'flex-end' }]}>
           {leftActions.map((action) => (

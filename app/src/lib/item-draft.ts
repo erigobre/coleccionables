@@ -1,4 +1,5 @@
-import type { ItemFormValues } from './item-form';
+import { itemFormFromItem, type ItemFormValues } from './item-form';
+import type { Item } from './items';
 
 // Borrador que la pantalla de captura le deja a "Nuevo objeto". Se usa un módulo
 // en vez de params de ruta porque las rutas solo llevan strings y aquí viajan
@@ -25,6 +26,10 @@ export interface ItemDraft {
   // objeto se guarda con éxito, "Nuevo objeto" borra este item de wishlist. Se
   // deja intacto si el usuario cancela el alta, para no perder el dato.
   wishlistItemId?: string;
+  // Prellenado de ubicación/colecciones (solo lo usa el clon, ver buildCloneDraft):
+  // la captura por IA/código de barras nunca los trae, por eso no estaban antes.
+  locationId?: string | null;
+  collectionIds?: string[];
 }
 
 let current: ItemDraft | null = null;
@@ -35,4 +40,19 @@ export function setItemDraft(draft: ItemDraft | null) {
 
 export function getItemDraft(): ItemDraft | null {
   return current;
+}
+
+// "Clonar" ya no crea el objeto directo: deja un borrador para que "Nuevo
+// objeto" abra con todo copiado (nombre, fotos, características, tags,
+// ubicación y colecciones) y el usuario decida si lo modifica antes de guardar.
+export function buildCloneDraft(item: Item): ItemDraft {
+  return {
+    values: itemFormFromItem(item),
+    photoUrls: item.photos.map((photo) => photo.url),
+    suggestedTags: item.tags.map((ref) => ref.tag.name),
+    locationId: item.currentLocationId,
+    collectionIds: item.collections.map((ref) => ref.collectionId),
+    notice: `Clonando "${item.name}". Modifica lo que quieras y guarda para crear el objeto nuevo.`,
+    source: 'manual',
+  };
 }

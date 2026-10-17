@@ -89,8 +89,8 @@ export default function NewItemScreen() {
   const photoUrls = draft?.photoUrls ?? [];
 
   const [values, setValues] = useState<ItemFormValues>(draft?.values ?? EMPTY_ITEM_FORM);
-  const [locationId, setLocationId] = useState<string | null>(null);
-  const [collectionIds, setCollectionIds] = useState<string[]>([]);
+  const [locationId, setLocationId] = useState<string | null>(draft?.locationId ?? null);
+  const [collectionIds, setCollectionIds] = useState<string[]>(draft?.collectionIds ?? []);
   // Tags ya existentes elegidos para este objeto (autocomplete, no un catálogo
   // completo: con miles de tags no tiene sentido cargarlos todos de un jalón).
   const [selectedTags, setSelectedTags] = useState<Tag[]>([]);

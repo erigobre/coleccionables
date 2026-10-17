@@ -2,7 +2,8 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Share } from 'react-native';
 import { authErrorMessage, useAuth } from '../../context/auth-context';
-import { cloneItem, deleteItem, shareItem, type Item, type ItemActionType } from '../../lib/items';
+import { buildCloneDraft, setItemDraft } from '../../lib/item-draft';
+import { deleteItem, shareItem, type Item, type ItemActionType } from '../../lib/items';
 import { colors } from '../../theme/tokens';
 import type { SwipeAction } from '../ui/SwipeableRow';
 import { RequestAuthorizationModal } from './RequestAuthorizationModal';
@@ -20,7 +21,7 @@ export function useItemQuickActions(item: Item, { onChanged, onError }: UseItemQ
   const { accessToken, user } = useAuth();
   const router = useRouter();
   const [requestAction, setRequestAction] = useState<ItemActionType | null>(null);
-  const [busyKey, setBusyKey] = useState<'share' | 'clone' | null>(null);
+  const [busyKey, setBusyKey] = useState<'share' | null>(null);
 
   const isRealOwner = !!user && item.ownerId === user.sub;
   const pendingActions = item.myPendingActionRequests ?? [];
@@ -38,20 +39,16 @@ export function useItemQuickActions(item: Item, { onChanged, onError }: UseItemQ
     }
   };
 
-  const onClone = async () => {
-    if (!accessToken) return;
-    setBusyKey('clone');
-    try {
-      const cloned = await cloneItem(accessToken, item.id);
-      router.push(`/objeto/${cloned.id}`);
-    } catch (err) {
-      onError(authErrorMessage(err));
-    } finally {
-      setBusyKey(null);
-    }
+  // Ya no crea el clon directo: deja el borrador cargado y navega a "Nuevo
+  // objeto" para que el usuario pueda modificarlo antes de guardar.
+  const onClone = () => {
+    setItemDraft(buildCloneDraft(item));
+    router.push('/new');
   };
 
   const onEdit = () => router.push(`/(tabs)/objetos/${item.id}/edit`);
+
+  const onChangeLocation = () => router.push(`/(tabs)/objetos/${item.id}/ubicacion`);
 
   const onDelete = () => {
     if (!accessToken) return;
@@ -101,7 +98,6 @@ export function useItemQuickActions(item: Item, { onChanged, onError }: UseItemQ
       background: colors.primary,
       iconColor: colors.primaryText,
       onPress: onClone,
-      disabled: busyKey === 'clone',
     },
     {
       key: 'edit',
@@ -134,6 +130,18 @@ export function useItemQuickActions(item: Item, { onChanged, onError }: UseItemQ
     },
   ];
 
+  // Solo se agrega a allActions (long-press de Colecciones): ahí completa una
+  // grilla pareja de 6 (3x2). El swipe de Objetos (leftActions/rightActions)
+  // no la incluye, a propósito.
+  const locationAction: SwipeAction = {
+    key: 'location',
+    label: 'Reubicar',
+    icon: 'location-outline',
+    background: colors.surfaceElevated,
+    iconColor: colors.text,
+    onPress: onChangeLocation,
+  };
+
   const modal =
     accessToken && requestAction ? (
       <RequestAuthorizationModal
@@ -149,5 +157,5 @@ export function useItemQuickActions(item: Item, { onChanged, onError }: UseItemQ
       />
     ) : null;
 
-  return { leftActions, rightActions, allActions: [...leftActions, ...rightActions], modal };
+  return { leftActions, rightActions, allActions: [...leftActions, locationAction, ...rightActions], modal };
 }

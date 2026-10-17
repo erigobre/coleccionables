@@ -10,11 +10,11 @@ import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { useFt } from '../../../../context/ft-context';
 import { fetchActiveCollections, type Collection } from '../../../../lib/collections';
+import { buildCloneDraft, setItemDraft } from '../../../../lib/item-draft';
 import { conservationLabel, packagingLabel, usageLabel } from '../../../../lib/item-enums';
 import {
   addItemToCollection,
   addItemTag,
-  cloneItem,
   fetchItem,
   lookupMarketPrice,
   peekMarketPrice,
@@ -74,7 +74,6 @@ export default function ItemDetailScreen() {
   const [pendingTransfer, setPendingTransfer] = useState<OutgoingTransfer | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [sharing, setSharing] = useState(false);
-  const [cloning, setCloning] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [item, setItem] = useState<Item | null | undefined>(undefined);
   const [collections, setCollections] = useState<Collection[] | null>(null);
@@ -233,18 +232,12 @@ export default function ItemDetailScreen() {
     }
   };
 
-  const onClone = async () => {
-    if (!accessToken || !item) return;
-    setCloning(true);
-    setError(null);
-    try {
-      const cloned = await cloneItem(accessToken, item.id);
-      router.push(`/objeto/${cloned.id}`);
-    } catch (err) {
-      setError(authErrorMessage(err));
-    } finally {
-      setCloning(false);
-    }
+  // Ya no crea el clon directo: deja el borrador cargado y navega a "Nuevo
+  // objeto" para que el usuario pueda modificarlo antes de guardar.
+  const onClone = () => {
+    if (!item) return;
+    setItemDraft(buildCloneDraft(item));
+    router.push('/new');
   };
 
   const onUnshare = async () => {
@@ -659,7 +652,7 @@ export default function ItemDetailScreen() {
                 disabled={pendingActions.includes('SELL')}
               />
             ) : null}
-            <Button label="Clonar objeto" variant="secondary" onPress={onClone} loading={cloning} />
+            <Button label="Clonar objeto" variant="secondary" onPress={onClone} />
             <Pressable onPress={onUnshare} className="items-center py-2">
               <Text className="text-xs text-textMuted underline">Dejar de compartir el enlace público</Text>
             </Pressable>
