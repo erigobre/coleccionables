@@ -1,7 +1,7 @@
 // Página pública de soporte (frikidex.com/soporte) — la URL que se registra
 // como "support URL" en la ficha de Google Play / App Store Connect. Un
 // formulario general que guarda la solicitud en BD (misma idea que
-// api/src/waitlist/), no envía correo todavía (ver TODO en support.service.ts).
+// api/src/waitlist/) y manda confirmación por correo (ver support.service.ts).
 const CONTACT_EMAIL = 'privacidad@appgo.mx';
 
 const STYLES = `

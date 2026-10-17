@@ -183,6 +183,24 @@ export class EmailService {
     });
   }
 
+  // Confirmación de un mensaje de soporte (SupportService.create) — avisa que
+  // se recibió, sin prometer un tiempo de respuesta concreto.
+  async sendSupportRequestReceivedEmail({ toEmail, name }: { toEmail: string; name: string }) {
+    await this.send({
+      toEmail,
+      fromAddress: 'noreply',
+      subject: 'Recibimos tu mensaje — Frikidex',
+      html: buildSimpleEmailHtml({
+        heading: 'Recibimos tu mensaje',
+        bodyHtml: `
+          <p>Hola ${escapeHtml(name)},</p>
+          <p>Gracias por escribirnos. Ya tenemos tu mensaje y te responderemos a este mismo correo en cuanto podamos.</p>
+        `,
+      }),
+      logContext: `confirmación de soporte a ${toEmail}`,
+    });
+  }
+
   // Punto de entrada compartido para el resto de correos transaccionales
   // (no son invitaciones) — usan no-reply@frikidex.com por defecto.
   private async send({
