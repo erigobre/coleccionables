@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { copyFile, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import sharp from 'sharp';
 import type { BoundingBox, ImageInput } from '../ai/ai.types.js';
@@ -39,21 +39,6 @@ export class StorageService {
   async deleteImage(url: string): Promise<void> {
     if (!STORED_IMAGE_URL.test(url)) return;
     await unlink(join(UPLOADS_DIR, url.slice('/uploads/'.length))).catch(() => undefined);
-  }
-
-  // Copia física del archivo a un nombre nuevo (para "Clonar objeto"): el clon
-  // necesita su propio archivo, porque deleteImage borra el archivo físico y
-  // dos objetos no pueden compartir una misma foto en disco sin que borrar una
-  // rompa la otra.
-  async duplicateImage(url: string): Promise<string | null> {
-    if (!STORED_IMAGE_URL.test(url)) return null;
-    const filename = `${randomUUID()}.jpg`;
-    try {
-      await copyFile(join(UPLOADS_DIR, url.slice('/uploads/'.length)), join(UPLOADS_DIR, filename));
-    } catch {
-      return null;
-    }
-    return `/uploads/${filename}`;
   }
 
   // Avatar 1:1 del objeto (plan de re-ranking visual "¿Ya lo tengo?"): si viene
