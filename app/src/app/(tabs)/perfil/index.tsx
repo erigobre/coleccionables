@@ -1,15 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Link } from 'expo-router';
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Link, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { Image, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../components/ui/Button';
 import { FtCoin } from '../../../components/ui/FtCoin';
 import { Screen } from '../../../components/ui/Screen';
 import { colors } from '../../../theme/tokens';
 import { useAuth } from '../../../context/auth-context';
 import { useFt } from '../../../context/ft-context';
+import { resolvePhotoUrl } from '../../../lib/api';
 import { clearLastFatalError, readLastFatalError } from '../../../lib/crash-log';
 import { fetchMyReferralInfo } from '../../../lib/referrals';
+import { fetchMe } from '../../../lib/users';
 
 function MenuRow({
   icon,
@@ -44,6 +46,7 @@ export default function PerfilScreen() {
   const { balance } = useFt();
   const [canInvite, setCanInvite] = useState(false);
   const [lastFatalError, setLastFatalError] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -51,6 +54,16 @@ export default function PerfilScreen() {
       .then((info) => setCanInvite(info.canInvite))
       .catch(() => setCanInvite(false));
   }, [accessToken]);
+
+  // El JWT (useAuth().user) no trae avatarUrl: solo /users/me lo tiene.
+  useFocusEffect(
+    useCallback(() => {
+      if (!accessToken) return;
+      fetchMe(accessToken)
+        .then((me) => setAvatarUrl(me.avatarUrl))
+        .catch(() => {});
+    }, [accessToken]),
+  );
 
   useEffect(() => {
     readLastFatalError().then(setLastFatalError);
@@ -60,8 +73,12 @@ export default function PerfilScreen() {
     <View style={{ flex: 1 }}>
     <Screen>
       <View className="mb-8 items-center">
-        <View className="mb-3 h-20 w-20 items-center justify-center rounded-full bg-surfaceElevated">
-          <Ionicons name="person" size={36} color={colors.secondary} />
+        <View className="mb-3 h-20 w-20 items-center justify-center overflow-hidden rounded-full bg-surfaceElevated">
+          {avatarUrl ? (
+            <Image source={{ uri: resolvePhotoUrl(avatarUrl) }} style={{ width: 80, height: 80 }} />
+          ) : (
+            <Ionicons name="person" size={36} color={colors.secondary} />
+          )}
         </View>
         {user?.username ? (
           <View className="flex-row items-center">
