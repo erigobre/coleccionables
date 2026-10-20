@@ -62,6 +62,12 @@
         {
           "faceIDPermission": "Frikidex usa Face ID para desbloquear la app como alternativa a tu PIN."
         }
+      ],
+      [
+        "expo-iap",
+        {
+          "androidBillingLibraryVersion": "7.x"
+        }
       ]
     ],
     "extra": {

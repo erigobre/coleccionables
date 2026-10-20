@@ -13,6 +13,8 @@ import { CloseHeaderButton } from '../components/CloseHeaderButton';
 import { AuthProvider, useAuth } from '../context/auth-context';
 import { FtProvider } from '../context/ft-context';
 import { installGlobalErrorHandler } from '../lib/crash-log';
+import { drainUnfinishedTransactions, initIapConnection, storeToPlatform } from '../lib/iap';
+import { fetchIapCatalog, verifyPackagePurchase, verifySubscriptionPurchase } from '../lib/iap-server';
 import { colors } from '../theme/tokens';
 
 // Se instala antes que cualquier otra cosa: los crashes que llegan vía
@@ -88,6 +90,65 @@ function useNotificationNavigation() {
   }, []);
 }
 
+// Drena compras cobradas pero nunca finalizadas (la app se cerró a medio
+// verify, o una suscripción se renovó mientras la app estaba cerrada).
+// StoreKit/Google Play las siguen reportando hasta que se llame
+// finishTransaction, así que esto corre en cada arranque con sesión activa,
+// no solo cuando el usuario toca "comprar".
+function useIapDrain(accessToken: string | null) {
+  useEffect(() => {
+    if (!accessToken) return;
+    let active = true;
+    (async () => {
+      try {
+        await initIapConnection();
+        const catalog = await fetchIapCatalog(accessToken);
+        if (!active) return;
+        await drainUnfinishedTransactions(async (purchase) => {
+          const platform = storeToPlatform(purchase.store);
+          const jws = platform === 'IOS' ? purchase.purchaseToken ?? undefined : undefined;
+          const token = platform === 'ANDROID' ? purchase.purchaseToken ?? undefined : undefined;
+
+          const pkg = catalog.packages.find(
+            (p) => p.storeProductIdIos === purchase.productId || p.storeProductIdAndroid === purchase.productId,
+          );
+          if (pkg) {
+            const result = await verifyPackagePurchase(accessToken, {
+              platform,
+              ftPackageCode: pkg.code,
+              iosTransactionJws: jws,
+              androidPurchaseToken: token,
+              androidProductId: platform === 'ANDROID' ? purchase.productId : undefined,
+            });
+            return { success: result.success, isConsumable: true };
+          }
+
+          const plan = catalog.plans.find(
+            (p) => p.storeProductIdIos === purchase.productId || p.storeProductIdAndroid === purchase.productId,
+          );
+          if (plan) {
+            await verifySubscriptionPurchase(accessToken, {
+              platform,
+              ftPlanCode: plan.code,
+              iosTransactionJws: jws,
+              androidPurchaseToken: token,
+              androidProductId: platform === 'ANDROID' ? purchase.productId : undefined,
+            });
+            return { success: true, isConsumable: false };
+          }
+
+          return { success: false, isConsumable: false };
+        });
+      } catch {
+        // Se reintenta en el próximo arranque.
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, [accessToken]);
+}
+
 export default function RootLayout() {
   const [bungeeLoaded] = useBungeeFont({ Bungee_400Regular });
   const [dmSansLoaded] = useDMSansFont({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
@@ -110,10 +171,11 @@ export default function RootLayout() {
 }
 
 function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
-  const { isLoading, user } = useAuth();
+  const { isLoading, user, accessToken } = useAuth();
   const ready = fontsLoaded && !isLoading;
 
   useNotificationNavigation();
+  useIapDrain(accessToken);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});

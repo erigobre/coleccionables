@@ -1,12 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { FtCoin } from '../../../../components/ui/FtCoin';
 import { Screen } from '../../../../components/ui/Screen';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
-import { fetchFtPlans, type FtPlanOption } from '../../../../lib/ft';
+import { finishPurchase, initIapConnection, purchaseSubscription, storeToPlatform } from '../../../../lib/iap';
+import { fetchIapCatalog, verifySubscriptionPurchase, type IapCatalogPlan } from '../../../../lib/iap-server';
 import { cancelSubscription, fetchOrganizationInfo, type OrganizationInfo } from '../../../../lib/organizations';
 import { colors } from '../../../../theme/tokens';
 
@@ -21,16 +22,17 @@ export default function SubscriptionScreen() {
   const router = useRouter();
 
   const [org, setOrg] = useState<OrganizationInfo | null>(null);
-  const [plans, setPlans] = useState<FtPlanOption[]>([]);
+  const [plans, setPlans] = useState<IapCatalogPlan[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [canceling, setCanceling] = useState(false);
+  const [subscribingCode, setSubscribingCode] = useState<string | null>(null);
 
   const load = useCallback(() => {
     if (!accessToken) return;
-    Promise.all([fetchOrganizationInfo(accessToken), fetchFtPlans()])
-      .then(([o, p]) => {
+    Promise.all([fetchOrganizationInfo(accessToken), fetchIapCatalog(accessToken)])
+      .then(([o, catalog]) => {
         setOrg(o);
-        setPlans(p);
+        setPlans(catalog.plans);
       })
       .catch((err) => setError(authErrorMessage(err)));
   }, [accessToken]);
@@ -41,11 +43,34 @@ export default function SubscriptionScreen() {
     }, [load]),
   );
 
-  const onSubscribe = (plan: FtPlanOption) => {
-    Alert.alert(
-      'Muy pronto',
-      `Suscribirte al plan ${plan.label} dentro de la app estará disponible muy pronto. Mientras tanto contáctanos en la sección de soporte.`,
-    );
+  const onSubscribe = async (plan: IapCatalogPlan) => {
+    if (!accessToken) return;
+    const sku = Platform.OS === 'ios' ? plan.storeProductIdIos : plan.storeProductIdAndroid;
+    if (!sku) {
+      Alert.alert('No disponible', 'Este plan no está configurado para tu tienda todavía.');
+      return;
+    }
+    setError(null);
+    setSubscribingCode(plan.code);
+    try {
+      await initIapConnection();
+      const purchase = await purchaseSubscription(sku);
+      const platform = storeToPlatform(purchase.store);
+      await verifySubscriptionPurchase(accessToken, {
+        platform,
+        ftPlanCode: plan.code,
+        iosTransactionJws: platform === 'IOS' ? purchase.purchaseToken ?? undefined : undefined,
+        androidPurchaseToken: platform === 'ANDROID' ? purchase.purchaseToken ?? undefined : undefined,
+        androidProductId: platform === 'ANDROID' ? purchase.productId : undefined,
+      });
+      await finishPurchase(purchase, false);
+      load();
+      Alert.alert('¡Listo!', `Tu suscripción al plan ${plan.label} está activa.`);
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setSubscribingCode(null);
+    }
   };
 
   const onCancel = () => {
@@ -129,6 +154,8 @@ export default function SubscriptionScreen() {
                 <Button
                   label={`Suscribirme — $${(plan.monthlyPriceMxnCents / 100).toLocaleString('es-MX')}/mes`}
                   onPress={() => onSubscribe(plan)}
+                  loading={subscribingCode === plan.code}
+                  disabled={subscribingCode !== null}
                 />
               </View>
             </View>

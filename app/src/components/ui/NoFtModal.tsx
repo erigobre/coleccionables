@@ -1,7 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Modal, Pressable, Text, View } from 'react-native';
-import { fetchFtPackages, type FtPackageOption } from '../../lib/ft';
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, Text, View } from 'react-native';
+import { authErrorMessage, useAuth } from '../../context/auth-context';
+import { fetchIapCatalog, verifyPackagePurchase, type IapCatalogPackage } from '../../lib/iap-server';
+import { finishPurchase, initIapConnection, purchasePackage, storeToPlatform } from '../../lib/iap';
 import { colors } from '../../theme/tokens';
 import { Button } from './Button';
 import { FtCoin } from './FtCoin';
@@ -12,7 +14,7 @@ interface NoFtModalProps {
 }
 
 // Solo se muestran 2 columnas: el paquete más barato y el más caro del catálogo.
-function featuredPackages(packages: FtPackageOption[]): FtPackageOption[] {
+function featuredPackages(packages: IapCatalogPackage[]): IapCatalogPackage[] {
   if (packages.length <= 2) return packages;
   const sorted = [...packages].sort((a, b) => a.priceMxnCents - b.priceMxnCents);
   return [sorted[0], sorted[sorted.length - 1]];
@@ -20,29 +22,55 @@ function featuredPackages(packages: FtPackageOption[]): FtPackageOption[] {
 
 // Se dispara cuando una acción que cobra FT tira 402 (INSUFFICIENT_FT): en vez
 // de solo un texto de error, se ofrece de una vez comprar más. Los paquetes
-// salen de /ft/packages — el mismo catálogo (misma BD) que alimenta la landing
-// y el resto del proyecto, nunca hardcodeados aquí.
+// salen de /iap/catalog (requiere sesión, incluye los IDs de producto de cada
+// tienda) para poder comprarlos con StoreKit/Google Play desde aquí mismo.
 export function NoFtModal({ visible, onClose }: NoFtModalProps) {
-  const [packages, setPackages] = useState<FtPackageOption[]>([]);
+  const { accessToken } = useAuth();
+  const [packages, setPackages] = useState<IapCatalogPackage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [buyingCode, setBuyingCode] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !accessToken) return;
     setLoading(true);
-    fetchFtPackages()
-      .then(setPackages)
+    setError(null);
+    fetchIapCatalog(accessToken)
+      .then((r) => setPackages(r.packages))
       .catch(() => setPackages([]))
       .finally(() => setLoading(false));
-  }, [visible]);
+  }, [visible, accessToken]);
 
-  // La compra real dentro de la app (StoreKit/Google Play Billing) todavía no
-  // existe — Fase 10, pendiente aparte. Por ahora el botón deja clara la
-  // intención y el precio, pero solo avisa que está por venir.
-  const onBuy = (pkg: FtPackageOption) => {
-    Alert.alert(
-      'Muy pronto',
-      `La compra de ${pkg.ftAmount.toLocaleString('es-MX')} FT dentro de la app estará disponible muy pronto. Mientras tanto, visita tu almacén o contáctanos en la sección de soporte.`,
-    );
+  const onBuy = async (pkg: IapCatalogPackage) => {
+    if (!accessToken) return;
+    const sku = Platform.OS === 'ios' ? pkg.storeProductIdIos : pkg.storeProductIdAndroid;
+    if (!sku) {
+      Alert.alert('No disponible', 'Este paquete no está configurado para tu tienda todavía.');
+      return;
+    }
+    setError(null);
+    setBuyingCode(pkg.code);
+    try {
+      await initIapConnection();
+      const purchase = await purchasePackage(sku);
+      const platform = storeToPlatform(purchase.store);
+      const result = await verifyPackagePurchase(accessToken, {
+        platform,
+        ftPackageCode: pkg.code,
+        iosTransactionJws: platform === 'IOS' ? purchase.purchaseToken ?? undefined : undefined,
+        androidPurchaseToken: platform === 'ANDROID' ? purchase.purchaseToken ?? undefined : undefined,
+        androidProductId: platform === 'ANDROID' ? purchase.productId : undefined,
+      });
+      if (result.success) {
+        await finishPurchase(purchase, true);
+        onClose();
+        Alert.alert('¡Listo!', `Se agregaron ${pkg.ftAmount.toLocaleString('es-MX')} FT a tu cuenta.`);
+      }
+    } catch (err) {
+      setError(authErrorMessage(err));
+    } finally {
+      setBuyingCode(null);
+    }
   };
 
   return (
@@ -53,6 +81,8 @@ export function NoFtModal({ visible, onClose }: NoFtModalProps) {
           <Text className="mt-2 text-center text-sm text-textSecondary">
             Consíguelas aquí o visita tu almacén para obtener más.
           </Text>
+
+          {error ? <Text className="mt-3 text-center text-sm text-danger">{error}</Text> : null}
 
           {loading ? (
             <ActivityIndicator className="mt-6" color={colors.primary} />
@@ -73,6 +103,8 @@ export function NoFtModal({ visible, onClose }: NoFtModalProps) {
                       label={`$${(pkg.priceMxnCents / 100).toLocaleString('es-MX')}`}
                       onPress={() => onBuy(pkg)}
                       variant="primary"
+                      loading={buyingCode === pkg.code}
+                      disabled={buyingCode !== null}
                     />
                   </View>
                 </View>
