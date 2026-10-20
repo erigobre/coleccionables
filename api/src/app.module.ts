@@ -19,6 +19,7 @@ import { WishlistModule } from './wishlist/wishlist.module.js';
 import { ShareModule } from './share/share.module.js';
 import { AdminModule } from './admin/admin.module.js';
 import { FtModule } from './ft/ft.module.js';
+import { IapModule } from './iap/iap.module.js';
 import { LegalModule } from './legal/legal.module.js';
 import { WaitlistModule } from './waitlist/waitlist.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
@@ -60,6 +61,7 @@ import { AccountRecoveryModule } from './account-recovery/account-recovery.modul
     ShareModule,
     AdminModule,
     FtModule,
+    IapModule,
     LegalModule,
     WaitlistModule,
     NotificationsModule,

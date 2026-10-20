@@ -34,6 +34,14 @@ export class CreateFtPackageDto {
   @IsOptional()
   @IsDateString()
   availableUntil?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdIos?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdAndroid?: string;
 }
 
 export class UpdateFtPackageDto {
@@ -66,4 +74,12 @@ export class UpdateFtPackageDto {
   @IsOptional()
   @IsDateString()
   availableUntil?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdIos?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdAndroid?: string;
 }

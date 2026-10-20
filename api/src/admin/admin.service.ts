@@ -548,6 +548,8 @@ export class AdminService {
         sortOrder: dto.sortOrder ?? 0,
         availableFrom: dto.availableFrom ? new Date(dto.availableFrom) : undefined,
         availableUntil: dto.availableUntil ? new Date(dto.availableUntil) : undefined,
+        storeProductIdIos: dto.storeProductIdIos,
+        storeProductIdAndroid: dto.storeProductIdAndroid,
       },
     });
     await this.logAction(admin, 'ftPackage.create', 'FtPackage', created.id, { ...dto });
@@ -566,6 +568,8 @@ export class AdminService {
         sortOrder: dto.sortOrder,
         availableFrom: dto.availableFrom ? new Date(dto.availableFrom) : undefined,
         availableUntil: dto.availableUntil ? new Date(dto.availableUntil) : undefined,
+        storeProductIdIos: dto.storeProductIdIos,
+        storeProductIdAndroid: dto.storeProductIdAndroid,
       },
     });
     await this.logAction(admin, 'ftPackage.update', 'FtPackage', id, { ...dto });
@@ -590,6 +594,8 @@ export class AdminService {
         badge: dto.badge,
         isActive: dto.isActive ?? true,
         sortOrder: dto.sortOrder ?? 0,
+        storeProductIdIos: dto.storeProductIdIos,
+        storeProductIdAndroid: dto.storeProductIdAndroid,
       },
     });
     await this.logAction(admin, 'ftPlan.create', 'FtPlan', created.id, { ...dto });
@@ -609,6 +615,8 @@ export class AdminService {
         badge: dto.badge,
         isActive: dto.isActive,
         sortOrder: dto.sortOrder,
+        storeProductIdIos: dto.storeProductIdIos,
+        storeProductIdAndroid: dto.storeProductIdAndroid,
       },
     });
     await this.logAction(admin, 'ftPlan.update', 'FtPlan', id, { ...dto });

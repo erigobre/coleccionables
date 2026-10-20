@@ -22,6 +22,8 @@ export async function createFtPackageAction(
   const priceMxnCents = toCents(String(formData.get('priceMxn') ?? ''));
   const badge = String(formData.get('badge') ?? '').trim() || undefined;
   const sortOrder = formData.get('sortOrder') ? Number(formData.get('sortOrder')) : undefined;
+  const storeProductIdIos = String(formData.get('storeProductIdIos') ?? '').trim() || undefined;
+  const storeProductIdAndroid = String(formData.get('storeProductIdAndroid') ?? '').trim() || undefined;
 
   if (!code) return { error: 'El código es obligatorio' };
   if (!ftAmount || ftAmount <= 0) return { error: 'La cantidad de FT debe ser mayor a 0' };
@@ -30,7 +32,7 @@ export async function createFtPackageAction(
   try {
     await backendFetch('/admin/ft-packages', {
       method: 'POST',
-      body: { code, ftAmount, priceMxnCents, badge, sortOrder },
+      body: { code, ftAmount, priceMxnCents, badge, sortOrder, storeProductIdIos, storeProductIdAndroid },
     });
   } catch {
     return { error: 'No se pudo crear el paquete (¿el código ya existe?)' };
@@ -50,6 +52,8 @@ export async function updateFtPackageAction(
   const badge = String(formData.get('badge') ?? '').trim() || undefined;
   const sortOrder = formData.get('sortOrder') ? Number(formData.get('sortOrder')) : undefined;
   const isActive = formData.get('isActive') === 'on';
+  const storeProductIdIos = String(formData.get('storeProductIdIos') ?? '').trim() || undefined;
+  const storeProductIdAndroid = String(formData.get('storeProductIdAndroid') ?? '').trim() || undefined;
 
   if (!ftAmount || ftAmount <= 0) return { error: 'La cantidad de FT debe ser mayor a 0' };
   if (!priceMxnCents || priceMxnCents <= 0) return { error: 'El precio debe ser mayor a 0' };
@@ -57,7 +61,7 @@ export async function updateFtPackageAction(
   try {
     await backendFetch(`/admin/ft-packages/${packageId}`, {
       method: 'PATCH',
-      body: { ftAmount, priceMxnCents, badge, sortOrder, isActive },
+      body: { ftAmount, priceMxnCents, badge, sortOrder, isActive, storeProductIdIos, storeProductIdAndroid },
     });
   } catch {
     return { error: 'No se pudo actualizar el paquete' };
@@ -81,6 +85,8 @@ export async function createFtPlanAction(
   const monthlyPriceMxnCents = toCents(String(formData.get('monthlyPriceMxn') ?? ''));
   const badge = String(formData.get('badge') ?? '').trim() || undefined;
   const sortOrder = formData.get('sortOrder') ? Number(formData.get('sortOrder')) : undefined;
+  const storeProductIdIos = String(formData.get('storeProductIdIos') ?? '').trim() || undefined;
+  const storeProductIdAndroid = String(formData.get('storeProductIdAndroid') ?? '').trim() || undefined;
 
   if (!code) return { error: 'El código es obligatorio' };
   if (!label) return { error: 'La etiqueta es obligatoria' };
@@ -90,7 +96,7 @@ export async function createFtPlanAction(
   try {
     await backendFetch('/admin/ft-plans', {
       method: 'POST',
-      body: { code, label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder },
+      body: { code, label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder, storeProductIdIos, storeProductIdAndroid },
     });
   } catch {
     return { error: 'No se pudo crear el plan (¿el código ya existe?)' };
@@ -111,6 +117,8 @@ export async function updateFtPlanAction(
   const badge = String(formData.get('badge') ?? '').trim() || undefined;
   const sortOrder = formData.get('sortOrder') ? Number(formData.get('sortOrder')) : undefined;
   const isActive = formData.get('isActive') === 'on';
+  const storeProductIdIos = String(formData.get('storeProductIdIos') ?? '').trim() || undefined;
+  const storeProductIdAndroid = String(formData.get('storeProductIdAndroid') ?? '').trim() || undefined;
 
   if (!label) return { error: 'La etiqueta es obligatoria' };
   if (!ftAmountMonthly || ftAmountMonthly <= 0) return { error: 'La cantidad de FT/mes debe ser mayor a 0' };
@@ -119,7 +127,7 @@ export async function updateFtPlanAction(
   try {
     await backendFetch(`/admin/ft-plans/${planId}`, {
       method: 'PATCH',
-      body: { label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder, isActive },
+      body: { label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder, isActive, storeProductIdIos, storeProductIdAndroid },
     });
   } catch {
     return { error: 'No se pudo actualizar el plan' };

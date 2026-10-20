@@ -57,6 +57,16 @@ export function CreateFtPackageDialog() {
               <Input id="sortOrder" name="sortOrder" type="number" defaultValue={0} />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdIos">ID de producto iOS (opcional)</Label>
+              <Input id="storeProductIdIos" name="storeProductIdIos" placeholder="com.frikidex.app.ft.pro" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdAndroid">ID de producto Android (opcional)</Label>
+              <Input id="storeProductIdAndroid" name="storeProductIdAndroid" placeholder="ft_pro" />
+            </div>
+          </div>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -76,6 +86,8 @@ interface EditFtPackageDialogProps {
   badge: string | null;
   sortOrder: number;
   isActive: boolean;
+  storeProductIdIos: string | null;
+  storeProductIdAndroid: string | null;
 }
 
 export function EditFtPackageDialog({
@@ -85,6 +97,8 @@ export function EditFtPackageDialog({
   badge,
   sortOrder,
   isActive,
+  storeProductIdIos,
+  storeProductIdAndroid,
 }: EditFtPackageDialogProps) {
   const [open, setOpen] = useState(false);
   const action = updateFtPackageAction.bind(null, packageId);
@@ -131,6 +145,26 @@ export function EditFtPackageDialog({
             <div className="space-y-2">
               <Label htmlFor="sortOrder">Orden</Label>
               <Input id="sortOrder" name="sortOrder" type="number" defaultValue={sortOrder} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdIos">ID de producto iOS (opcional)</Label>
+              <Input
+                id="storeProductIdIos"
+                name="storeProductIdIos"
+                placeholder="com.frikidex.app.ft.pro"
+                defaultValue={storeProductIdIos ?? ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdAndroid">ID de producto Android (opcional)</Label>
+              <Input
+                id="storeProductIdAndroid"
+                name="storeProductIdAndroid"
+                placeholder="ft_pro"
+                defaultValue={storeProductIdAndroid ?? ''}
+              />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">

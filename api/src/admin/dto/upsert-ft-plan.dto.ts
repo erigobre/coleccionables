@@ -40,6 +40,14 @@ export class CreateFtPlanDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdIos?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdAndroid?: string;
 }
 
 export class UpdateFtPlanDto {
@@ -78,4 +86,12 @@ export class UpdateFtPlanDto {
   @IsOptional()
   @IsInt()
   sortOrder?: number;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdIos?: string;
+
+  @IsOptional()
+  @IsString()
+  storeProductIdAndroid?: string;
 }

@@ -12,6 +12,8 @@ interface AdminFtPackage {
   badge: string | null;
   isActive: boolean;
   sortOrder: number;
+  storeProductIdIos: string | null;
+  storeProductIdAndroid: string | null;
 }
 
 interface AdminFtPlan {
@@ -23,6 +25,8 @@ interface AdminFtPlan {
   badge: string | null;
   isActive: boolean;
   sortOrder: number;
+  storeProductIdIos: string | null;
+  storeProductIdAndroid: string | null;
 }
 
 function mxn(cents: number) {
@@ -83,6 +87,8 @@ export default async function FrikiTokensPage() {
                       badge={pkg.badge}
                       sortOrder={pkg.sortOrder}
                       isActive={pkg.isActive}
+                      storeProductIdIos={pkg.storeProductIdIos}
+                      storeProductIdAndroid={pkg.storeProductIdAndroid}
                     />
                   </TableCell>
                 </TableRow>
@@ -137,6 +143,8 @@ export default async function FrikiTokensPage() {
                       badge={plan.badge}
                       sortOrder={plan.sortOrder}
                       isActive={plan.isActive}
+                      storeProductIdIos={plan.storeProductIdIos}
+                      storeProductIdAndroid={plan.storeProductIdAndroid}
                     />
                   </TableCell>
                 </TableRow>

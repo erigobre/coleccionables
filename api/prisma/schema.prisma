@@ -66,6 +66,10 @@ model Organization {
   moderationFlags ModerationFlag[]
   invites         OrganizationInvite[]
 
+  // Fase 10 (compras reales de FrikiTokens vía StoreKit/Google Play Billing).
+  ftStorePurchases     FtStorePurchase[]
+  ftStoreSubscription  FtStoreSubscription?
+
   @@map("organizations")
 }
 
@@ -107,6 +111,7 @@ model User {
   requestedItemActions        ItemActionRequest[]  @relation("ItemActionRequestedBy")
   ownedItemActionRequests     ItemActionRequest[]  @relation("ItemActionRequestOwner")
   favoriteItems               ItemFavorite[]
+  ftStorePurchases             FtStorePurchase[]
 
   // Qué versión de cada documento legal aceptó al registrarse y cuándo (plan
   // §5: hay que poder probar qué texto exacto aceptó cada usuario, no solo
@@ -423,6 +428,8 @@ model FtTransaction {
   createdAt        DateTime            @default(now())
   confirmedAt      DateTime?
 
+  ftStorePurchase FtStorePurchase?
+
   @@index([organizationId, createdAt])
   @@map("ft_transactions")
 }
@@ -447,6 +454,8 @@ model FtPackage {
   storeProductIdAndroid String?
   createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
+
+  ftStorePurchases FtStorePurchase[]
 
   @@map("ft_packages")
 }
@@ -478,9 +487,96 @@ model FtPlan {
   // (plan "Ajustes de cuenta + Wallet de FrikiTokens", Oct 2026).
   maxInvitedMembers Int @default(0)
 
-  organizations Organization[]
+  organizations        Organization[]
+  ftStoreSubscriptions FtStoreSubscription[]
 
   @@map("ft_plans")
+}
+
+// ---------------------------------------------------------------------------
+// Fase 10 — Compras reales de FrikiTokens (StoreKit / Google Play Billing).
+// Verificación de recibo contra Apple/Google siempre ocurre en el backend
+// (nunca se confía en el cliente); FtService.grant() sigue siendo el único
+// mecanismo que acredita FT — estos modelos son solo la capa de auditoría +
+// protección anti-doble-entrega + estado de suscripción sincronizado por los
+// webhooks de Apple (App Store Server Notifications V2) y Google (RTDN).
+// ---------------------------------------------------------------------------
+
+enum IapPlatform {
+  IOS
+  ANDROID
+}
+
+enum FtStorePurchaseStatus {
+  VERIFIED // comprobado contra Apple/Google, FT ya otorgado
+  REFUNDED // reembolso recibido vía webhook después de otorgado (no se le quita FT al usuario)
+}
+
+// Un registro por transacción real de una compra única (FtPackage). El
+// `@@unique([platform, storeTransactionId])` es la barrera anti-doble-entrega
+// independiente del `idempotencyKey` de FtTransaction — protege contra que
+// StoreKit redelivere una transacción no terminada o el cliente reintente
+// verify-purchase con el mismo recibo tras perder la respuesta.
+model FtStorePurchase {
+  id                 String                @id @default(cuid())
+  organizationId     String
+  organization       Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId             String
+  user               User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform           IapPlatform
+  storeTransactionId String // StoreKit transactionId / Google Play orderId
+  purchaseToken      String? // solo Android, para log/soporte
+  productId          String // storeProductIdIos/Android verificado contra el recibo
+  ftPackageId        String?
+  ftPackage          FtPackage?            @relation(fields: [ftPackageId], references: [id], onDelete: SetNull)
+  ftTransactionId    String                @unique
+  ftTransaction      FtTransaction         @relation(fields: [ftTransactionId], references: [id], onDelete: Cascade)
+  status             FtStorePurchaseStatus @default(VERIFIED)
+  rawPayload         Json? // payload decodificado del recibo, solo para soporte
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@unique([platform, storeTransactionId])
+  @@index([organizationId, createdAt])
+  @@map("ft_store_purchases")
+}
+
+enum FtStoreSubscriptionStatus {
+  ACTIVE
+  GRACE_PERIOD // Apple/Google reintentando el cobro; acceso se mantiene
+  PAST_DUE
+  CANCELED
+  REVOKED // reembolsada/revocada por la tienda
+}
+
+// Liga la suscripción real de StoreKit/Play con la Organization. Los
+// webhooks identifican la suscripción por su propio id (originalTransactionId
+// en iOS, purchaseToken en Android), nunca por el nuestro — por eso ambos se
+// indexan. El otorgamiento del lote mensual SUBSCRIPTION sigue siendo
+// responsabilidad exclusiva de FtGrantCronService; esta tabla solo mantiene
+// el estado de la suscripción en sí.
+model FtStoreSubscription {
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  platform       IapPlatform
+  ftPlanId       String
+  ftPlan         FtPlan       @relation(fields: [ftPlanId], references: [id])
+
+  originalTransactionId String? // iOS: clave estable de la suscripción
+  purchaseToken         String? // Android: token vigente (rota en cada renovación)
+  storeSubscriptionId   String? // Android: productId/base plan id
+
+  status                FtStoreSubscriptionStatus @default(ACTIVE)
+  currentPeriodEndsAt   DateTime?
+  lastNotificationType  String? // crudo, solo debug ("DID_RENEW", "SUBSCRIPTION_RENEWED"...)
+  lastNotificationAt    DateTime?
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  @@index([platform, originalTransactionId])
+  @@index([platform, purchaseToken])
+  @@map("ft_store_subscriptions")
 }
 
 // Lista de espera de la landing pública (frikidex.com). Un correo puede

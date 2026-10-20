@@ -59,6 +59,16 @@ export function CreateFtPlanDialog() {
               <Input id="sortOrder" name="sortOrder" type="number" defaultValue={0} />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdIos">ID de suscripción iOS (opcional)</Label>
+              <Input id="storeProductIdIos" name="storeProductIdIos" placeholder="com.frikidex.app.sub.coleccionista" />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdAndroid">ID de suscripción Android (opcional)</Label>
+              <Input id="storeProductIdAndroid" name="storeProductIdAndroid" placeholder="sub_coleccionista" />
+            </div>
+          </div>
           {state.error && <p className="text-sm text-destructive">{state.error}</p>}
           <DialogFooter>
             <Button type="submit" disabled={pending}>
@@ -79,6 +89,8 @@ interface EditFtPlanDialogProps {
   badge: string | null;
   sortOrder: number;
   isActive: boolean;
+  storeProductIdIos: string | null;
+  storeProductIdAndroid: string | null;
 }
 
 export function EditFtPlanDialog({
@@ -89,6 +101,8 @@ export function EditFtPlanDialog({
   badge,
   sortOrder,
   isActive,
+  storeProductIdIos,
+  storeProductIdAndroid,
 }: EditFtPlanDialogProps) {
   const [open, setOpen] = useState(false);
   const action = updateFtPlanAction.bind(null, planId);
@@ -139,6 +153,26 @@ export function EditFtPlanDialog({
             <div className="space-y-2">
               <Label htmlFor="sortOrder">Orden</Label>
               <Input id="sortOrder" name="sortOrder" type="number" defaultValue={sortOrder} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdIos">ID de suscripción iOS (opcional)</Label>
+              <Input
+                id="storeProductIdIos"
+                name="storeProductIdIos"
+                placeholder="com.frikidex.app.sub.coleccionista"
+                defaultValue={storeProductIdIos ?? ''}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="storeProductIdAndroid">ID de suscripción Android (opcional)</Label>
+              <Input
+                id="storeProductIdAndroid"
+                name="storeProductIdAndroid"
+                placeholder="sub_coleccionista"
+                defaultValue={storeProductIdAndroid ?? ''}
+              />
             </div>
           </div>
           <label className="flex items-center gap-2 text-sm text-foreground">
