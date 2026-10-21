@@ -152,6 +152,21 @@ export class AdminService {
         ...(dto.activeFtPlanId !== undefined ? { activeFtPlanId: dto.activeFtPlanId || null } : {}),
       },
     });
+
+    // Sin esto, una suscripción real de Apple/Google ligada a esta
+    // organización sigue viva y se autorenovando (en sandbox, cada ~5 min):
+    // la próxima notificación DID_RENEW/SUBSCRIBED/RENEWED la encontraría por
+    // su originalTransactionId/purchaseToken y pondría subscriptionStatus en
+    // ACTIVE otra vez, pisando en silencio lo que el admin acaba de poner
+    // (bug real reportado 2026-10-21). Al desvincular la fila aquí, esas
+    // notificaciones futuras ya no encuentran ninguna suscripción asociada a
+    // esta organización y se ignoran como "desconocidas".
+    const clearingFtPlan = dto.activeFtPlanId !== undefined && !dto.activeFtPlanId;
+    const cancelingStatus = dto.subscriptionStatus === 'CANCELED' || dto.subscriptionStatus === 'PAST_DUE';
+    if (clearingFtPlan || cancelingStatus) {
+      await this.prisma.ftStoreSubscription.deleteMany({ where: { organizationId } });
+    }
+
     await this.logAction(admin, 'organization.update', 'Organization', organizationId, { ...dto });
     return updated;
   }
