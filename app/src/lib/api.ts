@@ -140,9 +140,19 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     if (token) headers.Authorization = `Bearer ${token}`;
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    return fetch(`${API_BASE_URL}${path}`, { method, headers, body: serializedBody, signal: controller.signal }).finally(
-      () => clearTimeout(timeoutId),
-    );
+    // cache: 'no-store' es necesario: el caché HTTP nativo de iOS (NSURLCache)
+    // guarda respuestas GET por URL sin distinguir el header Authorization —
+    // sin esto, una cuenta puede recibir el balance/suscripción cacheado de
+    // OTRA cuenta que usó la app en el mismo dispositivo (bug real reportado
+    // 2026-10-21: @hydis vio de pronto el balance y la suscripción familiar
+    // de otra cuenta al abrir la pantalla de Wallet).
+    return fetch(`${API_BASE_URL}${path}`, {
+      method,
+      headers,
+      body: serializedBody,
+      signal: controller.signal,
+      cache: 'no-store',
+    }).finally(() => clearTimeout(timeoutId));
   };
 
   const response = await request(accessToken);
