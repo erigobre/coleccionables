@@ -1,7 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { backendFetch } from '@/lib/backend';
+import { backendFetch, BackendError } from '@/lib/backend';
+
+function errorMessage(error: unknown, fallback: string): string {
+  return error instanceof BackendError ? error.message : fallback;
+}
 
 export interface FtPackageFormState {
   error?: string;
@@ -34,8 +38,8 @@ export async function createFtPackageAction(
       method: 'POST',
       body: { code, ftAmount, priceMxnCents, badge, sortOrder, storeProductIdIos, storeProductIdAndroid },
     });
-  } catch {
-    return { error: 'No se pudo crear el paquete (¿el código ya existe?)' };
+  } catch (error) {
+    return { error: errorMessage(error, 'No se pudo crear el paquete (¿el código ya existe?)') };
   }
 
   revalidatePath('/frikitokens');
@@ -63,8 +67,8 @@ export async function updateFtPackageAction(
       method: 'PATCH',
       body: { ftAmount, priceMxnCents, badge, sortOrder, isActive, storeProductIdIos, storeProductIdAndroid },
     });
-  } catch {
-    return { error: 'No se pudo actualizar el paquete' };
+  } catch (error) {
+    return { error: errorMessage(error, 'No se pudo actualizar el paquete') };
   }
 
   revalidatePath('/frikitokens');
@@ -98,8 +102,8 @@ export async function createFtPlanAction(
       method: 'POST',
       body: { code, label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder, storeProductIdIos, storeProductIdAndroid },
     });
-  } catch {
-    return { error: 'No se pudo crear el plan (¿el código ya existe?)' };
+  } catch (error) {
+    return { error: errorMessage(error, 'No se pudo crear el plan (¿el código ya existe?)') };
   }
 
   revalidatePath('/frikitokens');
@@ -129,8 +133,8 @@ export async function updateFtPlanAction(
       method: 'PATCH',
       body: { label, ftAmountMonthly, monthlyPriceMxnCents, badge, sortOrder, isActive, storeProductIdIos, storeProductIdAndroid },
     });
-  } catch {
-    return { error: 'No se pudo actualizar el plan' };
+  } catch (error) {
+    return { error: errorMessage(error, 'No se pudo actualizar el plan') };
   }
 
   revalidatePath('/frikitokens');
