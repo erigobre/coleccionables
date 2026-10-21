@@ -25,6 +25,15 @@ function loadRootCertificates(): Buffer[] {
 // la rechaza por INVALID_ENVIRONMENT, reintentar con el otro (plan Fase 10,
 // decisión §4.1) — así los testers de sandbox también funcionan en el mismo
 // endpoint que producción.
+//
+// enableOnlineChecks (2do parámetro de SignedDataVerifier) se deja en false:
+// con true, la librería hace una verificación OCSP por HTTP (puerto 80)
+// contra los servidores de Apple por cada certificado de la cadena, con 30s
+// de timeout cada una — si el host bloquea ese tráfico (bug real reportado
+// 2026-10-21: una compra se quedaba "pensando" sin error ni timeout visible),
+// se suman hasta ~2 minutos (2 entornos × 2 certs) antes de fallar. La
+// validación de firma/cadena/bundle ID sigue aplicando igual sin esto; OCSP
+// solo cubre el caso raro de un certificado intermedio revocado.
 @Injectable()
 export class AppleReceiptService {
   private readonly logger = new Logger(AppleReceiptService.name);
@@ -38,14 +47,14 @@ export class AppleReceiptService {
     if (environment === Environment.PRODUCTION) {
       this.productionVerifier ??= new SignedDataVerifier(
         rootCertificates,
-        true,
+        false,
         Environment.PRODUCTION,
         this.bundleId,
         this.appAppleId,
       );
       return this.productionVerifier;
     }
-    this.sandboxVerifier ??= new SignedDataVerifier(rootCertificates, true, Environment.SANDBOX, this.bundleId);
+    this.sandboxVerifier ??= new SignedDataVerifier(rootCertificates, false, Environment.SANDBOX, this.bundleId);
     return this.sandboxVerifier;
   }
 
