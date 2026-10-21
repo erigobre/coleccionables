@@ -114,6 +114,16 @@ export class IapService {
       throw new NotFoundException('Plan de suscripción no encontrado');
     }
 
+    // Sin este chequeo, un dispositivo con el mismo Apple ID/cuenta de Google
+    // firmado en dos cuentas de Frikidex distintas (común en pruebas, posible
+    // también en producción al cambiar de cuenta en el mismo teléfono) deja
+    // que StoreKit/Play entregue la MISMA transacción real a la segunda
+    // cuenta, y esta función creaba sin más una segunda fila
+    // `FtStoreSubscription` para esa organización reusando la misma
+    // transacción — "clonando" la suscripción de otra persona (bug real
+    // reportado 2026-10-21). StoreKit/Play no tienen concepto de "a qué
+    // cuenta de la app pertenece esto", así que hay que bloquearlo aquí.
+
     const platform: IapPlatform = dto.platform;
     let originalTransactionId: string | null = null;
     let purchaseToken: string | null = null;
@@ -151,6 +161,19 @@ export class IapService {
       if (!verified.acknowledged) {
         await this.googlePlayService.acknowledgeSubscription(dto.androidPurchaseToken);
       }
+    }
+
+    const claimedByOther = await this.prisma.ftStoreSubscription.findFirst({
+      where: {
+        platform,
+        organizationId: { not: user.organizationId },
+        ...(originalTransactionId ? { originalTransactionId } : { purchaseToken }),
+      },
+    });
+    if (claimedByOther) {
+      throw new BadRequestException(
+        'Esta suscripción ya está ligada a otra cuenta. Si quieres mudarla, cancélala primero desde esa cuenta.',
+      );
     }
 
     await this.prisma.$transaction([
