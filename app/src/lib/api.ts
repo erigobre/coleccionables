@@ -89,16 +89,29 @@ let refreshPromise: Promise<string | null> | null = null;
 function refreshAccessToken(): Promise<string | null> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
+      const stored = await loadTokens();
+      if (!stored) return null;
       try {
-        const stored = await loadTokens();
-        if (!stored) return null;
         const fresh = await refreshRequest(stored.refreshToken);
+        // Si mientras esta petición de red estaba en vuelo alguien cerró sesión
+        // y entró con otra cuenta (ej. probando cuentas de prueba), el refresh
+        // token que arrancó esto ya no es el que está guardado — aplicar `fresh`
+        // ahora pisaría la sesión nueva con la vieja (bug real detectado:
+        // cuentas nuevas "heredando" la suscripción de FrikiTokens de otra
+        // cuenta). Si cambió de por medio, se descarta en silencio.
+        const current = await loadTokens();
+        if (!current || current.refreshToken !== stored.refreshToken) return null;
         await saveTokens(fresh);
         tokenListener?.(fresh);
         return fresh.accessToken;
       } catch {
-        await clearStoredTokens();
-        tokenListener?.(null);
+        // Mismo cuidado al fallar: solo cerrar la sesión si sigue siendo la
+        // misma que intentó este refresh, nunca la de una cuenta que entró después.
+        const current = await loadTokens();
+        if (current && current.refreshToken === stored.refreshToken) {
+          await clearStoredTokens();
+          tokenListener?.(null);
+        }
         return null;
       } finally {
         refreshPromise = null;
