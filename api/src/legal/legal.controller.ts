@@ -2,6 +2,7 @@ import { Controller, Get, Res } from '@nestjs/common';
 import type { Response } from 'express';
 import { renderPrivacyPolicyPage } from './privacy-policy.page.js';
 import { renderTermsOfUsePage } from './terms-of-use.page.js';
+import { renderAccountDeletionPage } from './account-deletion.page.js';
 
 const PAGE_HEADERS = {
   'Content-Type': 'text/html; charset=utf-8',
@@ -39,5 +40,10 @@ export class LegalController {
   @Get('condiciones-de-uso')
   termsOfUseAlias(@Res() res: Response) {
     res.status(200).set(PAGE_HEADERS).send(renderTermsOfUsePage());
+  }
+
+  @Get('eliminar-cuenta')
+  accountDeletion(@Res() res: Response) {
+    res.status(200).set(PAGE_HEADERS).send(renderAccountDeletionPage());
   }
 }
