@@ -31,6 +31,17 @@ export class IapService {
   }
 
   async verifyPackagePurchase(user: AuthenticatedUser, dto: VerifyPackagePurchaseDto) {
+    try {
+      return await this.doVerifyPackagePurchase(user, dto);
+    } catch (error) {
+      this.logger.error(
+        `verifyPackagePurchase falló: userId=${user.id} platform=${dto.platform} ftPackageCode=${dto.ftPackageCode} error=${(error as Error)?.message ?? error}`,
+      );
+      throw error;
+    }
+  }
+
+  private async doVerifyPackagePurchase(user: AuthenticatedUser, dto: VerifyPackagePurchaseDto) {
     const ftPackage = await this.prisma.ftPackage.findUnique({ where: { code: dto.ftPackageCode } });
     if (!ftPackage || !ftPackage.isActive) {
       throw new NotFoundException('Paquete de FrikiTokens no encontrado');
@@ -46,6 +57,9 @@ export class IapService {
         throw new BadRequestException('Falta iosTransactionJws');
       }
       const decoded = await this.appleReceiptService.verifyTransaction(dto.iosTransactionJws);
+      this.logger.log(
+        `Apple verify OK: ftPackageCode=${dto.ftPackageCode} decoded.productId=${decoded.productId} decoded.transactionId=${decoded.transactionId} esperado.storeProductIdIos=${ftPackage.storeProductIdIos}`,
+      );
       if (!decoded.transactionId || !decoded.productId) {
         throw new BadRequestException('Transacción de Apple incompleta');
       }
