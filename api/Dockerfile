@@ -17,6 +17,7 @@ FROM deps AS build
 COPY api ./api
 WORKDIR /repo/api
 RUN npx prisma generate
+ENV NODE_OPTIONS=--max-old-space-size=3072
 RUN npm run build
 
 FROM base AS runtime
