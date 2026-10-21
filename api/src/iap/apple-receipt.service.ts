@@ -59,12 +59,27 @@ export class AppleReceiptService {
   }
 
   private async withEnvironmentFallback<T>(verify: (verifier: SignedDataVerifier) => Promise<T>): Promise<T> {
+    const startedAt = Date.now();
     try {
-      return await verify(this.getVerifier(Environment.PRODUCTION));
+      const result = await verify(this.getVerifier(Environment.PRODUCTION));
+      this.logger.debug(`Verificación en PRODUCTION OK (${Date.now() - startedAt}ms)`);
+      return result;
     } catch (error) {
       if (error instanceof VerificationException) {
-        this.logger.debug(`Verificación en PRODUCTION falló (${error.status}), reintentando en SANDBOX`);
-        return verify(this.getVerifier(Environment.SANDBOX));
+        this.logger.debug(
+          `Verificación en PRODUCTION falló (${error.status}) tras ${Date.now() - startedAt}ms, reintentando en SANDBOX`,
+        );
+        const sandboxStartedAt = Date.now();
+        try {
+          const result = await verify(this.getVerifier(Environment.SANDBOX));
+          this.logger.debug(`Verificación en SANDBOX OK (${Date.now() - sandboxStartedAt}ms)`);
+          return result;
+        } catch (sandboxError) {
+          this.logger.debug(
+            `Verificación en SANDBOX también falló tras ${Date.now() - sandboxStartedAt}ms: ${(sandboxError as Error)?.message ?? sandboxError}`,
+          );
+          throw sandboxError;
+        }
       }
       throw error;
     }
