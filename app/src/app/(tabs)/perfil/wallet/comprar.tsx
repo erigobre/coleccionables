@@ -21,7 +21,7 @@ export default function BuyFtScreen() {
     if (!accessToken) return;
     setLoading(true);
     fetchIapCatalog(accessToken)
-      .then((r) => setPackages(r.packages))
+      .then((r) => setPackages([...r.packages].sort((a, b) => b.ftAmount - a.ftAmount)))
       .catch((err) => setError(authErrorMessage(err)))
       .finally(() => setLoading(false));
   }, [accessToken]);
