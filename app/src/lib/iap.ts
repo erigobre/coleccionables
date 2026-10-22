@@ -44,20 +44,38 @@ export async function fetchNativeProducts(skus: string[], type: 'in-app' | 'subs
 // documenta expo-iap): el resultado llega por purchaseUpdatedListener /
 // purchaseErrorListener. Esta función envuelve ambos en una sola Promise
 // para poder usar purchasePackage/purchaseSubscription como un await normal.
+//
+// Timeout obligatorio: StoreKit/Google Play a veces no disparan ninguno de
+// los dos listeners (compra "deferred", revalidación de pago, o un evento
+// que la librería nativa no emite en cierto caso límite) — sin esto, la
+// Promise se queda pendiente para siempre y la UI que hace `await` sobre
+// ella (ej. el spinner de compra en NoFtModal) se congela sin error ni
+// manera de reintentar (bug real reportado 2026-10-21). Si StoreKit sí cobró
+// pero el timeout gana la carrera, la transacción queda sin terminar y
+// drainUnfinishedTransactions la recoge en el próximo arranque de la app.
+const NATIVE_PURCHASE_TIMEOUT_MS = 45_000;
+
 function awaitNativePurchase(sku: string): Promise<Purchase> {
   return new Promise((resolve, reject) => {
-    const updatedSub = purchaseUpdatedListener((purchase) => {
-      if (purchase.productId !== sku) return;
+    const settle = (fn: () => void) => {
+      clearTimeout(timeoutId);
       updatedSub.remove();
       errorSub.remove();
-      resolve(purchase);
+      fn();
+    };
+    const updatedSub = purchaseUpdatedListener((purchase) => {
+      if (purchase.productId !== sku) return;
+      settle(() => resolve(purchase));
     });
     const errorSub = purchaseErrorListener((error: ExpoPurchaseError) => {
       if (error.productId && error.productId !== sku) return;
-      updatedSub.remove();
-      errorSub.remove();
-      reject(error);
+      settle(() => reject(error));
     });
+    const timeoutId = setTimeout(() => {
+      settle(() =>
+        reject(new Error('La tienda no respondió a tiempo. Si se te cobró, los FrikiTokens se agregarán solos.')),
+      );
+    }, NATIVE_PURCHASE_TIMEOUT_MS);
   });
 }
 
