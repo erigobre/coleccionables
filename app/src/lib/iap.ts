@@ -53,42 +53,80 @@ export async function fetchNativeProducts(skus: string[], type: 'in-app' | 'subs
 // manera de reintentar (bug real reportado 2026-10-21). Si StoreKit sí cobró
 // pero el timeout gana la carrera, la transacción queda sin terminar y
 // drainUnfinishedTransactions la recoge en el próximo arranque de la app.
+//
+// El timeout tiene que envolver TAMBIÉN el `await requestPurchase(...)`, no
+// solo la espera de los listeners: si el SKU no existe para la tienda (ej.
+// un ID de producto mal configurado), la llamada nativa puede quedarse
+// pendiente sin disparar ni error ni listener, y antes el timeout nunca
+// llegaba a correr porque nadie esperaba esa Promise todavía (congelamiento
+// real reportado 2026-10-21 con el paquete de 100 FT).
 const NATIVE_PURCHASE_TIMEOUT_MS = 45_000;
+
+function withPurchaseTimeout<T>(run: () => Promise<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('La tienda no respondió a tiempo. Si se te cobró, los FrikiTokens se agregarán solos.'));
+    }, NATIVE_PURCHASE_TIMEOUT_MS);
+    run().then(
+      (value) => {
+        clearTimeout(timeoutId);
+        resolve(value);
+      },
+      (error) => {
+        clearTimeout(timeoutId);
+        reject(error);
+      },
+    );
+  });
+}
 
 function awaitNativePurchase(sku: string): Promise<Purchase> {
   return new Promise((resolve, reject) => {
-    const settle = (fn: () => void) => {
-      clearTimeout(timeoutId);
-      updatedSub.remove();
-      errorSub.remove();
-      fn();
-    };
     const updatedSub = purchaseUpdatedListener((purchase) => {
       if (purchase.productId !== sku) return;
-      settle(() => resolve(purchase));
+      updatedSub.remove();
+      errorSub.remove();
+      resolve(purchase);
     });
     const errorSub = purchaseErrorListener((error: ExpoPurchaseError) => {
       if (error.productId && error.productId !== sku) return;
-      settle(() => reject(error));
+      updatedSub.remove();
+      errorSub.remove();
+      reject(error);
     });
-    const timeoutId = setTimeout(() => {
-      settle(() =>
-        reject(new Error('La tienda no respondió a tiempo. Si se te cobró, los FrikiTokens se agregarán solos.')),
-      );
-    }, NATIVE_PURCHASE_TIMEOUT_MS);
   });
 }
 
 export async function purchasePackage(sku: string): Promise<Purchase> {
-  const pending = awaitNativePurchase(sku);
-  await requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'in-app' });
-  return pending;
+  return withPurchaseTimeout(async () => {
+    const pending = awaitNativePurchase(sku);
+    await requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'in-app' });
+    return pending;
+  });
 }
 
 export async function purchaseSubscription(sku: string): Promise<Purchase> {
-  const pending = awaitNativePurchase(sku);
-  await requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'subs' });
-  return pending;
+  return withPurchaseTimeout(async () => {
+    const pending = awaitNativePurchase(sku);
+    await requestPurchase({ request: { apple: { sku }, google: { skus: [sku] } }, type: 'subs' });
+    return pending;
+  });
+}
+
+// Para mostrar en pantalla qué devolvió exactamente StoreKit/Google Play —
+// `code`/`responseCode`/`productId`/`debugMessage` son justo los campos que
+// authErrorMessage() descarta (solo usa name+message), y son los que hacen
+// falta para diagnosticar un error nativo sin acceso a logs remotos.
+export function describePurchaseError(err: unknown): string {
+  if (!err || typeof err !== 'object') return String(err);
+  const e = err as Record<string, unknown>;
+  const parts: string[] = [];
+  if (e.code !== undefined) parts.push(`code=${String(e.code)}`);
+  if (e.responseCode !== undefined) parts.push(`responseCode=${String(e.responseCode)}`);
+  if (e.productId) parts.push(`productId=${String(e.productId)}`);
+  if (e.debugMessage) parts.push(`debug=${String(e.debugMessage)}`);
+  if (e.message) parts.push(`message=${String(e.message)}`);
+  return parts.length ? parts.join(' | ') : String(err);
 }
 
 export async function finishPurchase(purchase: Purchase, isConsumable: boolean): Promise<void> {

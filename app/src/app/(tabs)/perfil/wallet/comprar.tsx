@@ -5,7 +5,8 @@ import { Button } from '../../../../components/ui/Button';
 import { FtCoin } from '../../../../components/ui/FtCoin';
 import { Screen } from '../../../../components/ui/Screen';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
-import { finishPurchase, initIapConnection, purchasePackage, storeToPlatform } from '../../../../lib/iap';
+import { describePurchaseError, finishPurchase, initIapConnection, purchasePackage, storeToPlatform } from '../../../../lib/iap';
+import { ApiError } from '../../../../lib/api';
 import { fetchIapCatalog, verifyPackagePurchase, type IapCatalogPackage } from '../../../../lib/iap-server';
 import { colors } from '../../../../theme/tokens';
 
@@ -57,7 +58,8 @@ export default function BuyFtScreen() {
         Alert.alert('¡Listo!', `Se agregaron ${pkg.ftAmount.toLocaleString('es-MX')} FT a tu cuenta.`);
       }
     } catch (err) {
-      setError(authErrorMessage(err));
+      const detail = err instanceof ApiError ? '' : `\n\n[detalle] ${describePurchaseError(err)}`;
+      setError(`${authErrorMessage(err)}${detail}`);
     } finally {
       setBuyingCode(null);
     }
