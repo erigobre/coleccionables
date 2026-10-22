@@ -27,6 +27,7 @@ export default function PerfilStackLayout() {
       <Stack.Screen name="ajustes/pin" options={{ title: 'PIN y bloqueo' }} />
       <Stack.Screen name="ajustes/eliminar-cuenta" options={{ title: 'Eliminar cuenta' }} />
       <Stack.Screen name="wallet/index" options={{ title: 'FrikiTokens' }} />
+      <Stack.Screen name="wallet/comprar" options={{ title: 'Comprar FrikiTokens' }} />
       <Stack.Screen name="wallet/suscripcion" options={{ title: 'Suscripción' }} />
       <Stack.Screen name="wallet/familiares" options={{ title: 'Familiares' }} />
       <Stack.Screen name="wallet/invitaciones" options={{ title: 'Invitaciones' }} />

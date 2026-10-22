@@ -4,7 +4,6 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { Button } from '../../../../components/ui/Button';
 import { FtCoin } from '../../../../components/ui/FtCoin';
-import { NoFtModal } from '../../../../components/ui/NoFtModal';
 import { Screen } from '../../../../components/ui/Screen';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { fetchFtBalance, type FtBalance } from '../../../../lib/ft';
@@ -53,7 +52,6 @@ export default function WalletScreen() {
   const [balance, setBalance] = useState<FtBalance | null>(null);
   const [org, setOrg] = useState<OrganizationInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [showBuy, setShowBuy] = useState(false);
 
   const load = useCallback(() => {
     if (!accessToken) return;
@@ -101,7 +99,7 @@ export default function WalletScreen() {
 
       <View className="mb-8 flex-row gap-3">
         <View className="flex-1">
-          <Button label="Comprar" variant="secondary" onPress={() => setShowBuy(true)} />
+          <Button label="Comprar" variant="secondary" onPress={() => router.push('/(tabs)/perfil/wallet/comprar')} />
         </View>
         <View className="flex-1">
           <Button label="Suscripción" onPress={() => router.push('/(tabs)/perfil/wallet/suscripcion')} />
@@ -115,8 +113,6 @@ export default function WalletScreen() {
           <MenuRow icon="people-outline" label="Familiares" href="/(tabs)/perfil/wallet/familiares" />
         ) : null}
       </View>
-
-      <NoFtModal visible={showBuy} onClose={() => setShowBuy(false)} />
     </Screen>
   );
 }
