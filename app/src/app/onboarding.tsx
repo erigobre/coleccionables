@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/ui/Button';
+import { CollectingBoxAnimation } from '../components/ui/CollectingBoxAnimation';
 import { LogoHorizontal } from '../components/ui/LogoHorizontal';
 import { authErrorMessage, useAuth } from '../context/auth-context';
 import {
@@ -114,18 +115,21 @@ export default function OnboardingScreen() {
   if (step === 'welcome') {
     return (
       <View className="flex-1 bg-background" style={{ paddingTop: insets.top + 24, paddingHorizontal: 20 }}>
-        <View className="mb-8">
-          <LogoHorizontal />
-        </View>
-        <Text className="font-display text-[26px] uppercase tracking-wide text-text">
-          ¡Bienvenido, {user?.name ?? ''}!
-        </Text>
-        <Text className="mt-3 text-sm text-textMuted">
-          Antes de empezar, cuéntanos un poco sobre tu colección. Esto nos ayuda a configurar tu app a tu medida — toma
-          menos de un minuto.
-        </Text>
+        <LogoHorizontal />
 
-        <View className="flex-1" />
+        <View className="flex-1 items-center justify-center">
+          <Text className="font-display text-center text-[26px] uppercase tracking-wide text-text">
+            ¡Te damos la bienvenida{user?.name ? `, ${user.name}` : ''}!
+          </Text>
+          <Text className="mt-3 text-center text-sm text-textMuted">
+            Antes de empezar, cuéntanos un poco sobre tu colección. Esto nos ayuda a configurar tu app a tu medida — toma
+            menos de un minuto.
+          </Text>
+
+          <View className="mt-8">
+            <CollectingBoxAnimation />
+          </View>
+        </View>
 
         <View style={{ paddingBottom: insets.bottom + 24 }}>
           {error ? <Text className="mb-3 text-center text-sm text-danger">{error}</Text> : null}
