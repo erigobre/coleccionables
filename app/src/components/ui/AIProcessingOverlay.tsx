@@ -42,19 +42,28 @@ const FILL_TICK_MS = 150;
 const FILL_EASE_FACTOR = 0.025;
 const LONG_WAIT_MS = 30000;
 // Pasados los 30s, ya no hay un solo texto de "espera larga" sino una serie
-// escalonada (una cada LONG_WAIT_STEP_MS) que va subiendo el tono con humor —
-// se queda en la última si el proceso de verdad nunca termina.
-const LONG_WAIT_STEP_MS = 5000;
+// escalonada que va subiendo el tono con humor — cada mensaje tarda un
+// segundo más en llegar que el anterior (5s, 6s, 7s...) y se queda en el
+// último si el proceso de verdad nunca termina.
 const LONG_WAIT_MESSAGES = [
   'Esto está tardando más de lo usual, pero seguimos trabajando...',
-  'Estamos buscando en varias fuentes a la vez. Regálame unos segundos más...',
+  'Estamos buscando en varias fuentes a la vez... 👀',
   'Este objeto sí tarda. Es que no queremos adivinarle 😜',
   'Parece que está buscando en cada tienda del multiverso. Aguanta, coleccionista.',
   'No pues... ahora sí tardó 😔',
   'Mejor ya ni te digo nada porque a este paso me quedaré sin frases... 🥺🫰',
   '...',
   '😰',
+  '⌛',
 ];
+// Umbral acumulado (ms desde que se cumplió LONG_WAIT_MS) en el que aparece
+// cada mensaje a partir del segundo: 5000, 11000, 18000, 26000... (cada paso
+// 1s más largo que el anterior, empezando en 5s).
+const LONG_WAIT_THRESHOLDS_MS = LONG_WAIT_MESSAGES.slice(1).reduce<number[]>((acc, _message, i) => {
+  const previous = acc[i - 1] ?? 0;
+  acc.push(previous + (5000 + i * 1000));
+  return acc;
+}, []);
 
 interface AIProcessingOverlayProps {
   visible: boolean;
@@ -112,10 +121,9 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden, hasWebSear
       fill.value = withTiming(next, { duration: FILL_TICK_MS, easing: Easing.linear });
       const elapsed = Date.now() - startedAtRef.current;
       if (elapsed > LONG_WAIT_MS) {
-        const messageIndex = Math.min(
-          LONG_WAIT_MESSAGES.length - 1,
-          Math.floor((elapsed - LONG_WAIT_MS) / LONG_WAIT_STEP_MS),
-        );
+        const delta = elapsed - LONG_WAIT_MS;
+        const thresholdIndex = LONG_WAIT_THRESHOLDS_MS.findIndex((threshold) => delta < threshold);
+        const messageIndex = thresholdIndex === -1 ? LONG_WAIT_MESSAGES.length - 1 : thresholdIndex;
         setCurrentText(LONG_WAIT_MESSAGES[messageIndex]);
       } else if (steps.length > 0) {
         const stepIndex = Math.min(steps.length - 1, Math.floor(next * steps.length));
