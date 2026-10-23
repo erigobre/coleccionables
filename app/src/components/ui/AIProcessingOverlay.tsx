@@ -25,7 +25,7 @@ const ICON_PURPLE_DIM = 'rgba(120, 73, 255, 0.22)';
 // Línea de agua: morado claro (no verde, no el mismo morado del relleno —
 // si no, no se distinguiría el borde contra el relleno ya lleno).
 const WATER_LINE_COLOR = '#C3B2FF';
-const WEB_SEARCH_NOTE = 'Este proceso realiza una búsqueda en todo internet así que puede tardar un poco';
+const WEB_SEARCH_NOTE = 'Cargando datos del mercado… no salgas de la app';
 
 // Relleno falso tipo "barra de carga psicológica": avanza rápido al inicio y
 // se va frenando sin llegar nunca al 100% hasta que `done` sea true de
@@ -41,7 +41,20 @@ const FILL_TICK_MS = 150;
 // acorde a que casi ningún proceso real tarda menos de 30s.
 const FILL_EASE_FACTOR = 0.025;
 const LONG_WAIT_MS = 30000;
-const LONG_WAIT_TEXT = 'Esto está tardando más de lo usual, pero seguimos trabajando...';
+// Pasados los 30s, ya no hay un solo texto de "espera larga" sino una serie
+// escalonada (una cada LONG_WAIT_STEP_MS) que va subiendo el tono con humor —
+// se queda en la última si el proceso de verdad nunca termina.
+const LONG_WAIT_STEP_MS = 5000;
+const LONG_WAIT_MESSAGES = [
+  'Esto está tardando más de lo usual, pero seguimos trabajando...',
+  'Estamos buscando en varias fuentes a la vez. Regálame unos segundos más...',
+  'Este objeto sí tarda. Es que no queremos adivinarle 😜',
+  'Parece que está buscando en cada tienda del multiverso. Aguanta, coleccionista.',
+  'No pues... ahora sí tardó 😔',
+  'Mejor ya ni te digo nada porque a este paso me quedaré sin frases... 🥺🫰',
+  '...',
+  '😰',
+];
 
 interface AIProcessingOverlayProps {
   visible: boolean;
@@ -99,7 +112,11 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden, hasWebSear
       fill.value = withTiming(next, { duration: FILL_TICK_MS, easing: Easing.linear });
       const elapsed = Date.now() - startedAtRef.current;
       if (elapsed > LONG_WAIT_MS) {
-        setCurrentText(LONG_WAIT_TEXT);
+        const messageIndex = Math.min(
+          LONG_WAIT_MESSAGES.length - 1,
+          Math.floor((elapsed - LONG_WAIT_MS) / LONG_WAIT_STEP_MS),
+        );
+        setCurrentText(LONG_WAIT_MESSAGES[messageIndex]);
       } else if (steps.length > 0) {
         const stepIndex = Math.min(steps.length - 1, Math.floor(next * steps.length));
         setCurrentText(steps[stepIndex] ?? '');
