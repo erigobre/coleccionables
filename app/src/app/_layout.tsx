@@ -1,6 +1,6 @@
 import { Bungee_400Regular, useFonts as useBungeeFont } from '@expo-google-fonts/bungee';
 import { DMSans_400Regular, DMSans_500Medium, DMSans_700Bold, useFonts as useDMSansFont } from '@expo-google-fonts/dm-sans';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { Stack, router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import * as SplashScreen from 'expo-splash-screen';
@@ -10,11 +10,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import '../../global.css';
 import { AppLockGate } from '../components/AppLockGate';
 import { CloseHeaderButton } from '../components/CloseHeaderButton';
-import { AuthProvider, useAuth } from '../context/auth-context';
+import { AuthProvider, useAuth, type AuthUser } from '../context/auth-context';
 import { FtProvider } from '../context/ft-context';
 import { installGlobalErrorHandler } from '../lib/crash-log';
 import { drainUnfinishedTransactions, initIapConnection, storeToPlatform } from '../lib/iap';
 import { fetchIapCatalog, verifyPackagePurchase, verifySubscriptionPurchase } from '../lib/iap-server';
+import { fetchOnboardingStatus } from '../lib/onboarding';
 import { colors } from '../theme/tokens';
 
 // Se instala antes que cualquier otra cosa: los crashes que llegan vía
@@ -149,6 +150,25 @@ function useIapDrain(accessToken: string | null) {
   }, [accessToken]);
 }
 
+// Dispara el modal de onboarding tras un registro (o un login con onboarding
+// pendiente, p. ej. si la app se cerró a medio flujo). `User.onboardingCompletedAt`
+// es la única fuente de verdad, nunca un flag local; se revisa una sola vez
+// por sesión de usuario (no en cada refresh de token).
+function useOnboardingRedirect(user: AuthUser | null, accessToken: string | null) {
+  const checkedForUserId = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!user || !accessToken) return;
+    if (checkedForUserId.current === user.sub) return;
+    checkedForUserId.current = user.sub;
+    fetchOnboardingStatus(accessToken)
+      .then((status) => {
+        if (!status.completed) router.replace('/onboarding');
+      })
+      .catch(() => {});
+  }, [user, accessToken]);
+}
+
 export default function RootLayout() {
   const [bungeeLoaded] = useBungeeFont({ Bungee_400Regular });
   const [dmSansLoaded] = useDMSansFont({ DMSans_400Regular, DMSans_500Medium, DMSans_700Bold });
@@ -176,6 +196,7 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
 
   useNotificationNavigation();
   useIapDrain(accessToken);
+  useOnboardingRedirect(user, accessToken);
 
   useEffect(() => {
     if (ready) SplashScreen.hideAsync().catch(() => {});
@@ -190,6 +211,17 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
       </Stack.Protected>
       <Stack.Protected guard={!!user}>
         <Stack.Screen name="(tabs)" />
+        {/* Onboarding de primera vez (3 preguntas): modal de pantalla completa,
+            no descartable con gesto ni botón de cerrar — se sale solo
+            completando un paso o tocando "Omitir" dentro de la pantalla. */}
+        <Stack.Screen
+          name="onboarding"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: false,
+            gestureEnabled: false,
+          }}
+        />
         {/* Modales de pantalla completa, fuera de cualquier tab: así entrar a la
             cámara desde Home/Wishlist/Objetos nunca deja a un tab con su stack
             interno "atorado" en la cámara, ni la barra de tabs queda visible

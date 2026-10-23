@@ -24,6 +24,14 @@ export const COLLECTION_ICON_CHOICES: IconName[] = [
   'gift-outline',
   'cube-outline',
   'camera-outline',
+  // Agregados para el catálogo de onboarding (plan "Onboarding de primera
+  // vez"): cubren las categorías de colección nuevas (tarjetas, estampillas,
+  // autos a escala, relojes, plantas) que no tenían un ícono curado todavía.
+  'card-outline',
+  'ticket-outline',
+  'car-sport-outline',
+  'watch-outline',
+  'leaf-outline',
 ];
 
 // Íconos que solo usan las colecciones del sistema (no se pueden elegir a mano).

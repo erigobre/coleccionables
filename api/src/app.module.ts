@@ -27,6 +27,7 @@ import { SupportModule } from './support/support.module.js';
 import { ReferralsModule } from './referrals/referrals.module.js';
 import { OrganizationsModule } from './organizations/organizations.module.js';
 import { AccountRecoveryModule } from './account-recovery/account-recovery.module.js';
+import { OnboardingModule } from './onboarding/onboarding.module.js';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { AccountRecoveryModule } from './account-recovery/account-recovery.modul
     ReferralsModule,
     OrganizationsModule,
     AccountRecoveryModule,
+    OnboardingModule,
   ],
 })
 export class AppModule {}

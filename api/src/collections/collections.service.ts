@@ -1,7 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import type { Collection, SharedRole } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { DEFAULT_COLLECTIONS } from './default-collections.js';
 import type { CreateCollectionDto } from './dto/create-collection.dto.js';
 import type { UpdateCollectionDto } from './dto/update-collection.dto.js';
 import type { RemoveCollectionDto } from './dto/remove-collection.dto.js';
@@ -16,12 +15,6 @@ const ROLE_RANK: Record<SharedRole, number> = { VIEWER: 0, EDITOR: 1, OWNER: 2 }
 @Injectable()
 export class CollectionsService {
   constructor(private readonly prisma: PrismaService) {}
-
-  async seedDefaults(ownerId: string) {
-    await this.prisma.collection.createMany({
-      data: DEFAULT_COLLECTIONS.map((name) => ({ ownerId, name, isDefault: true })),
-    });
-  }
 
   async create(ownerId: string, dto: CreateCollectionDto) {
     return this.prisma.collection.create({

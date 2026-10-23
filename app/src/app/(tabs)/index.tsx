@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useFocusEffect, useRouter } from 'expo-router';
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
+import { FallingCoinsAnimation } from '../../components/ui/FallingCoinsAnimation';
 import { FtCoin } from '../../components/ui/FtCoin';
 import { LogoHorizontal } from '../../components/ui/LogoHorizontal';
 import { Screen } from '../../components/ui/Screen';
@@ -12,8 +13,33 @@ import { useFt } from '../../context/ft-context';
 import { resolvePhotoUrl } from '../../lib/api';
 import { fetchMyCollectionInvites } from '../../lib/collections';
 import { fetchItems, type Item } from '../../lib/items';
+import { fetchOnboardingStatus } from '../../lib/onboarding';
 import { fetchMyInvites } from '../../lib/organizations';
 import { colors } from '../../theme/tokens';
+
+// Cuenta ascendente de 0 hasta `target` mientras `play` es true (usada para
+// la revelación del regalo de bienvenida); fuera de eso solo refleja `target`
+// tal cual, sin animar (ej. cuando el balance cambia por cualquier otro gasto).
+function useCountUp(target: number, play: boolean, duration = 1600) {
+  const [value, setValue] = useState(target);
+  useEffect(() => {
+    if (!play) {
+      setValue(target);
+      return;
+    }
+    setValue(0);
+    const start = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const tick = () => {
+      const progress = Math.min(1, (Date.now() - start) / duration);
+      setValue(Math.round(target * progress));
+      if (progress < 1) timer = setTimeout(tick, 32);
+    };
+    tick();
+    return () => clearTimeout(timer);
+  }, [play, target, duration]);
+  return value;
+}
 
 function StatCard({
   label,
@@ -59,6 +85,7 @@ export default function HomeScreen() {
   const { accessToken } = useAuth();
   const { costOf, balance } = useFt();
   const router = useRouter();
+  const params = useLocalSearchParams<{ onboarded?: string }>();
   const insets = useSafeAreaInsets();
   const scanCost = costOf('SCAN_HAVE_IT');
   const collectibilityCost = costOf('COLLECTIBILITY_CHECK');
@@ -66,6 +93,32 @@ export default function HomeScreen() {
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingCount, setPendingCount] = useState(0);
+
+  // El FT del regalo ya se otorgó en el registro (AuthService.register) —
+  // esto solo pone en escena algo que ya pasó, nunca un segundo otorgamiento.
+  // El parámetro de navegación solo aparece una vez, justo tras completar el
+  // onboarding, así que basta con una bandera local (sin flag en backend).
+  const checkedWelcomeGift = useRef(false);
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [welcomeGiftAmount, setWelcomeGiftAmount] = useState(0);
+  const [celebrating, setCelebrating] = useState(false);
+  const displayedBalance = useCountUp(balance ?? 0, celebrating);
+
+  useEffect(() => {
+    if (params.onboarded !== '1' || checkedWelcomeGift.current || !accessToken) return;
+    checkedWelcomeGift.current = true;
+    fetchOnboardingStatus(accessToken)
+      .then((status) => {
+        setWelcomeGiftAmount(status.welcomeGiftAmount);
+        setShowWelcomeModal(true);
+      })
+      .catch(() => {});
+  }, [params.onboarded, accessToken]);
+
+  const onClaimWelcomeGift = () => {
+    setShowWelcomeModal(false);
+    setCelebrating(true);
+  };
 
   // Alimenta el badge de la campana: solo lo pendiente por aceptar/rechazar
   // (invitaciones a colecciones compartidas + familia de FrikiTokens), no un
@@ -140,7 +193,7 @@ export default function HomeScreen() {
         <>
           <View className="mt-6 flex-row gap-3">
             <StatCard label="Objetos totales" value={items.length} onPress={() => router.push('/(tabs)/objetos')} />
-            {balance != null ? <StatCard label="Tus FrikiTokens" value={balance} icon /> : null}
+            {balance != null ? <StatCard label="Tus FrikiTokens" value={displayedBalance} icon /> : null}
           </View>
 
           {items.length === 0 ? (
@@ -278,6 +331,24 @@ export default function HomeScreen() {
       >
         <Ionicons name="add" size={30} color={colors.primaryText} />
       </Pressable>
+
+      <FallingCoinsAnimation visible={celebrating} onDone={() => setCelebrating(false)} />
+
+      <Modal visible={showWelcomeModal} transparent animationType="fade">
+        <View className="flex-1 items-center justify-center bg-black/70 px-6">
+          <View className="w-full max-w-[380px] items-center rounded-2xl bg-surface p-6">
+            <FtCoin size={48} />
+            <Text className="font-display mt-4 text-center text-lg uppercase text-primary">¡Bienvenido!</Text>
+            <Text className="mt-2 text-center text-sm text-textSecondary">
+              Te regalamos {welcomeGiftAmount} FT para que puedas usar la app con todas sus funciones. Siempre podrás
+              adquirir más FrikiTokens en tu perfil.
+            </Text>
+            <View className="mt-5 w-full">
+              <Button label="¡Recibir FrikiTokens!" onPress={onClaimWelcomeGift} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

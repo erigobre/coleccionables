@@ -3,7 +3,6 @@ import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import * as bcrypt from 'bcrypt';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { DEFAULT_COLLECTIONS } from '../collections/default-collections.js';
 import { FtService } from '../ft/ft.service.js';
 import { ReferralsService } from '../referrals/referrals.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
@@ -114,22 +113,10 @@ export class AuthService {
         },
       });
 
-      await tx.location.create({
-        data: {
-          ownerId: createdUser.id,
-          name: 'Casa',
-          isPermanentDefault: true,
-        },
-      });
-
-      await tx.collection.createMany({
-        data: DEFAULT_COLLECTIONS.map((name) => ({
-          ownerId: createdUser.id,
-          name,
-          isDefault: true,
-        })),
-      });
-
+      // Ya no se siembra una Location "Casa" ni Collections por defecto: el
+      // onboarding de primera vez (ver OnboardingModule) es ahora la única
+      // fuente de colecciones/ubicaciones iniciales, según lo que el usuario
+      // elija ahí (o nada, si lo omite).
       return createdUser;
     });
 

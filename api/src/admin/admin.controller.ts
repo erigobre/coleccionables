@@ -1,5 +1,5 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from '@nestjs/common';
-import type { FtServiceKey } from '@prisma/client';
+import type { FtServiceKey, OnboardingOptionKind } from '@prisma/client';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard.js';
 import { RolesGuard } from '../common/guards/roles.guard.js';
 import { Roles } from '../common/decorators/roles.decorator.js';
@@ -12,6 +12,7 @@ import { UpdateUserDto } from './dto/update-user.dto.js';
 import { UpdateOrganizationDto } from './dto/update-organization.dto.js';
 import { CreateFtPackageDto, UpdateFtPackageDto } from './dto/upsert-ft-package.dto.js';
 import { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.js';
+import { CreateOnboardingOptionDto, UpdateOnboardingOptionDto } from './dto/upsert-onboarding-option.dto.js';
 import { GrantFtDto } from './dto/grant-ft.dto.js';
 import { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
 import { UpdateFtServiceConfigDto } from './dto/update-ft-service-config.dto.js';
@@ -162,6 +163,27 @@ export class AdminController {
   @Patch('ft-plans/:id')
   updateFtPlan(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string, @Body() dto: UpdateFtPlanDto) {
     return this.adminService.updateFtPlan(admin, id, dto);
+  }
+
+  // Catálogo de las preguntas 1 y 2 del onboarding (qué coleccionas / dónde
+  // lo tienes) — editable aquí sin requerir un release de la app.
+  @Get('onboarding-options')
+  findOnboardingOptions(@Query('kind') kind?: OnboardingOptionKind) {
+    return this.adminService.findOnboardingOptions(kind);
+  }
+
+  @Post('onboarding-options')
+  createOnboardingOption(@CurrentUser() admin: AuthenticatedUser, @Body() dto: CreateOnboardingOptionDto) {
+    return this.adminService.createOnboardingOption(admin, dto);
+  }
+
+  @Patch('onboarding-options/:id')
+  updateOnboardingOption(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: UpdateOnboardingOptionDto,
+  ) {
+    return this.adminService.updateOnboardingOption(admin, id, dto);
   }
 
   // Regalo manual de FT a una organización, sin pago (queda como sponsor).

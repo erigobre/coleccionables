@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
-import type { Prisma } from '@prisma/client';
+import type { OnboardingOptionKind, Prisma } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { FtService } from '../ft/ft.service.js';
@@ -14,6 +14,7 @@ import type { CreateFtPlanDto, UpdateFtPlanDto } from './dto/upsert-ft-plan.dto.
 import type { GrantFtDto } from './dto/grant-ft.dto.js';
 import type { UpdateFtConfigDto } from './dto/update-ft-config.dto.js';
 import type { UpdateFtServiceConfigDto } from './dto/update-ft-service-config.dto.js';
+import type { CreateOnboardingOptionDto, UpdateOnboardingOptionDto } from './dto/upsert-onboarding-option.dto.js';
 import type { FtServiceKey } from '@prisma/client';
 
 const ACTIVE_WINDOW_DAYS = 30;
@@ -636,6 +637,53 @@ export class AdminService {
     });
     await this.logAction(admin, 'ftPlan.update', 'FtPlan', id, { ...dto });
     return updated;
+  }
+
+  // Catálogo administrable de las preguntas 1 y 2 del onboarding (qué
+  // coleccionas / dónde lo tienes) — mismo modelo que GET /onboarding/options.
+  findOnboardingOptions(kind?: OnboardingOptionKind) {
+    return this.prisma.onboardingOption.findMany({
+      where: kind ? { kind } : undefined,
+      orderBy: [{ kind: 'asc' }, { sortOrder: 'asc' }],
+    });
+  }
+
+  async createOnboardingOption(admin: { id: string; email: string }, dto: CreateOnboardingOptionDto) {
+    const created = await this.prisma.onboardingOption.create({
+      data: {
+        kind: dto.kind,
+        code: dto.code,
+        label: dto.label,
+        icon: dto.icon,
+        isActive: dto.isActive ?? true,
+        sortOrder: dto.sortOrder ?? 0,
+      },
+    });
+    await this.logAction(admin, 'onboardingOption.create', 'OnboardingOption', created.id, { ...dto });
+    return created;
+  }
+
+  async updateOnboardingOption(admin: { id: string; email: string }, id: string, dto: UpdateOnboardingOptionDto) {
+    await this.assertOnboardingOptionExists(id);
+    const updated = await this.prisma.onboardingOption.update({
+      where: { id },
+      data: {
+        label: dto.label,
+        icon: dto.icon,
+        isActive: dto.isActive,
+        sortOrder: dto.sortOrder,
+      },
+    });
+    await this.logAction(admin, 'onboardingOption.update', 'OnboardingOption', id, { ...dto });
+    return updated;
+  }
+
+  private async assertOnboardingOptionExists(id: string) {
+    const found = await this.prisma.onboardingOption.findUnique({ where: { id } });
+    if (!found) {
+      throw new NotFoundException('Opción de onboarding no encontrada');
+    }
+    return found;
   }
 
   // Regalo manual de FT a una organización, sin pago real (plan pedido

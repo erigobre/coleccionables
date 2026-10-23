@@ -173,7 +173,44 @@ model User {
   passwordChangedAt           DateTime?
   passwordChangeLogs          PasswordChangeLog[]
 
+  // Onboarding de primera vez (3 preguntas), Oct 2026: onboardingCompletedAt
+  // es la única fuente de verdad de "ya pasó por el onboarding" (nunca un
+  // flag local del dispositivo). themePreference solo se guarda como
+  // preferencia por ahora — el sistema de temas todavía no está programado.
+  onboardingCompletedAt DateTime?
+  themePreference       ThemePreference @default(MORADO)
+
   @@map("users")
+}
+
+enum ThemePreference {
+  MORADO
+  NEGRO
+  ROSA
+}
+
+enum OnboardingOptionKind {
+  COLLECTING
+  LOCATION
+}
+
+// Catálogo administrable desde Superadmin de las opciones que se muestran en
+// las preguntas 1 y 2 del onboarding — no hardcodeadas en la app, para poder
+// activar/desactivar/reordenar según el uso real sin requerir un release.
+model OnboardingOption {
+  id        String               @id @default(cuid())
+  kind      OnboardingOptionKind
+  code      String // clave estable (ej. "toys", "warehouse"), no se traduce
+  label     String // texto mostrado al usuario
+  icon      String // para COLLECTING debe ser uno de COLLECTION_ICON_CHOICES; para LOCATION, uno de LOCATION_ICONS
+  isActive  Boolean              @default(true)
+  sortOrder Int                  @default(0)
+  createdAt DateTime             @default(now())
+  updatedAt DateTime             @updatedAt
+
+  @@unique([kind, code])
+  @@index([kind, isActive, sortOrder])
+  @@map("onboarding_options")
 }
 
 // Auditoría de seguridad (plan de Ajustes, ampliado para "recuperar
