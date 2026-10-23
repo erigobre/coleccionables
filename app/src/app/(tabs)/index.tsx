@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../../components/ui/Button';
@@ -17,12 +17,17 @@ import { fetchOnboardingStatus } from '../../lib/onboarding';
 import { fetchMyInvites } from '../../lib/organizations';
 import { colors } from '../../theme/tokens';
 
+const ftCoinImage = require('../../../assets/ft-coin.png');
+
 // Cuenta ascendente de 0 hasta `target` mientras `play` es true (usada para
 // la revelación del regalo de bienvenida); fuera de eso solo refleja `target`
 // tal cual, sin animar (ej. cuando el balance cambia por cualquier otro gasto).
+// useLayoutEffect (no useEffect) para que el reset a 0 se aplique antes de
+// pintar el frame: con useEffect llega a verse un parpadeo del valor final
+// durante un frame antes de reiniciar a 0.
 function useCountUp(target: number, play: boolean, duration = 1600) {
-  const [value, setValue] = useState(target);
-  useEffect(() => {
+  const [value, setValue] = useState(() => (play ? 0 : target));
+  useLayoutEffect(() => {
     if (!play) {
       setValue(target);
       return;
@@ -102,7 +107,14 @@ export default function HomeScreen() {
   const [showWelcomeModal, setShowWelcomeModal] = useState(false);
   const [welcomeGiftAmount, setWelcomeGiftAmount] = useState(0);
   const [celebrating, setCelebrating] = useState(false);
-  const displayedBalance = useCountUp(balance ?? 0, celebrating);
+  // Mientras haya un regalo de bienvenida por reclamar (venimos de onboarding
+  // y aún no se mostró/animó), el balance se muestra en 0 sin importar el
+  // balance real ya otorgado — nunca debe verse el monto final antes de la
+  // animación. Se inicializa en el primer render según el parámetro de
+  // navegación para no parpadear mientras se resuelve el fetch de abajo.
+  const [giftPending, setGiftPending] = useState(() => params.onboarded === '1');
+  const animatedBalance = useCountUp(balance ?? 0, celebrating);
+  const displayedBalance = celebrating ? animatedBalance : giftPending ? 0 : balance ?? 0;
 
   useEffect(() => {
     if (params.onboarded !== '1' || checkedWelcomeGift.current || !accessToken) return;
@@ -112,12 +124,17 @@ export default function HomeScreen() {
         setWelcomeGiftAmount(status.welcomeGiftAmount);
         setShowWelcomeModal(true);
       })
-      .catch(() => {});
+      .catch(() => setGiftPending(false));
   }, [params.onboarded, accessToken]);
 
   const onClaimWelcomeGift = () => {
     setShowWelcomeModal(false);
     setCelebrating(true);
+  };
+
+  const onCelebrationDone = () => {
+    setCelebrating(false);
+    setGiftPending(false);
   };
 
   // Alimenta el badge de la campana: solo lo pendiente por aceptar/rechazar
@@ -332,12 +349,12 @@ export default function HomeScreen() {
         <Ionicons name="add" size={30} color={colors.primaryText} />
       </Pressable>
 
-      <FallingCoinsAnimation visible={celebrating} onDone={() => setCelebrating(false)} />
+      <FallingCoinsAnimation visible={celebrating} coinImage={ftCoinImage} onDone={onCelebrationDone} />
 
       <Modal visible={showWelcomeModal} transparent animationType="fade">
         <View className="flex-1 items-center justify-center bg-black/70 px-6">
           <View className="w-full max-w-[380px] items-center rounded-2xl bg-surface p-6">
-            <FtCoin size={48} />
+            <Image source={ftCoinImage} style={{ width: 48, height: 48 }} resizeMode="contain" />
             <Text className="font-display mt-4 text-center text-lg uppercase text-primary">¡Bienvenido!</Text>
             <Text className="mt-2 text-center text-sm text-textSecondary">
               Te regalamos {welcomeGiftAmount} FT para que puedas usar la app con todas sus funciones. Siempre podrás
