@@ -404,10 +404,20 @@ export interface IdentifyResult {
 
 // Identifica el objeto de la foto y lo busca en la colección. No guarda las fotos
 // en el servidor: si el usuario decide agregarlo, se suben después.
+// A diferencia de "Analizar"/"Es Coleccionable", además compara contra la
+// colección y hace una segunda llamada a Gemini (comparación visual contra
+// hasta 3 candidatos, con descarga de sus fotos) — más margen que el timeout
+// por defecto de apiFetch (60s) para evitar cancelacion prematura (reportado
+// 2026-10-23).
 export async function identifyItemPhotos(accessToken: string, photoUris: string[]) {
   const compressed = await compressPhotos(photoUris);
   const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
-  return apiFetch<IdentifyResult>('/items/identify', { method: 'POST', body: { photos }, accessToken });
+  return apiFetch<IdentifyResult>('/items/identify', {
+    method: 'POST',
+    body: { photos },
+    accessToken,
+    timeoutMs: 120_000,
+  });
 }
 
 // "¿Es Coleccionable?" (Home): identificación + calificación 0-5 de qué tan
