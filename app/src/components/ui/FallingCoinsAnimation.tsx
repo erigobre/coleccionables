@@ -14,6 +14,8 @@ interface FallingCoinsAnimationProps {
   visible: boolean;
   /** Imagen alterna a la moneda por defecto (ej. para la futura pantalla de compra exitosa de FT). */
   coinImage?: ImageSourcePropType;
+  /** Multiplicador sobre el tamaño base (26-40px) de cada moneda. */
+  sizeScale?: number;
   count?: number;
   onDone?: () => void;
 }
@@ -74,7 +76,7 @@ function Coin({ spec, floor, coinImage }: { spec: CoinSpec; floor: number; coinI
 // carril solo empieza a caer cuando la anterior de ese carril ya debió
 // terminar su caída+rebote, así `count` puede ser mucho mayor sin saturar
 // la pantalla.
-export function FallingCoinsAnimation({ visible, coinImage, count = 20, onDone }: FallingCoinsAnimationProps) {
+export function FallingCoinsAnimation({ visible, coinImage, sizeScale = 1, count = 20, onDone }: FallingCoinsAnimationProps) {
   const { width, height } = useWindowDimensions();
   const onDoneRef = useRef(onDone);
   onDoneRef.current = onDone;
@@ -86,7 +88,7 @@ export function FallingCoinsAnimation({ visible, coinImage, count = 20, onDone }
     return Array.from({ length: count }, (_, i) => {
       const lane = i % lanes;
       const round = Math.floor(i / lanes);
-      const size = 26 + Math.round(Math.random() * 14);
+      const size = Math.round((26 + Math.round(Math.random() * 14)) * sizeScale);
       return {
         key: i,
         x: 16 + Math.random() * Math.max(width - 48, 0),
@@ -97,7 +99,7 @@ export function FallingCoinsAnimation({ visible, coinImage, count = 20, onDone }
       };
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visible, count, width]);
+  }, [visible, count, width, sizeScale]);
 
   useEffect(() => {
     if (!visible || coins.length === 0) return;

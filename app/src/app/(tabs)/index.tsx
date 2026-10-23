@@ -349,12 +349,12 @@ export default function HomeScreen() {
         <Ionicons name="add" size={30} color={colors.primaryText} />
       </Pressable>
 
-      <FallingCoinsAnimation visible={celebrating} coinImage={ftCoinImage} onDone={onCelebrationDone} />
+      <FallingCoinsAnimation visible={celebrating} coinImage={ftCoinImage} sizeScale={2} onDone={onCelebrationDone} />
 
       <Modal visible={showWelcomeModal} transparent animationType="fade">
         <View className="flex-1 items-center justify-center bg-black/70 px-6">
           <View className="w-full max-w-[380px] items-center rounded-2xl bg-surface p-6">
-            <Image source={ftCoinImage} style={{ width: 48, height: 48 }} resizeMode="contain" />
+            <Image source={ftCoinImage} style={{ width: 96, height: 96 }} resizeMode="contain" />
             <Text className="font-display mt-4 text-center text-lg uppercase text-primary">¡Bienvenido!</Text>
             <Text className="mt-2 text-center text-sm text-textSecondary">
               Te regalamos {welcomeGiftAmount} FT para que puedas usar la app con todas sus funciones. Siempre podrás

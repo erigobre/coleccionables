@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Button } from '../components/ui/Button';
 import { CollectingBoxAnimation } from '../components/ui/CollectingBoxAnimation';
@@ -64,7 +64,7 @@ function OptionCard({
 }
 
 export default function OnboardingScreen() {
-  const { user, accessToken } = useAuth();
+  const { accessToken } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -103,7 +103,14 @@ export default function OnboardingScreen() {
   };
 
   const onSkip = () => {
-    finish();
+    Alert.alert(
+      '¿Salir de la configuración inicial?',
+      'Si omites este paso ahora, no volveremos a mostrártelo después. Siempre podrás crear tus colecciones y ubicaciones manualmente desde la app, pero perderás esta configuración guiada. ¿Deseas continuar?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        { text: 'Sí, omitir', style: 'destructive', onPress: finish },
+      ],
+    );
   };
 
   const stepsOrder: Step[] = useMemo(() => ['welcome', 'collecting', 'location', 'theme'], []);
@@ -119,7 +126,7 @@ export default function OnboardingScreen() {
 
         <View className="flex-1 items-center justify-center">
           <Text className="font-display text-center text-[26px] uppercase tracking-wide text-text">
-            ¡Te damos la bienvenida{user?.name ? `, ${user.name}` : ''}!
+            ¡Te damos la bienvenida!
           </Text>
           <Text className="mt-3 text-center text-sm text-textMuted">
             Antes de empezar, cuéntanos un poco sobre tu colección. Esto nos ayuda a configurar tu app a tu medida — toma
