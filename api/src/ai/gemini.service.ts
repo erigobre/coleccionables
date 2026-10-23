@@ -285,6 +285,14 @@ export class GeminiService {
       config: {
         tools: [{ googleSearch: {} }],
         safetySettings: SAFETY_SETTINGS,
+        // Benchmark 2026-10-22 (prompt real, foto de prueba): con thinking
+        // dinámico (default) el modelo gastaba ~1000 tokens de "pensamiento"
+        // extra y tardaba ~18s; con thinkingBudget=0 bajó a ~7.6s con la misma
+        // calidad de identificación, sin perder la capacidad de usar
+        // googleSearch. Es el flujo más lento de la app (identificación +
+        // rating + precio de mercado en un solo llamado), así que vale la
+        // pena desactivar el thinking aquí aunque no se toque analyzePhotos.
+        thinkingConfig: { thinkingBudget: 0 },
       },
     });
 
