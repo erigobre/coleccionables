@@ -517,10 +517,14 @@ export class ItemsService {
   // Cobra FrikiTokens (SCAN_HAVE_IT): ver módulo `ft`.
   async identify(ownerId: string, organizationId: string, files: ImageInput[], idempotencyKey: string) {
     this.assertHasPhotos(files);
+    const t0 = Date.now();
+    this.logger.log(`identify: inicio (idempotencyKey=${idempotencyKey})`);
     return this.ftService.runChargedAction(
       { organizationId, userId: ownerId, service: 'SCAN_HAVE_IT', idempotencyKey },
       async () => {
+        this.logger.log(`identify: llamando analyzePhotos (+${Date.now() - t0}ms)`);
         const { result: extracted, usage, moderation, boundingBox } = await this.geminiService.analyzePhotos(files);
+        this.logger.log(`identify: analyzePhotos listo (+${Date.now() - t0}ms)`);
         await this.blockIfUnsafe(organizationId, ownerId, 'identify', moderation);
         // "identify" nunca sube ni guarda la foto (a diferencia de analyzePhotos),
         // así que no hay objeto que retener: solo se marca para revisión, sin
@@ -537,6 +541,7 @@ export class ItemsService {
             },
           });
         }
+        this.logger.log(`identify: llamando match (+${Date.now() - t0}ms)`);
         const matchResult = await this.match(ownerId, {
           name: extracted.name,
           brand: extracted.brand,
@@ -544,13 +549,16 @@ export class ItemsService {
           category: Object.values(ItemCategory).find((c) => c === extracted.category),
           tags: extracted.suggestedTags,
         });
+        this.logger.log(`identify: match listo, ${matchResult.matches.length} candidatos (+${Date.now() - t0}ms)`);
 
+        this.logger.log(`identify: llamando applyVisualRerank (+${Date.now() - t0}ms)`);
         const { matches, hasMatch, visualCostUsd, visualUsage } = await this.applyVisualRerank(
           files[0],
           boundingBox,
           matchResult.matches,
           matchResult.hasMatch,
         );
+        this.logger.log(`identify: applyVisualRerank listo (+${Date.now() - t0}ms)`);
 
         return {
           data: { extracted, ...matchResult, matches, hasMatch },
