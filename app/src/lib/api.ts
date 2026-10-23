@@ -22,6 +22,7 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE';
   body?: unknown;
   accessToken?: string | null;
+  timeoutMs?: number;
 }
 
 function extractMessage(payload: unknown, fallback: string): string {
@@ -128,7 +129,7 @@ function refreshAccessToken(): Promise<string | null> {
 const REQUEST_TIMEOUT_MS = 60_000;
 
 export async function apiFetch<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, accessToken } = options;
+  const { method = 'GET', body, accessToken, timeoutMs = REQUEST_TIMEOUT_MS } = options;
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
   const idempotencyKey = generateIdempotencyKey();
 
@@ -139,7 +140,7 @@ export async function apiFetch<T>(path: string, options: RequestOptions = {}): P
     };
     if (token) headers.Authorization = `Bearer ${token}`;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
     // cache: 'no-store' es necesario: el caché HTTP nativo de iOS (NSURLCache)
     // guarda respuestas GET por URL sin distinguir el header Authorization —
     // sin esto, una cuenta puede recibir el balance/suscripción cacheado de

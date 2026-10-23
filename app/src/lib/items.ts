@@ -421,10 +421,19 @@ export interface CollectibilityCheckResult {
   currentMarket: MarketPriceResult;
 }
 
+// Identificación + calificación + 2 precios en una sola llamada a Gemini con
+// búsqueda web: tarda más que el resto de las llamadas de IA del proyecto, así
+// que necesita más margen que el timeout por defecto de apiFetch (60s) — sin
+// esto se abortaba sola a mitad de la búsqueda (reportado 2026-10-22).
 export async function checkCollectibility(accessToken: string, photoUris: string[]) {
   const compressed = await compressPhotos(photoUris);
   const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
-  return apiFetch<CollectibilityCheckResult>('/items/collectibility-check', { method: 'POST', body: { photos }, accessToken });
+  return apiFetch<CollectibilityCheckResult>('/items/collectibility-check', {
+    method: 'POST',
+    body: { photos },
+    accessToken,
+    timeoutMs: 120_000,
+  });
 }
 
 // Adjunta el precio de mercado ya obtenido por "¿Es Coleccionable?" a un
