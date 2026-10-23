@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { ItemCategory, type Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { CollectionsService } from '../collections/collections.service.js';
@@ -7,7 +7,7 @@ import { StorageService } from '../storage/storage.service.js';
 import { GeminiService } from '../ai/gemini.service.js';
 import { OpenAiService } from '../ai/openai.service.js';
 import { FtService } from '../ft/ft.service.js';
-import type { GeminiUsage, ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
+import type { GeminiUsage, ImageInput, MarketPriceResult, ModerationSignal, VisualCompareResult } from '../ai/ai.types.js';
 import type { CreateItemDto } from './dto/create-item.dto.js';
 import type { UpdateItemDto } from './dto/update-item.dto.js';
 import type { SetSaleDto } from './dto/set-sale.dto.js';
@@ -41,6 +41,8 @@ const MAX_SIMILAR_RESULTS = 10;
 
 @Injectable()
 export class ItemsService {
+  private readonly logger = new Logger(ItemsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly collectionsService: CollectionsService,
@@ -641,10 +643,29 @@ export class ItemsService {
     }
 
     const queryImage = await this.storageService.cropToAvatar(queryFile, boundingBox);
-    const { result: visual, usage } = await this.geminiService.compareCandidates(
-      queryImage,
-      candidates.map(({ label, image }) => ({ label, image })),
-    );
+    let visual: VisualCompareResult;
+    let usage: GeminiUsage;
+    try {
+      // Esta llamada a Gemini se colgaba indefinidamente en algunos casos
+      // (reportado 2026-10-23, "¿Ya lo tengo?" cancelándose sin importar
+      // cuánto se ampliara el timeout del cliente) — con límite propio, si no
+      // responde a tiempo se degrada a los resultados de texto sin puntaje
+      // visual en vez de bloquear toda la respuesta.
+      const result = await Promise.race([
+        this.geminiService.compareCandidates(
+          queryImage,
+          candidates.map(({ label, image }) => ({ label, image })),
+        ),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('compareCandidates timeout (20s)')), 20_000),
+        ),
+      ]);
+      visual = result.result;
+      usage = result.usage;
+    } catch (error) {
+      this.logger.warn(`applyVisualRerank: comparación visual falló o se colgó, degradando sin puntaje visual: ${error}`);
+      return { matches, hasMatch: fallbackHasMatch, visualCostUsd: 0, visualUsage: zeroUsage };
+    }
 
     const scoreByItemId = new Map(candidates.map((c) => [c.match.item.id, visual.scores[c.label] ?? 0]));
     const scoredMatches = matches.map((match) => ({
