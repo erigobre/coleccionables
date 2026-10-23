@@ -11,7 +11,7 @@ import { getItemDraft } from '../lib/item-draft';
 import { EMPTY_ITEM_FORM, itemFormIsValid, itemFormToCreateDto, type ItemFormValues } from '../lib/item-form';
 import { fetchActiveCollections, type Collection } from '../lib/collections';
 import { flattenLocationTree, fetchLocationTree, type LocationNode } from '../lib/locations';
-import { createItem } from '../lib/items';
+import { attachMarketPrice, createItem } from '../lib/items';
 import { findOrCreateTag, searchTags, type Tag } from '../lib/tags';
 import { deleteWishlistItem } from '../lib/wishlist';
 import { colors } from '../theme/tokens';
@@ -182,6 +182,11 @@ export default function NewItemScreen() {
         // Solo se borra tras guardar con éxito, nunca antes: si el usuario
         // abandona el formulario, el item de wishlist se queda intacto.
         deleteWishlistItem(accessToken, draft.wishlistItemId).catch(() => {});
+      }
+      if (draft?.pendingMarketPrice) {
+        // Viene de "¿Es Coleccionable?" → "Agregar objeto": adjunta el precio
+        // actual ya consultado, sin cobrar FT de nuevo.
+        attachMarketPrice(accessToken, item.id, draft.pendingMarketPrice).catch(() => {});
       }
       // `new` vive fuera de los tabs (ver root _layout.tsx), así que un simple
       // replace hacia una ruta anidada en (tabs) rompe el historial interno de

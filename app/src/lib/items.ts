@@ -409,3 +409,27 @@ export async function identifyItemPhotos(accessToken: string, photoUris: string[
   const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
   return apiFetch<IdentifyResult>('/items/identify', { method: 'POST', body: { photos }, accessToken });
 }
+
+// "¿Es Coleccionable?" (Home): identificación + calificación 0-5 de qué tan
+// coleccionable es + precio de lanzamiento (extracted.purchasePrice) +
+// precio actual de mercado (currentMarket). No compara contra la colección
+// del usuario ni guarda fotos — es investigación de mercado, no alta.
+export interface CollectibilityCheckResult {
+  extracted: ExtractedItemData;
+  collectibilityStars: number;
+  collectibilityExplanation: string;
+  currentMarket: MarketPriceResult;
+}
+
+export async function checkCollectibility(accessToken: string, photoUris: string[]) {
+  const compressed = await compressPhotos(photoUris);
+  const photos = compressed.map((photo) => ({ imageBase64: photo.base64, mimeType: 'image/jpeg' }));
+  return apiFetch<CollectibilityCheckResult>('/items/collectibility-check', { method: 'POST', body: { photos }, accessToken });
+}
+
+// Adjunta el precio de mercado ya obtenido por "¿Es Coleccionable?" a un
+// objeto recién creado, igual que si se hubiera presionado "Buscar precio
+// actual" — sin cobrar FT de nuevo (ya se pagó con COLLECTIBILITY_CHECK).
+export function attachMarketPrice(accessToken: string, itemId: string, market: MarketPriceResult) {
+  return apiFetch<void>(`/items/${itemId}/market-price/attach`, { method: 'POST', body: { market }, accessToken });
+}

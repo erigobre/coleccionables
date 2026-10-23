@@ -18,6 +18,7 @@ import {
 import type {
   BarcodeLookupResult,
   BoundingBox,
+  CollectibilityCheckResult,
   ExtractedItemData,
   GeminiCallResult,
   GeminiUsage,
@@ -108,6 +109,50 @@ Además, evalúa las fotos para moderación de contenido (esto es tan importante
 - "isLikelyCollectible": true si las fotos muestran principalmente un objeto que alguien podría razonablemente coleccionar como hobby — esto INCLUYE plantas (bonsáis, cactus, suculentas, etc., ya que hay coleccionistas de plantas igual que de figuras o cómics), animales/mascotas de colección, monedas, estampillas y cualquier otro objeto físico coleccionable, no solo juguetes o art toys. Responde false SOLO si la foto muestra claramente algo que no es un objeto físico de colección (una persona, un paisaje sin objeto identificable, un documento, una pantalla, etc.).
 - "containsIdentifiablePerson": true SOLO si se ve el rostro de una persona real y reconocible (una fotografía de un ser humano de carne y hueso). Una figura de acción, muñeco, busto, estatua o arte que representa un rostro humano NO cuenta como persona real: en esos casos responde false.
 - "moderationNote": si marcaste isLikelyCollectible en false o containsIdentifiablePerson en true, describe brevemente en español y de forma neutral qué se ve en la foto (para que un moderador humano lo entienda sin ver la imagen). Si no hay nada que señalar, deja este campo vacío.
+
+Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown, sin explicaciones antes o después) con los campos de arriba.`;
+
+// Usada por "¿Es Coleccionable?" (Home): identifica el objeto igual que
+// ANALYZE_PROMPT, pero además califica qué tan coleccionable es y pide el
+// precio ACTUAL de mercado por separado del precio de lanzamiento. A
+// diferencia de ANALYZE_PROMPT, aquí "purchasePrice" significa precio de
+// lanzamiento/original (lo que costó cuando salió nuevo), nunca el precio
+// actual de reventa — ese va en "currentMarket.averagePrice".
+const COLLECTIBILITY_PROMPT = `Eres un experto catalogador de coleccionables (juguetes, art toys, estatuas, cómics, libros, figuras de acción, esculturas, pinturas).
+
+Analiza las fotos adjuntas de un objeto coleccionable. Usa la búsqueda web para identificar el producto exacto (franquicia, línea, edición, fabricante, año, número de set) en vez de limitarte solo a lo que se ve en la imagen.
+
+Responde a cada uno de estos campos de identificación. Es preferible arriesgar una respuesta razonable (y que el usuario la corrija si hace falta) a dejar el campo vacío: solo omite un campo si de verdad no hay forma de estimarlo ni con la imagen ni con la búsqueda. Si no logras identificar el objeto con ninguna confianza razonable, deja "name" vacío/ausente y deja el resto de los campos de identificación y de mercado igualmente vacíos — no inventes una identificación.
+
+- "name": nombre del objeto tal como se vendería (marca + línea + personaje/modelo).
+- "category": EXACTAMENTE uno de estos valores (usa el código, no la etiqueta): LIBRO (Libro), COMIC (Cómic), ART_TOY (Art Toy), ESTATUA (Estatua), FIGURA_ACCION (Figura de acción), JUGUETE (Juguete), ESCULTURA (Escultura), PINTURA (Pintura), OTRO (Otro).
+- "packagingCondition": EXACTAMENTE uno de: SUELTO (sin caja/empaque), BLISTER_SELLADO (blister o caja sellada sin abrir), BLISTER_ABIERTO (blister o caja ya abierta), CON_CAJA_SIN_BLISTER (tiene caja pero no blister). Básate en lo que se ve en la foto.
+- "usageState": EXACTAMENTE uno de: NUEVO, USADO, ABIERTO. Básate en lo que se ve en la foto.
+- "conservationState": EXACTAMENTE uno de: MINT (perfecto estado), NEAR_MINT (casi perfecto, defectos mínimos), BUEN_ESTADO (uso visible pero cuidado), CON_DETALLES (daños o desgaste notorio). Evalúa el estado físico visible en la foto.
+- "brand": marca o fabricante (ej. Hasbro, Funko, McFarlane Toys, Marvel Comics).
+- "toyLine": línea de juguete, serie o modelo.
+- "edition": edición o variante (ej. "Edición limitada", "Exclusivo SDCC", "Chase").
+- "scale": escala o altura (ej. "1:6", "18cm", "1/10").
+- "designer": diseñador o artista, si el producto lo atribuye a alguien en particular.
+- "releaseYear": año de lanzamiento original, como número.
+- "originalSetNumber": número de set/modelo/SKU del fabricante impreso en la caja (no el código de barras EAN/UPC).
+- "purchasePrice": precio de LANZAMIENTO/ORIGINAL (lo que costaba nuevo cuando salió a la venta, NO el precio actual de reventa), como número EN PESOS MEXICANOS (MXN). Convierte a MXN si la fuente está en otra moneda. Este campo es distinto de "currentMarket.averagePrice" (ver abajo).
+- "collectorSummary": una sola frase en español (máximo 140 caracteres) con el dato más interesante que encontraste sobre este objeto.
+- Si la categoría es Cómic o Libro, además intenta: "comicCoverNumber", "comicIssueNumber", "comicWriter", "comicPenciler", "comicInker", "comicColorist", "comicPublisher".
+- "suggestedTags": array de tags cortos en español. SIEMPRE incluye al menos el color principal del objeto, y si reconoces la franquicia/personaje inclúyela también como tag.
+- "boundingBox": recuadro que encierra COMPLETO el objeto principal en la PRIMERA foto, como fracción del ancho/alto de esa imagen (0 a 1): {"xMin":, "yMin":, "xMax":, "yMax":}.
+
+Además, califica qué tan coleccionable es este objeto:
+- "collectibilityStars": número ENTERO de 0 a 5 (0 = nada coleccionable/sin valor de colección, 5 = extremadamente coleccionable/muy buscado), según rareza, demanda, tirada limitada, estado de descontinuación y relevancia cultural.
+- "collectibilityExplanation": párrafo en español explicando por qué le diste esa calificación y qué lo hace (o no) interesante para un coleccionista.
+
+Y busca el precio ACTUAL de mercado (reventa/coleccionismo, no el de lanzamiento):
+- "currentMarket": objeto con esta forma exacta: {"averagePrice": <número en MXN o null si no lo encuentras>, "currency": "MXN", "availability": "DISPONIBLE" | "AGOTADO" | "NO_EN_MERCADO", "purchaseLinks": [<URLs relevantes como strings, puede ser vacío>], "summary": "<resumen breve en español de 1-2 frases sobre el precio actual>", "collectorNotes": "<2-4 frases en español sobre rareza/tiraje/interés coleccionable>"}.
+
+Además, evalúa las fotos para moderación de contenido (esto es tan importante como los datos del objeto):
+- "isLikelyCollectible": true si las fotos muestran principalmente un objeto que alguien podría razonablemente coleccionar como hobby — esto INCLUYE plantas (bonsáis, cactus, suculentas, etc.), animales/mascotas de colección, monedas, estampillas y cualquier otro objeto físico coleccionable, no solo juguetes o art toys. Responde false SOLO si la foto muestra claramente algo que no es un objeto físico de colección (una persona, un paisaje sin objeto identificable, un documento, una pantalla, etc.).
+- "containsIdentifiablePerson": true SOLO si se ve el rostro de una persona real y reconocible (una fotografía de un ser humano de carne y hueso). Una figura de acción, muñeco, busto, estatua o arte que representa un rostro humano NO cuenta como persona real: en esos casos responde false.
+- "moderationNote": si marcaste isLikelyCollectible en false o containsIdentifiablePerson en true, describe brevemente en español y de forma neutral qué se ve en la foto. Si no hay nada que señalar, deja este campo vacío.
 
 Responde ÚNICAMENTE con un objeto JSON (sin texto adicional, sin markdown, sin explicaciones antes o después) con los campos de arriba.`;
 
@@ -223,6 +268,135 @@ export class GeminiService {
     if (xMin === undefined || yMin === undefined || xMax === undefined || yMax === undefined) return undefined;
     if (xMin >= xMax || yMin >= yMax) return undefined;
     return { xMin, yMin, xMax, yMax };
+  }
+
+  // "¿Es Coleccionable?" (Home, 5 FT): identificación + calificación 0-5 de
+  // qué tan coleccionable es + precio actual de mercado, en un solo llamado.
+  // Igual que analyzePhotos, no se puede combinar `responseSchema` con
+  // `googleSearch`, así que se parsea el JSON de forma tolerante.
+  async analyzeCollectibility(photos: ImageInput[]): Promise<GeminiCallResult<CollectibilityCheckResult>> {
+    const imageParts = photos.map((photo) => ({
+      inlineData: { data: photo.buffer.toString('base64'), mimeType: photo.mimetype },
+    }));
+
+    const response = await this.client.models.generateContent({
+      model: MODEL,
+      contents: [{ role: 'user', parts: [{ text: COLLECTIBILITY_PROMPT }, ...imageParts] }],
+      config: {
+        tools: [{ googleSearch: {} }],
+        safetySettings: SAFETY_SETTINGS,
+      },
+    });
+
+    const usage = this.extractUsage(response);
+    const moderation = this.extractModerationSignal(response);
+    const parsed = this.parseCollectibilityResponse(response.text ?? '');
+    moderation.isLikelyCollectible = parsed.isLikelyCollectible;
+    moderation.containsIdentifiablePerson = parsed.containsIdentifiablePerson;
+    moderation.moderationNote = parsed.moderationNote;
+    return { result: parsed.result, usage, moderation, boundingBox: parsed.boundingBox };
+  }
+
+  private parseCollectibilityResponse(text: string): {
+    result: CollectibilityCheckResult;
+    isLikelyCollectible: boolean | null;
+    containsIdentifiablePerson: boolean | null;
+    moderationNote: string | null;
+    boundingBox?: BoundingBox;
+  } {
+    const emptyMarket: MarketPriceResult = {
+      averagePrice: null,
+      currency: 'MXN',
+      availability: 'NO_EN_MERCADO',
+      purchaseLinks: [],
+      summary: '',
+      collectorNotes: '',
+    };
+    const empty = {
+      result: {
+        extracted: { suggestedTags: [] } as ExtractedItemData,
+        collectibilityStars: 0,
+        collectibilityExplanation: '',
+        currentMarket: emptyMarket,
+      },
+      isLikelyCollectible: null,
+      containsIdentifiablePerson: null,
+      moderationNote: null,
+    };
+    const start = text.indexOf('{');
+    const end = text.lastIndexOf('}');
+    if (start === -1 || end === -1 || end < start) return empty;
+
+    try {
+      const parsed = JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>;
+      const str = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : undefined);
+      const num = (value: unknown) => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
+      const year = num(parsed.releaseYear);
+      const summary = str(parsed.collectorSummary);
+      const tags = Array.isArray(parsed.suggestedTags)
+        ? parsed.suggestedTags.map(str).filter((tag): tag is string => !!tag)
+        : [];
+
+      const extracted: ExtractedItemData = {
+        name: str(parsed.name),
+        category: Object.values(ItemCategory).find((value) => value === parsed.category),
+        packagingCondition: Object.values(PackagingCondition).find((value) => value === parsed.packagingCondition),
+        usageState: Object.values(UsageState).find((value) => value === parsed.usageState),
+        conservationState: Object.values(ConservationState).find((value) => value === parsed.conservationState),
+        brand: str(parsed.brand),
+        toyLine: str(parsed.toyLine),
+        edition: str(parsed.edition),
+        scale: str(parsed.scale),
+        designer: str(parsed.designer),
+        releaseYear: year && year > 1800 && year < 2200 ? Math.trunc(year) : undefined,
+        originalSetNumber: str(parsed.originalSetNumber),
+        purchasePrice: num(parsed.purchasePrice),
+        collectorSummary: summary ? summary.slice(0, 140) : undefined,
+        comicCoverNumber: str(parsed.comicCoverNumber),
+        comicIssueNumber: str(parsed.comicIssueNumber),
+        comicWriter: str(parsed.comicWriter),
+        comicPenciler: str(parsed.comicPenciler),
+        comicInker: str(parsed.comicInker),
+        comicColorist: str(parsed.comicColorist),
+        comicPublisher: str(parsed.comicPublisher),
+        suggestedTags: tags,
+      };
+
+      const marketRaw = parsed.currentMarket && typeof parsed.currentMarket === 'object'
+        ? (parsed.currentMarket as Record<string, unknown>)
+        : {};
+      const currentMarket: MarketPriceResult = {
+        averagePrice: typeof marketRaw.averagePrice === 'number' ? marketRaw.averagePrice : null,
+        currency: str(marketRaw.currency) ?? 'MXN',
+        availability:
+          marketRaw.availability === 'DISPONIBLE' || marketRaw.availability === 'AGOTADO' || marketRaw.availability === 'NO_EN_MERCADO'
+            ? marketRaw.availability
+            : 'NO_EN_MERCADO',
+        purchaseLinks: Array.isArray(marketRaw.purchaseLinks) ? marketRaw.purchaseLinks.filter((l): l is string => typeof l === 'string') : [],
+        summary: str(marketRaw.summary) ?? '',
+        collectorNotes: str(marketRaw.collectorNotes) ?? '',
+      };
+
+      const starsRaw = num(parsed.collectibilityStars);
+      const collectibilityStars = starsRaw === undefined ? 0 : Math.min(5, Math.max(0, Math.round(starsRaw)));
+
+      return {
+        result: {
+          extracted,
+          collectibilityStars,
+          collectibilityExplanation: str(parsed.collectibilityExplanation) ?? '',
+          currentMarket,
+        },
+        isLikelyCollectible: typeof parsed.isLikelyCollectible === 'boolean' ? parsed.isLikelyCollectible : null,
+        containsIdentifiablePerson:
+          typeof parsed.containsIdentifiablePerson === 'boolean' ? parsed.containsIdentifiablePerson : null,
+        moderationNote: str(parsed.moderationNote) ?? null,
+        boundingBox: this.parseBoundingBox(parsed.boundingBox),
+      };
+    } catch (error) {
+      this.logger.error(`No se pudo parsear la respuesta de "¿Es Coleccionable?": ${text}`, error);
+      return empty;
+    }
   }
 
   // Compara visualmente la foto del objeto a identificar contra hasta 3

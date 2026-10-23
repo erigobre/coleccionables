@@ -350,6 +350,16 @@ export default function CollectionDetailScreen() {
           <Ionicons name="people" size={22} color={colors.text} />
         </Pressable>
       ) : null}
+      {!collection.isSystem ? (
+        <Pressable
+          onPress={() => router.push(`/(tabs)/colecciones/${collection.id}/objetos`)}
+          accessibilityLabel="Agregar o quitar objetos"
+          className="absolute h-14 w-14 items-center justify-center rounded-full bg-surfaceElevated shadow-lg"
+          style={{ right: 20, bottom: insets.bottom + 300 }}
+        >
+          <Ionicons name="albums-outline" size={22} color={colors.text} />
+        </Pressable>
+      ) : null}
       {longPressedItem ? (
         <ActiveItemQuickActions
           item={longPressedItem}

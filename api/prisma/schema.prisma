@@ -329,6 +329,7 @@ enum FtServiceKey {
   BARCODE_LOOKUP // Lectura de código de barras (con búsqueda web)
   MARKET_PRICE_FRESH // Precio de mercado, consulta nueva a Gemini (con búsqueda web)
   MARKET_PRICE_CACHED // Precio de mercado, reutilizando el último resultado guardado
+  COLLECTIBILITY_CHECK // "¿Es Coleccionable?": identificación + rating + precios (con búsqueda web)
 }
 
 model FtServiceConfig {

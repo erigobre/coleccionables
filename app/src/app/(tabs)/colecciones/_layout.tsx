@@ -22,6 +22,7 @@ export default function ColeccionesStackLayout() {
       <Stack.Screen name="[id]/temporadas" options={{ title: 'Temporadas', presentation: 'modal' }} />
       <Stack.Screen name="[id]/temporada-checklist" options={{ title: 'Checklist de temporada' }} />
       <Stack.Screen name="[id]/miembros" options={{ title: 'Miembros' }} />
+      <Stack.Screen name="[id]/objetos" options={{ title: 'Agregar o quitar objetos', presentation: 'modal' }} />
       <Stack.Screen name="invitacion" options={{ title: 'Invitación', presentation: 'modal' }} />
     </Stack>
   );

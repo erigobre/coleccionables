@@ -13,6 +13,7 @@ import { LookupBarcodeDto } from './dto/lookup-barcode.dto.js';
 import { LookupMarketPriceDto } from './dto/lookup-market-price.dto.js';
 import { AnalyzePhotosDto } from './dto/analyze-photos.dto.js';
 import { ModerationAppealDto } from './dto/moderation-appeal.dto.js';
+import type { MarketPriceResult } from '../ai/ai.types.js';
 
 @Controller('items')
 @UseGuards(JwtAuthGuard)
@@ -68,6 +69,22 @@ export class ItemsController {
       mimetype: photo.mimeType ?? 'image/jpeg',
     }));
     return this.itemsService.identify(user.id, user.organizationId, photos, idempotencyKey);
+  }
+
+  // "¿Es Coleccionable?" (Home): identifica el objeto y lo califica 0-5
+  // estrellas + precio de lanzamiento + precio actual de mercado. Cobra FT
+  // (COLLECTIBILITY_CHECK); requiere Idempotency-Key.
+  @Post('collectibility-check')
+  checkCollectibility(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: AnalyzePhotosDto,
+    @IdempotencyKey() idempotencyKey: string,
+  ) {
+    const photos = dto.photos.map((photo) => ({
+      buffer: Buffer.from(photo.imageBase64, 'base64'),
+      mimetype: photo.mimeType ?? 'image/jpeg',
+    }));
+    return this.itemsService.checkCollectibility(user.id, user.organizationId, photos, idempotencyKey);
   }
 
   // Busca el producto por código de barras (EAN/UPC) leído con la cámara.
@@ -154,6 +171,18 @@ export class ItemsController {
     @IdempotencyKey() idempotencyKey: string,
   ) {
     return this.itemsService.lookupMarketPrice(user.id, user.organizationId, id, dto.mode, idempotencyKey);
+  }
+
+  // Adjunta el precio de mercado ya obtenido por "¿Es Coleccionable?" al
+  // objeto recién creado, sin cobrar FT de nuevo (ya se pagó con
+  // COLLECTIBILITY_CHECK).
+  @Post(':id/market-price/attach')
+  attachMarketPrice(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body('market') market: MarketPriceResult,
+  ) {
+    return this.itemsService.attachMarketPrice(user.id, id, market);
   }
 
   @Patch(':id/location')

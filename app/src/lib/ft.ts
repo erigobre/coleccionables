@@ -8,7 +8,8 @@ export type FtServiceKey =
   | 'SCAN_HAVE_IT'
   | 'BARCODE_LOOKUP'
   | 'MARKET_PRICE_FRESH'
-  | 'MARKET_PRICE_CACHED';
+  | 'MARKET_PRICE_CACHED'
+  | 'COLLECTIBILITY_CHECK';
 
 export interface FtServiceConfig {
   key: FtServiceKey;

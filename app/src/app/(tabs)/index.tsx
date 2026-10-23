@@ -61,6 +61,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scanCost = costOf('SCAN_HAVE_IT');
+  const collectibilityCost = costOf('COLLECTIBILITY_CHECK');
 
   const [items, setItems] = useState<Item[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,6 +176,30 @@ export default function HomeScreen() {
                 </View>
                 <Ionicons name="camera" size={32} color={colors.white} />
               </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/es-coleccionable')}
+                className="mt-4 flex-row items-center rounded-xl bg-primary p-5 active:bg-primaryHover"
+              >
+                <View className="flex-1 pr-3">
+                  <View className="flex-row flex-wrap items-center gap-1.5">
+                    <Text className="font-display text-xl uppercase tracking-wide text-primaryText">¿Es Coleccionable?</Text>
+                    {collectibilityCost != null ? (
+                      <View className="flex-row items-center gap-1">
+                        <FtCoin size={12} />
+                        <Text className="text-sm text-primaryText">
+                          {collectibilityCost}
+                          <Text style={{ fontSize: 9 }}>FT</Text>
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text className="mt-1 text-sm text-primaryText/80">
+                    Fotografía cualquier objeto y descubre qué tan coleccionable es y cuánto vale hoy.
+                  </Text>
+                </View>
+                <Ionicons name="sparkles" size={32} color={colors.primaryText} />
+              </Pressable>
             </>
           ) : (
             <>
@@ -200,6 +225,30 @@ export default function HomeScreen() {
                   </Text>
                 </View>
                 <Ionicons name="camera" size={32} color={colors.white} />
+              </Pressable>
+
+              <Pressable
+                onPress={() => router.push('/es-coleccionable')}
+                className="mt-4 flex-row items-center rounded-xl bg-primary p-5 active:bg-primaryHover"
+              >
+                <View className="flex-1 pr-3">
+                  <View className="flex-row flex-wrap items-center gap-1.5">
+                    <Text className="font-display text-xl uppercase tracking-wide text-primaryText">¿Es Coleccionable?</Text>
+                    {collectibilityCost != null ? (
+                      <View className="flex-row items-center gap-1">
+                        <FtCoin size={12} />
+                        <Text className="text-sm text-primaryText">
+                          {collectibilityCost}
+                          <Text style={{ fontSize: 9 }}>FT</Text>
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text className="mt-1 text-sm text-primaryText/80">
+                    Fotografía cualquier objeto y descubre qué tan coleccionable es y cuánto vale hoy.
+                  </Text>
+                </View>
+                <Ionicons name="sparkles" size={32} color={colors.primaryText} />
               </Pressable>
 
               <View className="mt-8">

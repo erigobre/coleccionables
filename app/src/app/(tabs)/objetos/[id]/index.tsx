@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, Share, Text, useWindowDimensions, View } from 'react-native';
@@ -10,6 +11,7 @@ import { ApiError, resolvePhotoUrl } from '../../../../lib/api';
 import { authErrorMessage, useAuth } from '../../../../context/auth-context';
 import { useFt } from '../../../../context/ft-context';
 import { fetchActiveCollections, type Collection } from '../../../../lib/collections';
+import { collectionIconName } from '../../../../lib/collection-icons';
 import { buildCloneDraft, setItemDraft } from '../../../../lib/item-draft';
 import { conservationLabel, packagingLabel, usageLabel } from '../../../../lib/item-enums';
 import {
@@ -445,20 +447,57 @@ export default function ItemDetailScreen() {
         </View>
 
         <Text className="mb-2 text-sm font-semibold text-text">Colecciones</Text>
-        <View className="mb-5 flex-row flex-wrap gap-2">
-          {collections.map((collection) => {
-            const isLinked = item.collections.some((c) => c.collectionId === collection.id);
-            return (
-              <Pressable
-                key={collection.id}
-                onPress={() => onToggleCollection(collection.id)}
-                disabled={!editable || collection.isSystem}
-                className={`rounded-full border px-3 py-2 ${isLinked ? 'border-primary bg-surfaceElevated' : 'border-border bg-surfaceElevated'}`}
-              >
-                <Text className={`text-sm ${isLinked ? 'text-primary' : 'text-textMuted'}`}>{collection.name}</Text>
-              </Pressable>
-            );
-          })}
+        <View className="relative mb-5">
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 24 }}>
+            {collections.map((collection) => {
+              const isLinked = item.collections.some((c) => c.collectionId === collection.id);
+              const isShared = (collection.members?.length ?? 0) >= 2;
+              return (
+                <Pressable
+                  key={collection.id}
+                  onPress={() => onToggleCollection(collection.id)}
+                  disabled={!editable || collection.isSystem}
+                  style={{ width: 72 }}
+                  className="items-center"
+                >
+                  <View
+                    className={`h-14 w-14 items-center justify-center rounded-2xl ${
+                      isLinked ? 'bg-primary' : 'bg-surfaceElevated'
+                    }`}
+                  >
+                    <Ionicons
+                      name={collectionIconName(collection.icon)}
+                      size={24}
+                      color={isLinked ? colors.primaryText : colors.textMuted}
+                    />
+                    {isLinked ? (
+                      <View className="absolute -right-1 -top-1 rounded-full bg-surface">
+                        <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
+                      </View>
+                    ) : null}
+                    {isShared ? (
+                      <View className="absolute -bottom-1 -left-1 h-5 w-5 items-center justify-center rounded-full bg-secondary">
+                        <Ionicons name="people" size={11} color={colors.white} />
+                      </View>
+                    ) : null}
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    className={`mt-1 w-full text-center text-[11px] ${isLinked ? 'text-primary' : 'text-textMuted'}`}
+                  >
+                    {collection.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+          <LinearGradient
+            colors={[`${colors.background}00`, colors.background]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            pointerEvents="none"
+            style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 32 }}
+          />
         </View>
 
         <Text className="mb-2 text-sm font-semibold text-text">Tags</Text>
@@ -525,7 +564,7 @@ export default function ItemDetailScreen() {
 
               <View className="mt-4">
                 <Button
-                  label="Actualizar precio"
+                  label="Buscar precio actual"
                   ftCost={marketPeek?.fresh.ftCost}
                   variant="ghost"
                   onPress={() => onLookupMarketPrice('fresh')}
@@ -556,7 +595,7 @@ export default function ItemDetailScreen() {
                 </Text>
               )}
               <Button
-                label="Actualizar precio"
+                label="Buscar precio actual"
                 ftCost={marketPeek.fresh.ftCost}
                 variant={marketPeek.cached ? 'ghost' : 'secondary'}
                 onPress={() => onLookupMarketPrice('fresh')}

@@ -216,6 +216,17 @@ function RootNavigator({ fontsLoaded }: { fontsLoaded: boolean }) {
             headerLeft: () => <CloseHeaderButton />,
           }}
         />
+        <Stack.Screen
+          name="es-coleccionable"
+          options={{
+            presentation: 'fullScreenModal',
+            headerShown: true,
+            headerTransparent: true,
+            headerTintColor: colors.white,
+            headerTitle: '',
+            headerLeft: () => <CloseHeaderButton />,
+          }}
+        />
         {/* El formulario de alta también vive fuera de los tabs: llega siempre
             por un replace desde captura/ya-lo-tengo, así que al ser hermano de
             (tabs) en este mismo stack conserva el historial de vuelta (el

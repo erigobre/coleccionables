@@ -1,5 +1,5 @@
 import { itemFormFromItem, type ItemFormValues } from './item-form';
-import type { Item } from './items';
+import type { Item, MarketPriceResult } from './items';
 
 // Borrador que la pantalla de captura le deja a "Nuevo objeto". Se usa un módulo
 // en vez de params de ruta porque las rutas solo llevan strings y aquí viajan
@@ -30,6 +30,10 @@ export interface ItemDraft {
   // la captura por IA/código de barras nunca los trae, por eso no estaban antes.
   locationId?: string | null;
   collectionIds?: string[];
+  // Si el draft viene de "¿Es Coleccionable?" → "Agregar objeto": precio
+  // actual de mercado a adjuntar al objeto justo después de crearlo (ver
+  // new.tsx), sin cobrar FT de nuevo.
+  pendingMarketPrice?: MarketPriceResult;
 }
 
 let current: ItemDraft | null = null;

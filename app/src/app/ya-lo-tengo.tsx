@@ -304,7 +304,7 @@ export default function YaLoTengoScreen() {
         <View className="gap-3 px-5" style={{ paddingBottom: insets.bottom + 20, paddingTop: 16 }}>
           {error ? <Text className="text-center text-sm text-danger">{error}</Text> : null}
           <Button
-            label="Rastrear"
+            label="Buscar"
             ftCost={costOf('SCAN_HAVE_IT')}
             onPress={onSearch}
             loading={busy === 'buscar'}

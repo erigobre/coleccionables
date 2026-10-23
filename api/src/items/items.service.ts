@@ -562,6 +562,45 @@ export class ItemsService {
     );
   }
 
+  // "¿Es Coleccionable?" (Home, plan nuevo): identifica el objeto y lo
+  // califica de 0-5 estrellas + precio de lanzamiento + precio actual de
+  // mercado. A diferencia de `identify()`, NO compara contra la colección del
+  // usuario (no hay detección de duplicados, es investigación de mercado) ni
+  // guarda ninguna foto. Cobra FT (COLLECTIBILITY_CHECK).
+  async checkCollectibility(ownerId: string, organizationId: string, files: ImageInput[], idempotencyKey: string) {
+    this.assertHasPhotos(files);
+    return this.ftService.runChargedAction(
+      { organizationId, userId: ownerId, service: 'COLLECTIBILITY_CHECK', idempotencyKey },
+      async () => {
+        const { result, usage, moderation } = await this.geminiService.analyzeCollectibility(files);
+        await this.blockIfUnsafe(organizationId, ownerId, 'checkCollectibility', moderation);
+        if (moderation?.containsIdentifiablePerson === true || moderation?.isLikelyCollectible === false) {
+          await this.prisma.moderationFlag.create({
+            data: {
+              organizationId,
+              userId: ownerId,
+              context: 'checkCollectibility',
+              category: moderation.containsIdentifiablePerson ? 'possible_person' : 'not_collectible',
+              detail: moderation.moderationNote,
+              action: 'FLAGGED_FOR_REVIEW',
+            },
+          });
+        }
+
+        return {
+          data: result,
+          realCostUsd: GeminiService.estimateCostUsd(usage),
+          promptTokens: usage.promptTokens,
+          candidatesTokens: usage.candidatesTokens,
+          totalTokens: usage.totalTokens,
+          groundingRequests: usage.groundingQueries,
+          modelVersion: usage.modelVersion,
+          usageEventType: 'AI_SCAN' as const,
+        };
+      },
+    );
+  }
+
   // Etapa 2 del re-ranking "¿Ya lo tengo?" (etapa 1 = puntaje por texto, sin
   // tocar — ver similarity.ts): compara la foto de consulta contra los
   // avatares de los top-3 candidatos por texto. Solo se confirma un match si
@@ -771,6 +810,30 @@ export class ItemsService {
         };
       },
     );
+  }
+
+  // Adjunta el precio actual de mercado ya obtenido por "¿Es Coleccionable?"
+  // a un objeto recién creado, exactamente como si se hubiera presionado
+  // "Buscar precio actual" (crea un MarketPriceCheck) pero SIN cobrar FT de
+  // nuevo — ya se pagó una sola vez con COLLECTIBILITY_CHECK.
+  async attachMarketPrice(actingUserId: string, id: string, market: MarketPriceResult) {
+    await this.resolveItemAccess(actingUserId, id);
+    const fetchedAt = new Date();
+    await this.prisma.item.update({
+      where: { id },
+      data: {
+        lastMarketPriceResult: market as unknown as Prisma.InputJsonValue,
+        lastMarketPriceAt: fetchedAt,
+      },
+    });
+    await this.prisma.marketPriceCheck.create({
+      data: {
+        itemId: id,
+        result: market as unknown as Prisma.InputJsonValue,
+        fromCache: false,
+        ftCost: 0,
+      },
+    });
   }
 
   // Botón "Analizar" del flujo de alta (plan §5.3.6-9): sube las fotos ya

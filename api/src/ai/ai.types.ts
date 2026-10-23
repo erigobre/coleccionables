@@ -113,3 +113,14 @@ export interface BarcodeLookupResult {
   found: boolean;
   extracted: ExtractedItemData;
 }
+
+// Resultado de "¿Es Coleccionable?" (Home): identificación + calificación de
+// qué tan coleccionable es + precios. A diferencia de analyzePhotos, aquí
+// `extracted.purchasePrice` significa precio de lanzamiento/original, no el
+// precio pagado por el usuario (no existe compra todavía en este flujo).
+export interface CollectibilityCheckResult {
+  extracted: ExtractedItemData;
+  collectibilityStars: number; // 0-5
+  collectibilityExplanation: string;
+  currentMarket: MarketPriceResult;
+}
