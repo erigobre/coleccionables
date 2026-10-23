@@ -272,6 +272,7 @@ export default function EsColeccionableScreen() {
           done={analyzing.done}
           onHidden={analyzing.onHidden}
           steps={SEARCH_STEPS}
+          hasWebSearch
         />
         <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>

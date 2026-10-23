@@ -235,6 +235,7 @@ export default function CapturaScreen() {
           done={analyzing.done}
           onHidden={analyzing.onHidden}
           steps={ANALYZE_STEPS}
+          hasWebSearch
         />
         <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>

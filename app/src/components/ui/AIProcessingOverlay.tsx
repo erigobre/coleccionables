@@ -17,6 +17,16 @@ const FINAL_TEXT = '¡Proceso finalizado!';
 const HOLD_BEFORE_EXIT_MS = 700;
 const OUTRO_DURATION_MS = 420;
 
+// Morado exacto de android-icon-background.png (muestreado del PNG, no es
+// colors.secondary — son parecidos pero no idénticos, y esta capa tiene que
+// calzar sin costura con android-icon-foreground.png).
+const ICON_PURPLE = '#7849FF';
+const ICON_PURPLE_DIM = 'rgba(120, 73, 255, 0.22)';
+// Línea de agua: morado claro (no verde, no el mismo morado del relleno —
+// si no, no se distinguiría el borde contra el relleno ya lleno).
+const WATER_LINE_COLOR = '#C3B2FF';
+const WEB_SEARCH_NOTE = 'Este proceso realiza una búsqueda en todo internet así que puede tardar un poco';
+
 // Relleno falso tipo "barra de carga psicológica": avanza rápido al inicio y
 // se va frenando sin llegar nunca al 100% hasta que `done` sea true de
 // verdad — así el logo siempre parece estar progresando, nunca "atorado", y
@@ -36,13 +46,17 @@ interface AIProcessingOverlayProps {
   // Al pasar a true, se fuerza el texto final y arranca el fade-out invertido.
   done: boolean;
   onHidden: () => void;
+  // true si el proceso real en el backend hace una búsqueda en internet (hoy
+  // todas las llamadas de IA de la app la hacen, vía googleSearch/web_search)
+  // — muestra una nota aparte explicando por qué puede tardar más de lo usual.
+  hasWebSearch?: boolean;
 }
 
 // Overlay de "consultando IA" (¿Ya lo tengo?/Analizar/Obtener precio): fondo
 // con blur+oscurecido, partículas sutiles de fondo (mismas que la bienvenida,
 // a menor intensidad) y el logo rellenándose de abajo hacia arriba como agua
 // mientras dura la consulta.
-export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProcessingOverlayProps) {
+export function AIProcessingOverlay({ visible, steps, done, onHidden, hasWebSearch }: AIProcessingOverlayProps) {
   const intro = useSharedValue(0);
   const outro = useSharedValue(0);
   const textOpacity = useSharedValue(0);
@@ -167,21 +181,26 @@ export function AIProcessingOverlay({ visible, steps, done, onHidden }: AIProces
       <View className="flex-1 items-center justify-center px-10">
         <Animated.View style={logoWrapStyle}>
           <View style={{ width: LOGO_SIZE, height: LOGO_SIZE, borderRadius: 24, overflow: 'hidden' }}>
-            <Image
-              source={require('../../../assets/icon.png')}
-              style={{ width: LOGO_SIZE, height: LOGO_SIZE, opacity: 0.22 }}
-            />
+            {/* Solo el morado de fondo se "llena"; el marco+F+estrella van en
+                una capa aparte, siempre visibles al 100%, nunca se atenúan. */}
+            <View style={{ width: LOGO_SIZE, height: LOGO_SIZE, backgroundColor: ICON_PURPLE_DIM }} />
             <Animated.View style={[styles.fillMask, fillMaskStyle]}>
-              <Image
-                source={require('../../../assets/icon.png')}
-                style={{ width: LOGO_SIZE, height: LOGO_SIZE, position: 'absolute', bottom: 0, left: 0 }}
-              />
+              <View style={{ width: LOGO_SIZE, height: LOGO_SIZE, backgroundColor: ICON_PURPLE }} />
             </Animated.View>
             <Animated.View style={[styles.waterLine, waterLineStyle]} />
+            <Image
+              source={require('../../../assets/android-icon-foreground.png')}
+              style={{ width: LOGO_SIZE, height: LOGO_SIZE, position: 'absolute', top: 0, left: 0 }}
+            />
           </View>
         </Animated.View>
         <Animated.View style={[textStyle, { marginTop: 24 }]}>
           <Text className="text-center text-sm text-textSecondary">{currentText}</Text>
+          {hasWebSearch ? (
+            <Text className="mt-2 text-center text-xs" style={{ color: colors.primary }}>
+              {WEB_SEARCH_NOTE}
+            </Text>
+          ) : null}
         </Animated.View>
       </View>
     </View>
@@ -200,9 +219,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    height: 3,
-    backgroundColor: colors.primary,
-    shadowColor: colors.primary,
+    height: 1.5,
+    backgroundColor: WATER_LINE_COLOR,
+    shadowColor: WATER_LINE_COLOR,
     shadowOpacity: 0.8,
     shadowRadius: 6,
   },

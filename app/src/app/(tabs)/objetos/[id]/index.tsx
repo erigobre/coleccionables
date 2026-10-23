@@ -759,6 +759,7 @@ export default function ItemDetailScreen() {
         done={marketPriceProcessing.done}
         onHidden={marketPriceProcessing.onHidden}
         steps={MARKET_PRICE_STEPS}
+        hasWebSearch
       />
       <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       {accessToken ? (

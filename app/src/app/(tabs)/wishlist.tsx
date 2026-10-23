@@ -391,7 +391,13 @@ function AddModal({
           <Button label="Autollenar datos" ftCost={costOf('SCAN_HAVE_IT')} onPress={onAutofill} loading={busy === 'autofill'} />
           <Button label="Llenado manual" variant="secondary" onPress={() => setStep('form')} disabled={busy !== null} />
         </View>
-        <AIProcessingOverlay visible={searching.visible} done={searching.done} onHidden={searching.onHidden} steps={AUTOFILL_STEPS} />
+        <AIProcessingOverlay
+          visible={searching.visible}
+          done={searching.done}
+          onHidden={searching.onHidden}
+          steps={AUTOFILL_STEPS}
+          hasWebSearch
+        />
         <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>
     );

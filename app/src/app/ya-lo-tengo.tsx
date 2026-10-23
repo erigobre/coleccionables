@@ -321,6 +321,7 @@ export default function YaLoTengoScreen() {
           done={searching.done}
           onHidden={searching.onHidden}
           steps={SEARCH_STEPS}
+          hasWebSearch
         />
         <NoFtModal visible={noFtVisible} onClose={() => setNoFtVisible(false)} />
       </View>
