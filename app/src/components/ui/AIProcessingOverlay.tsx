@@ -34,8 +34,13 @@ const WEB_SEARCH_NOTE = 'Este proceso realiza una búsqueda en todo internet as�
 // mucho, de pocos segundos a más de un minuto).
 const FILL_CAP = 0.93;
 const FILL_TICK_MS = 150;
-const FILL_EASE_FACTOR = 0.05;
-const LONG_WAIT_MS = 15000;
+// La mitad de FILL_EASE_FACTOR ≈ el doble de lento en tiempo real, tanto en
+// el tramo rápido inicial como en la desaceleración (es una curva
+// exponencial: medio avance por segundo se reduce a la mitad al reducir el
+// factor a la mitad). Antes llegaba a ~90% del tope en ~7s; ahora en ~14s —
+// acorde a que casi ningún proceso real tarda menos de 30s.
+const FILL_EASE_FACTOR = 0.025;
+const LONG_WAIT_MS = 30000;
 const LONG_WAIT_TEXT = 'Esto está tardando más de lo usual, pero seguimos trabajando...';
 
 interface AIProcessingOverlayProps {
