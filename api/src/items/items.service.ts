@@ -5,6 +5,7 @@ import { CollectionsService } from '../collections/collections.service.js';
 import { LocationsService } from '../locations/locations.service.js';
 import { StorageService } from '../storage/storage.service.js';
 import { GeminiService } from '../ai/gemini.service.js';
+import { OpenAiService } from '../ai/openai.service.js';
 import { FtService } from '../ft/ft.service.js';
 import type { GeminiUsage, ImageInput, MarketPriceResult, ModerationSignal } from '../ai/ai.types.js';
 import type { CreateItemDto } from './dto/create-item.dto.js';
@@ -46,6 +47,7 @@ export class ItemsService {
     private readonly locationsService: LocationsService,
     private readonly storageService: StorageService,
     private readonly geminiService: GeminiService,
+    private readonly openAiService: OpenAiService,
     private readonly ftService: FtService,
   ) {}
 
@@ -572,7 +574,7 @@ export class ItemsService {
     return this.ftService.runChargedAction(
       { organizationId, userId: ownerId, service: 'COLLECTIBILITY_CHECK', idempotencyKey },
       async () => {
-        const { result, usage, moderation } = await this.geminiService.analyzeCollectibility(files);
+        const { result, usage, moderation } = await this.openAiService.analyzeCollectibility(files);
         await this.blockIfUnsafe(organizationId, ownerId, 'checkCollectibility', moderation);
         if (moderation?.containsIdentifiablePerson === true || moderation?.isLikelyCollectible === false) {
           await this.prisma.moderationFlag.create({
@@ -589,7 +591,7 @@ export class ItemsService {
 
         return {
           data: result,
-          realCostUsd: GeminiService.estimateCostUsd(usage),
+          realCostUsd: OpenAiService.estimateCostUsd(usage),
           promptTokens: usage.promptTokens,
           candidatesTokens: usage.candidatesTokens,
           totalTokens: usage.totalTokens,
@@ -770,7 +772,7 @@ export class ItemsService {
     return this.ftService.runChargedAction(
       { organizationId, userId: actingUserId, service: 'MARKET_PRICE_FRESH', idempotencyKey, metadata: { itemId: id } },
       async () => {
-        const { result: marketPrice, usage } = await this.geminiService.lookupMarketPrice(
+        const { result: marketPrice, usage } = await this.openAiService.lookupMarketPrice(
           description,
           item.currency,
           knownFields,
@@ -799,7 +801,7 @@ export class ItemsService {
             fetchedAt,
             fromCache: false,
           },
-          realCostUsd: GeminiService.estimateCostUsd(usage),
+          realCostUsd: OpenAiService.estimateCostUsd(usage),
           promptTokens: usage.promptTokens,
           candidatesTokens: usage.candidatesTokens,
           totalTokens: usage.totalTokens,
